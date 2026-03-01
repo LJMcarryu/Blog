@@ -1,7 +1,7 @@
 # 项目分析报告：My Blog
 
 > 生成日期：2026-03-01
-> 第六轮更新：2026-03-01（第二梯队功能实现）
+> 第七轮更新：2026-03-02（第三梯队功能实现）
 > 分析范围：全部源代码文件、配置文件、样式文件、i18n 文件、MDX 内容
 
 ---
@@ -15,26 +15,28 @@
 5. [第四轮复查](#5-第四轮复查)
 6. [第五轮：第一梯队功能实现](#6-第五轮第一梯队功能实现)
 7. [第六轮：第二梯队功能实现](#7-第六轮第二梯队功能实现)
-8. [新增文件说明](#8-新增文件说明)
-9. [架构改进](#9-架构改进)
-10. [全面审计通过项](#10-全面审计通过项)
-11. [遗留事项](#11-遗留事项)
+8. [第七轮：第三梯队功能实现](#8-第七轮第三梯队功能实现)
+9. [新增文件说明](#9-新增文件说明)
+10. [架构改进](#10-架构改进)
+11. [全面审计通过项](#11-全面审计通过项)
+12. [遗留事项](#12-遗留事项)
 
 ---
 
 ## 1. 总览评分
 
-| 维度           | 初始 | 第一轮 | 第二轮 | 第三轮 | 第五轮 | 说明 |
-|----------------|------|--------|--------|--------|--------|------|
-| 代码质量       | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | try-catch、类型安全、ESLint 零警告 |
-| 功能完整性     | ⭐⭐⭐  | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 代码高亮、RSS、阅读时间、移动导航 |
-| SEO            | ⭐⭐   | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | RSS feed + favicon 补全 |
-| 无障碍访问     | ⭐⭐⭐  | ⭐���⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 移动端汉堡菜单 aria 完整 |
-| 性能           | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 代码高亮在构建时完成（SSR） |
-| 可维护性       | ⭐⭐⭐  | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 阅读时间独立模块、数据文件完善 |
-| 国际化         | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | 阅读时间支持中英文 |
-| 内容完整性     | ⭐    | ⭐     | ⭐     | ⭐     | ⭐⭐⭐⭐⭐ | 4 篇博客、占位数据全部填充 |
-| 移动端体验     | ⭐⭐   | ⭐⭐    | ⭐⭐    | ⭐⭐    | ⭐⭐⭐⭐⭐ | 响应式汉堡菜单 |
+| 维度 | 初始 | 第一轮 | 第二轮 | 第三轮 | 第五轮 | 第七轮 | 说明 |
+|------|------|--------|--------|--------|--------|--------|------|
+| 代码质量 | 4 | 5 | 5 | 5 | 5 | 5 | 新增 17 项单元测试全部通过 |
+| 功能完整性 | 3 | 4 | 4 | 4 | 5 | 5 | OG 图片、分页、分析组件 |
+| SEO | 2 | 5 | 5 | 5 | 5 | 5 | OG 图片 + JSON-LD 结构化数据 |
+| 无障碍访问 | 3 | 4 | 5 | 5 | 5 | 5 | 分页组件含 aria-current |
+| 性能 | 4 | 4 | 4 | 5 | 5 | 5 | 分页减少首屏渲染量 |
+| 可维护性 | 3 | 5 | 5 | 5 | 5 | 5 | Vitest 测试覆盖核心模块 |
+| 国际化 | 4 | 4 | 5 | 5 | 5 | 5 | OG 图片 + 分页支持中英文 |
+| 内容完整性 | 1 | 1 | 1 | 1 | 5 | 5 | — |
+| 移动端体验 | 2 | 2 | 2 | 2 | 5 | 5 | — |
+| 测试覆盖 | — | — | — | — | — | 4 | 17 项核心库函数测试 |
 
 ---
 
@@ -325,7 +327,67 @@
 
 ---
 
-## 8. 新增文件说明
+## 8. 第七轮：第三梯队功能实现（5 项 ✅）
+
+### 8.1 OG 图片生成
+
+**文件:** `app/og/route.tsx`（新建）, `app/[locale]/blog/[slug]/page.tsx`
+
+**实现:**
+- Edge Runtime 路由处理器，接受 `?title=...&locale=zh` 查询参数
+- 使用 `next/og` 的 `ImageResponse` 生成 1200×630 PNG
+- 深黑背景 (#050505)，白色标题居中，半透明副标题
+- 博客文章 `generateMetadata` 中自动设置 `openGraph.images`
+- 支持中英文副标题（"Jimmy 的个人博客" / "Jimmy's Blog"）
+
+### 8.2 JSON-LD 结构化数据
+
+**文件:** `app/[locale]/blog/[slug]/page.tsx`, `app/[locale]/layout.tsx`
+
+**实现:**
+- 博客文章页注入 `Article` schema（headline、datePublished、author、description、url、image）
+- 根布局注入 `WebSite` schema（name、url、inLanguage）
+- 使用 `<script type="application/ld+json">` + `JSON.stringify()`
+- 无新依赖
+
+### 8.3 网站分析（Umami）
+
+**文件:** `components/Analytics.tsx`（新建）, `app/[locale]/layout.tsx`, `.env.example`
+
+**实现:**
+- 客户端组件，渲染 Umami `<script defer>` 标签
+- 仅当 `NEXT_PUBLIC_UMAMI_WEBSITE_ID` 和 `NEXT_PUBLIC_UMAMI_URL` 都设置时才渲染
+- 环境变量未设置时优雅降级为空（不输出任何 DOM）
+- Umami 无 cookie、GDPR 合规，无需同意横幅
+- `.env.example` 已更新
+
+### 8.4 博客分页
+
+**文件:** `components/Pagination.tsx`（新建）, `app/[locale]/blog/page.tsx`, `app/globals.css`
+
+**实现:**
+- `POSTS_PER_PAGE = 10` 常量
+- URL 参数 `?page=1`，与 `?q=` 和 `?tag=` 兼容
+- 先按标签和搜索过滤，再按页码切片
+- 分页 UI：上一页/下一页 + 页码按钮
+- 中英文标签（"← 上一页" / "← Previous"）
+- 总数 ≤ 10 时自动隐藏
+- `aria-current="page"` 无障碍支持
+
+### 8.5 单元测试（Vitest）
+
+**文件:** `vitest.config.ts`（新建）, `lib/__tests__/posts.test.ts`（新建）, `lib/__tests__/reading-time.test.ts`（新建）, `package.json`
+
+**实现:**
+- 安装 `vitest` 开发依赖，添加 `"test": "vitest run"` 脚本
+- `vitest.config.ts` 配置 `@/` 路径别名
+- `posts.test.ts`：8 项测试（排序、空 locale、frontmatter 解析、slug 查询、null 返回）
+- `reading-time.test.ts`：9 项测试（中英文计算、混合内容、最小值、MDX 剥离）
+- 全部 17 项测试通过
+
+---
+
+## 9. 新增文件说明
 
 | 文件 | 用途 |
 |------|------|
@@ -352,18 +414,16 @@
 | `content/*/dark-mode-implementation.mdx` | 暗色模式实现（中/英） |
 | `public/photos/*.svg` | 4 张 SVG 插画照片 |
 | `.env.example` | 环境变量模板 |
-| `content/zh/building-my-blog.mdx` | 博客搭建记录（中文��� |
-| `content/en/building-my-blog.mdx` | 博客搭建记录（英文） |
-| `content/zh/react-hooks-guide.mdx` | React Hooks 指南（中文） |
-| `content/en/react-hooks-guide.mdx` | React Hooks 指南（英文） |
-| `content/zh/dark-mode-implementation.mdx` | 暗色模式实现（中文） |
-| `content/en/dark-mode-implementation.mdx` | 暗色模式实现（英文） |
-| `public/photos/*.svg` | 4 张 SVG 插画照片 |
-| `.env.example` | 环境变量模板 |
+| `app/og/route.tsx` | OG 图片生成路由（Edge Runtime） |
+| `components/Analytics.tsx` | Umami 分析组件（环境变量控制） |
+| `components/Pagination.tsx` | 博客列表分页组件 |
+| `vitest.config.ts` | Vitest 测试配置 |
+| `lib/__tests__/posts.test.ts` | posts.ts 单元测试（8 项） |
+| `lib/__tests__/reading-time.test.ts` | reading-time.ts 单元测试（9 项） |
 
 ---
 
-## 9. 架构改进
+## 10. 架构改进
 
 ### 9.1 数据与视图分离
 所有展示数据从页面组件提取到 `data/` 目录。
@@ -408,12 +468,12 @@
 
 ---
 
-## 10. 全面审计通过项
+## 11. 全面审计通过项
 
 | 检查项 | 状态 |
 |--------|------|
 | **安全** | |
-| XSS 防护 | ✅ 无 dangerouslySetInnerHTML 风险（仅暗色模式脚本） |
+| XSS 防护 | ✅ 无 dangerouslySetInnerHTML 风险（仅暗色模式脚本 + JSON-LD） |
 | 外部链接 rel="noopener noreferrer" | ✅ 全部外链已设置 |
 | 无硬编码密钥/凭证 | ✅ |
 | **TypeScript** | |
@@ -433,23 +493,28 @@
 | 语义化 HTML（header/main/article/nav/footer） | ✅ |
 | Lightbox role="dialog" | ✅ |
 | TOC nav aria-label | ✅ |
+| 分页 aria-current="page" | ✅ |
 | **SEO** | |
 | 所有页面有 generateMetadata | ✅ |
 | metadataBase 已设置 | ✅ |
-| OpenGraph 博客文章 metadata | ✅ |
+| OpenGraph 博客文章 metadata + OG 图片 | ✅ |
+| JSON-LD 结构化数据（Article + WebSite） | ✅ |
 | robots.txt + sitemap.xml 已生成 | ✅ |
 | RSS Feed 可用 | ✅ |
 | favicon 已生成 | ✅ |
 | **i18n** | |
 | zh/en 消息文件键值一致 | ✅ |
 | 阅读时间 + 上下篇导航支持中英文 | ✅ |
+| OG 图片 + 分页支持中英文 | ✅ |
+| **测试** | |
+| 核心库函数单元测试（17 项） | ✅ |
 | **内容** | |
 | 4 篇技术博客（中英双语，含标签） | ✅ |
 | 数据文件内容完整 | ✅ |
 
 ---
 
-## 11. 遗留事项
+## 12. 遗留事项
 
 ### 用户操作
 
@@ -459,27 +524,26 @@
 | 创建 `.env.local` | 基于 `.env.example` 创建，填入实际站点 URL |
 | 替换照片 | 将真实照片放入 `public/photos/`，替换示例 SVG |
 | 部署到 Vercel | `vercel` 一键部署 |
+| 配置 Umami 分析 | 填入 `NEXT_PUBLIC_UMAMI_WEBSITE_ID` 和 `NEXT_PUBLIC_UMAMI_URL` |
 
-### 建议后续增强（第三梯队）
+### 建议后续增强
 
 | 事项 | 说明 |
 |------|------|
-| OG 图片生成 | `app/og/route.tsx` 动态生成社交分享图 |
-| JSON-LD 结构化数据 | 文章页添加 Schema.org 标记 |
-| 网站分析 | 集成 Umami / Plausible |
-| 单元测试 | 为 `lib/posts.ts` 等核心模块编写测试 |
-| 博客分页 | 文章增多后添加分页 |
 | Pagefind 全文搜索 | 替代当前 URL query 搜索 |
+| E2E 测试 | Playwright/Cypress 覆盖关键用户流程 |
+| 评论通知 | Giscus 评论 webhook 通知 |
 
 ---
 
 ## 构建验证
 
 ```
-✓ Compiled successfully
+✓ Compiled successfully (Turbopack)
 ✓ TypeScript check passed
 ✓ ESLint — 0 errors, 0 warnings
-✓ 33 routes generated (including feed.xml, icon, robots.txt, sitemap.xml)
+✓ Vitest — 17 tests passed (2 files)
+✓ 33 routes generated (including feed.xml, icon, og, robots.txt, sitemap.xml)
 ✓ All routes functional
 ```
 
@@ -495,117 +559,5 @@
 | 第四轮 | 1 项 | 1 文件 | ESLint 零警告（catch 参数清理） |
 | 第五轮 | 6 项 | 25+ 文件 | 代码高亮、RSS、阅读时间、favicon、移动导航、内容 |
 | 第六轮 | 7 项 | 15+ 文件 | 标签系统、TOC、复制按钮、上下篇、返回顶部、灯箱、Footer |
-| **合计** | **46 项** | — | **全功能博客，build 0 errors, lint 0 warnings** |
-
----
-
-## 9. 全面审计通过项
-
-| 检查项 | 状态 |
-|--------|------|
-| **安全** | |
-| XSS 防护 | ✅ 无 dangerouslySetInnerHTML 风险（仅暗色模式脚本） |
-| 外部链接 rel="noopener noreferrer" | ✅ 全部外链已设置 |
-| 无硬编码密钥/凭证 | ✅ |
-| **TypeScript** | |
-| 严格模式启用 | ✅ |
-| 无 `as any` 类型断言 | ✅ |
-| 无未使用 import | ✅ |
-| 无未使用 prop | ✅ |
-| 所有类型定义精确 | ✅ |
-| 无未使用 catch 参数 | ✅ |
-| **React** | |
-| 无 index-as-key anti-pattern | ✅ |
-| Server/Client 组件划分正确 | ✅ |
-| 所有 useEffect 正确清理 | ✅ |
-| **无障碍** | |
-| 所有装饰性 SVG 有 aria-hidden | ✅ |
-| 所有交互元素有 aria-label | ✅ |
-| 图片有 alt 文本 | ✅ |
-| 语义化 HTML（header/main/article/nav） | ✅ |
-| 移动端汉堡菜单 aria-expanded | ✅ |
-| **SEO** | |
-| 所有页面有 generateMetadata | ✅ |
-| metadataBase 已设置 | ✅ |
-| OpenGraph 博客文章 metadata | ✅ |
-| robots.txt 已生成 | ✅ |
-| sitemap.xml 已生成 | ✅ |
-| RSS Feed 可用 | ✅ |
-| favicon 已生成 | ✅ |
-| **i18n** | |
-| zh/en 消息文件键值一致 | ✅ |
-| 无未使用的翻译 key | ✅ |
-| error.tsx / not-found.tsx 支持中英文 | ✅ |
-| 阅读时间支持中英文 | ✅ |
-| **代码风格** | |
-| 所有页面 prose 类名统一 | ✅ |
-| 颜色一致使用 CSS 变量 | ✅ |
-| 无死代码 | ✅ |
-| **容错** | |
-| 文件读取有 try-catch | ✅ |
-| 日期排序处理无效值 | ✅ |
-| 占位链接不渲染 | ✅ |
-| **内容** | |
-| MDX 中技术版本号正确 | ✅ |
-| 4 篇技术博客（中英双语） | ✅ |
-| 数据文件内容完整 | ✅ |
-
----
-
-## 10. 遗留事项
-
-### 用户操作
-
-| 事项 | 说明 |
-|------|------|
-| 填写社交链接 | 编辑 `data/social-links.ts`，将 `#` 替换为实际 URL |
-| 创建 `.env.local` | 基于 `.env.example` 创建，填入实际站点 URL |
-| 替换照片 | 将真实照片放入 `public/photos/`，替换示例 SVG |
-| 部署到 Vercel | `vercel` 一键部署 |
-
-### 建议后续增强（第二梯队）
-
-| 事项 | 说明 |
-|------|------|
-| 标签/分类系统 | frontmatter 添加 `tags` 字段 + 标签页面 |
-| 目录组件 (TOC) | 解析 heading 生成侧边目录 |
-| 代码块复制按钮 | 一键复制代码内容 |
-| 上一篇/下一篇 | 文章底部导航 |
-| 返回顶部按钮 | 滚动后出现 |
-| 图片 Lightbox | 点击大图查看 |
-| 网站底部 Footer | 版权信息 + 社交链接 |
-
-### 建议后续增强（第三梯队）
-
-| 事项 | 说明 |
-|------|------|
-| OG 图片生成 | `app/og/route.tsx` 动态生成社交分享图 |
-| JSON-LD 结构化数据 | 文章页添加 Schema.org 标记 |
-| 网站分析 | 集成 Umami / Plausible |
-| 单元测试 | 为 `lib/posts.ts` 等核心模块编写测试 |
-| 博客分页 | 文章增多后添加分页 |
-
----
-
-## 构建验证
-
-```
-✓ Compiled successfully
-✓ TypeScript check passed
-✓ ESLint — 0 errors, 0 warnings
-✓ 33 routes generated (including feed.xml, icon, robots.txt, sitemap.xml)
-✓ All routes functional
-```
-
----
-
-## 修复与功能统计
-
-| 轮次 | 项数 | 影响文件 | 关键改进 |
-|------|------|----------|----------|
-| 第一轮 | 19 项 | 35 文件 | 搜索实现、SEO、数据分离、a11y |
-| 第二轮 | 7 项 | 10 文件 | NaN 排序、OG 清洗、React key、i18n error |
-| 第三轮 | 6 项 | 9 文件 | metadataBase、类型收紧、try-catch、死代码 |
-| 第四轮 | 1 项 | 1 文件 | ESLint 零警告（catch 参数清理） |
-| 第五轮 | 6 项 | 25+ 文件 | 代码高亮、RSS、阅读时间、favicon、移动导航、内容 |
-| **合计** | **39 项** | — | **全功能博客，build 0 errors, lint 0 warnings** |
+| 第七轮 | 5 项 | 12+ 文件 | OG 图片、JSON-LD、Umami 分析、分页、单元测试 |
+| **合计** | **51 项** | — | **生产就绪博客，build 0 errors, lint 0 warnings, 17 tests pass** |

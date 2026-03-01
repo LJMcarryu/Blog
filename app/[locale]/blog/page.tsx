@@ -3,6 +3,9 @@ import { getTranslations } from "next-intl/server";
 import { getPostsByLocale } from "@/lib/posts";
 import PostCard from "@/components/PostCard";
 import SearchBar from "@/components/SearchBar";
+import Pagination from "@/components/Pagination";
+
+const POSTS_PER_PAGE = 10;
 
 export async function generateMetadata({
   params,
@@ -19,10 +22,10 @@ export default async function BlogPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string; tag?: string }>;
+  searchParams: Promise<{ q?: string; tag?: string; page?: string }>;
 }) {
   const { locale } = await params;
-  const { q, tag } = await searchParams;
+  const { q, tag, page } = await searchParams;
   const t = await getTranslations({ locale, namespace: "blog" });
 
   const allPosts = getPostsByLocale(locale);
@@ -48,6 +51,21 @@ export default async function BlogPage({
         p.description?.toLowerCase().includes(query)
     );
   }
+
+  // Pagination
+  const currentPage = Math.max(1, parseInt(page || "1", 10) || 1);
+  const totalPages = Math.max(1, Math.ceil(posts.length / POSTS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+  const paginatedPosts = posts.slice(
+    (safePage - 1) * POSTS_PER_PAGE,
+    safePage * POSTS_PER_PAGE
+  );
+
+  // Build base href for pagination links (preserve tag + search params)
+  const baseParams = new URLSearchParams();
+  if (tag) baseParams.set("tag", tag);
+  if (q) baseParams.set("q", q);
+  const baseHref = baseParams.toString() ? `?${baseParams.toString()}` : "?";
 
   return (
     <div className="prose m-auto">
@@ -80,7 +98,7 @@ export default async function BlogPage({
       )}
 
       <div className="not-prose mt-8 flex flex-col gap-4 slide-enter-3">
-        {posts.map((post) => (
+        {paginatedPosts.map((post) => (
           <PostCard key={post.slug} post={post} />
         ))}
         {posts.length === 0 && (
@@ -92,6 +110,15 @@ export default async function BlogPage({
           </p>
         )}
       </div>
+
+      {posts.length > 0 && (
+        <Pagination
+          currentPage={safePage}
+          totalPages={totalPages}
+          locale={locale}
+          baseHref={baseHref}
+        />
+      )}
     </div>
   );
 }

@@ -6,6 +6,7 @@ import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import Lightbox from "@/components/Lightbox";
+import Analytics from "@/components/Analytics";
 import "../globals.css";
 
 export const metadata: Metadata = {
@@ -38,11 +39,25 @@ export default async function LocaleLayout({
 
   const messages = (await import(`@/messages/${locale}.json`)).default;
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+  const webSiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Jimmy's Blog",
+    url: siteUrl,
+    inLanguage: locale === "zh" ? "zh-CN" : "en-US",
+  };
+
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webSiteJsonLd) }}
+        />
         {/* RSS feed discovery */}
         <link rel="alternate" type="application/rss+xml" title="Jimmy's Blog RSS" href="/feed.xml" />
+        <Analytics />
         {/* Inline script: apply .dark class before first paint to prevent flash */}
         <script
           dangerouslySetInnerHTML={{

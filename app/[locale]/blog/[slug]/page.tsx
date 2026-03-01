@@ -36,6 +36,14 @@ export async function generateMetadata({
       description,
       type: "article",
       publishedTime: post.date,
+      images: [
+        {
+          url: `/og?title=${encodeURIComponent(post.title)}&locale=${locale}`,
+          width: 1200,
+          height: 630,
+          alt: post.title,
+        },
+      ],
     },
   };
 }
@@ -67,8 +75,27 @@ export default async function PostPage({
   const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
   const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Article",
+    headline: post.title,
+    datePublished: post.date,
+    description: post.description || "",
+    url: `${siteUrl}/${locale}/blog/${slug}`,
+    author: {
+      "@type": "Person",
+      name: "Jimmy",
+    },
+    image: `${siteUrl}/og?title=${encodeURIComponent(post.title)}&locale=${locale}`,
+  };
+
   return (
     <article>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       {/* Header — staggered entry */}
       <div className="slide-enter-content prose m-auto mb-8">
         <Link
