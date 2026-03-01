@@ -1,4 +1,4 @@
-import { useTranslations } from "next-intl";
+import { getTranslations } from "next-intl/server";
 import { getPostsByLocale } from "@/lib/posts";
 import PostCard from "@/components/PostCard";
 import SearchBar from "@/components/SearchBar";
@@ -9,7 +9,7 @@ export default async function BlogPage({
   params: Promise<{ locale: string }>;
 }) {
   const { locale } = await params;
-  const t = useTranslations("blog");
+  const t = await getTranslations({ locale, namespace: "blog" });
   const posts = getPostsByLocale(locale);
 
   return (
