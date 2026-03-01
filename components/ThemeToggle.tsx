@@ -1,14 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 
 export default function ThemeToggle() {
   const [dark, setDark] = useState(false);
+  const pathname = usePathname();
 
-  // Sync React state with the class set by the inline script
+  // Apply theme from localStorage after every navigation (including locale switch)
   useEffect(() => {
-    setDark(document.documentElement.classList.contains("dark"));
-  }, []);
+    try {
+      const saved = localStorage.getItem("blog-color-scheme");
+      const prefersDark = window.matchMedia(
+        "(prefers-color-scheme:dark)"
+      ).matches;
+      const shouldBeDark =
+        saved === "dark" || (saved !== "light" && prefersDark);
+      document.documentElement.classList.toggle("dark", shouldBeDark);
+      setDark(shouldBeDark);
+    } catch (_) {
+      setDark(document.documentElement.classList.contains("dark"));
+    }
+  }, [pathname]);
 
   const toggle = () => {
     const html = document.documentElement;
