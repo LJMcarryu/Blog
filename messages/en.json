@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "home": "Home",
+    "blog": "Blog"
+  },
+  "home": {
+    "greeting": "Hi, I'm",
+    "name": "Your Name",
+    "bio": "Welcome to my personal blog, where I share thoughts on tech and life.",
+    "viewPosts": "View Posts"
+  },
+  "blog": {
+    "title": "All Posts",
+    "readMore": "Read More",
+    "backToList": "Back to List",
+    "noResults": "No posts found",
+    "searchPlaceholder": "Search posts..."
+  }
+}

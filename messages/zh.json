@@ -1,0 +1,19 @@
+{
+  "nav": {
+    "home": "首页",
+    "blog": "博客"
+  },
+  "home": {
+    "greeting": "你好，我是",
+    "name": "你的名字",
+    "bio": "这里是我的个人博客，记录技术与生活的思考。",
+    "viewPosts": "查看文章"
+  },
+  "blog": {
+    "title": "所有文章",
+    "readMore": "阅读全文",
+    "backToList": "返回列表",
+    "noResults": "没有找到相关文章",
+    "searchPlaceholder": "搜索文章..."
+  }
+}
