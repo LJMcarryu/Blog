@@ -81,6 +81,7 @@ my_blog/
 ├── components/                   # 共享组件
 │   ├── Navigation.tsx            # 顶部导航栏（Client Component）
 │   ├── LanguageSwitcher.tsx      # 语言切换按钮（Client Component）
+│   ├── ThemeToggle.tsx           # 亮/暗色模式切换（Client Component）
 │   ├── PostCard.tsx              # 博客文章卡片（Server Component）
 │   ├── SearchBar.tsx             # 搜索框（Client Component）
 │   └── Comments.tsx             # Giscus 评论区（Client Component）
@@ -176,6 +177,7 @@ export default async function BlogPage({ params }) {
 |------|------|
 | `Navigation.tsx` | 使用 `usePathname()` 判断当前路由高亮 |
 | `LanguageSwitcher.tsx` | 使用 `useLocale()`、`useRouter()` |
+| `ThemeToggle.tsx` | 使用 `useState`、`useEffect`、操作 `document` |
 | `SearchBar.tsx` | 使用 `useState`、表单事件 |
 | `Comments.tsx` | 使用 `useEffect` 动态注入 Giscus 脚本 |
 
@@ -234,6 +236,55 @@ i18n/navigation.ts       导出 locale-aware 的 Link、useRouter、usePathname
        ↓
 proxy.ts                 中间件：拦截所有请求，处理语言重定向
 ```
+
+---
+
+## 暗色模式架构
+
+### 驱动机制
+
+暗色模式通过给 `<html>` 元素添加/移除 `.dark` 类来控制，而非 CSS 媒体查询。这允许用户独立设置博客主题，不跟随系统偏好。
+
+```
+用户点击 ThemeToggle
+        ↓
+document.documentElement.classList.toggle("dark")
+        ↓
+localStorage.setItem("blog-color-scheme", "dark"/"light")
+        ↓
+CSS @variant dark (&:where(.dark, .dark *)) 触发
+        ↓
+CSS 变量 --c-bg / --fg / --fg-deep 等切换值
+```
+
+### 防闪烁（FOUC 预防）
+
+在 `app/[locale]/layout.tsx` 的 `<head>` 中注入内联脚本，在首次渲染前读取 localStorage 并立即设置 `.dark` 类：
+
+```html
+<html suppressHydrationWarning>
+  <head>
+    <script dangerouslySetInnerHTML={{ __html: `
+      (function(){
+        var d = localStorage.getItem('blog-color-scheme') || 'auto';
+        var sys = window.matchMedia('(prefers-color-scheme:dark)').matches;
+        if (d === 'dark' || (d === 'auto' && sys))
+          document.documentElement.classList.add('dark');
+      })()
+    `}} />
+  </head>
+```
+
+`suppressHydrationWarning` 用于抑制 React hydration 时 class 不匹配的警告（服务端渲染时 html 没有 `.dark` 类，客户端脚本添加后会有短暂不一致）。
+
+### Tailwind v4 配置
+
+```css
+/* globals.css */
+@variant dark (&:where(.dark, .dark *));
+```
+
+这一行使所有 `dark:*` 工具类响应 `.dark` 类名而非媒体查询。
 
 ---
 

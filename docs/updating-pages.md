@@ -412,13 +412,15 @@ const ZH_LINKS = [
 
 ```typescript
 const navLinks = [
-  { href: "/", label: t("home") },
-  { href: "/blog", label: t("blog") },
+  { href: "/blog",     label: t("blog") },
   { href: "/projects", label: t("projects") },
-  { href: "/photos", label: t("photos") },
-  { href: "/about", label: t("about") },
+  { href: "/photos",   label: t("photos") },
+  { href: "/about",    label: t("about") },
 ];
+// 注意：首页链接已移除，左上角的 Logo（"Jimmy"）即为首页入口
 ```
+
+> **注意：** 导航栏右侧的 `ThemeToggle`（亮/暗色切换）和 `LanguageSwitcher`（语言切换）不在 `navLinks` 数组中，它们是单独的组件，始终显示在导航栏最右侧。若需修改这两个按钮的行为，分别编辑 `components/ThemeToggle.tsx` 和 `components/LanguageSwitcher.tsx`。
 
 ### 添加新导航项
 
