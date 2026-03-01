@@ -19,14 +19,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticEntries = routing.locales.flatMap((locale) =>
     pages.map((page) => ({
       url: `${baseUrl}/${locale}${page}`,
-      lastModified: new Date(),
     }))
   );
 
   const blogEntries = routing.locales.flatMap((locale) =>
     getPostsByLocale(locale).map((post) => ({
       url: `${baseUrl}/${locale}/blog/${post.slug}`,
-      lastModified: post.date ? new Date(post.date) : new Date(),
+      lastModified: post.date ? new Date(post.date) : undefined,
     }))
   );
 

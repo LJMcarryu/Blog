@@ -22,16 +22,26 @@ export function getPostsByLocale(locale: string): Post[] {
   return files
     .map((filename) => {
       const slug = filename.replace(/\.mdx$/, "");
-      const raw = fs.readFileSync(path.join(dir, filename), "utf-8");
-      const { data, content } = matter(raw);
+      try {
+        const raw = fs.readFileSync(path.join(dir, filename), "utf-8");
+        const { data, content } = matter(raw);
 
-      return {
-        slug,
-        title: data.title ?? slug,
-        date: data.date ?? "",
-        description: data.description ?? "",
-        content,
-      };
+        return {
+          slug,
+          title: data.title ?? slug,
+          date: data.date ?? "",
+          description: data.description ?? "",
+          content,
+        };
+      } catch {
+        return {
+          slug,
+          title: slug,
+          date: "",
+          description: "",
+          content: "",
+        };
+      }
     })
     .sort((a, b) => {
       const ta = a.date ? new Date(a.date).getTime() : 0;
@@ -45,14 +55,18 @@ export function getPostBySlug(slug: string, locale: string): Post | null {
 
   if (!fs.existsSync(filePath)) return null;
 
-  const raw = fs.readFileSync(filePath, "utf-8");
-  const { data, content } = matter(raw);
+  try {
+    const raw = fs.readFileSync(filePath, "utf-8");
+    const { data, content } = matter(raw);
 
-  return {
-    slug,
-    title: data.title ?? slug,
-    date: data.date ?? "",
-    description: data.description ?? "",
-    content,
-  };
+    return {
+      slug,
+      title: data.title ?? slug,
+      date: data.date ?? "",
+      description: data.description ?? "",
+      content,
+    };
+  } catch {
+    return null;
+  }
 }

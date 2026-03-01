@@ -16,7 +16,6 @@
   },
   "blog": {
     "title": "All Posts",
-    "readMore": "Read More",
     "backToList": "Back to List",
     "noResults": "No posts found",
     "searchPlaceholder": "Search posts..."

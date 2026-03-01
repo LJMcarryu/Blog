@@ -1,6 +1,6 @@
 export interface Project {
   name: string;
-  description: Record<string, string>;
+  description: Record<"zh" | "en", string>;
   tech: string[];
   github: string;
   live: string;

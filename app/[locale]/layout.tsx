@@ -6,6 +6,9 @@ import Navigation from "@/components/Navigation";
 import "../globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL || "https://example.com"
+  ),
   title: {
     default: "Jimmy's Blog",
     template: "%s | Jimmy's Blog",
