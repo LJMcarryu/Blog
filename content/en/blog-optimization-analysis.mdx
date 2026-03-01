@@ -1,0 +1,153 @@
+---
+title: "How Does My Blog Compare to Top Developer Blogs?"
+date: "2026-03-02"
+description: "A gap analysis comparing my personal blog against antfu.me, leerob.io, and joshwcomeau.com — what's done, what's missing, and what to prioritize next."
+tags: ["Blog", "SEO", "UX"]
+---
+
+## Why This Analysis
+
+After building the blog and adding plenty of features, one question kept nagging me: **how does it actually compare to the best developer blogs out there?**
+
+So I picked a few widely-admired developer blogs for benchmarking:
+
+- **antfu.me** (Anthony Fu) — minimal design, smooth animations, prolific OSS author
+- **leerob.io** (Lee Robinson) — Vercel VP, the gold standard for Next.js blogs
+- **joshwcomeau.com** (Josh W. Comeau) — interactive tutorials, custom MDX components
+- **overreacted.io** (Dan Abramov) — ultimate minimalism, content-first
+
+## Current State: 80%+ Complete
+
+After 7 rounds of iteration, my blog covers most core features:
+
+- ✅ Next.js 16 App Router + React Server Components
+- ✅ Bilingual Chinese/English (next-intl)
+- ✅ Dark mode (zero-flash + View Transitions)
+- ✅ Syntax highlighting (Shiki dual themes)
+- ✅ Full SEO suite (sitemap, robots, RSS, OG images, JSON-LD)
+- ✅ Tags, TOC, pagination
+- ✅ Comments (Giscus)
+- ✅ Unit tests (Vitest, 17 passing)
+
+But comparing against top blogs reveals **gaps on three levels**.
+
+## Level 1: Content & Authenticity
+
+This is the biggest gap, and **code can't fix it**.
+
+| Current State | Problem |
+|--------------|---------|
+| Photos are SVG placeholders | Visitors see through it instantly |
+| Only 1 demo project | Doesn't show technical breadth |
+| Social links point to `#` | Clicking does nothing |
+| Only 4 blog posts | Not enough to browse |
+
+> The appeal of antfu.me isn't fancy tech — it's that **the content is real and continuously updated**.
+
+### Action Items
+
+- Replace all placeholder content (photos, projects, social links, email)
+- Write at least 10 original, in-depth articles
+- Cover diverse topics, not just "how I built this blog"
+
+## Level 2: Reading Experience Details
+
+These are the polish details that keep users browsing longer:
+
+### Full-Text Search
+
+Current search only matches titles and descriptions — **post content is completely unsearchable**. This problem grows worse as posts accumulate.
+
+antfu.me uses [Pagefind](https://pagefind.app/) — generates search indexes at build time, fully static, no backend needed. It's the best fit for static blogs.
+
+### Heading Anchor Links
+
+Technical articles frequently need shareable links to specific sections. Top blogs show a `#` icon next to h2/h3 headings — visible on hover, clickable to copy.
+
+```tsx
+// Ideal result
+<h2 id="why-nextjs">
+  <a href="#why-nextjs" class="anchor">#</a>
+  Why Next.js?
+</h2>
+```
+
+### Code Block Enhancements
+
+Current code blocks have syntax highlighting and copy buttons. Still missing:
+
+- **Filename/language labels**: `rehype-pretty-code` supports `title` meta
+- **Line numbers**: Essential for referencing specific lines in long blocks
+- **Diff highlighting**: Green/red markers for showing code changes
+
+### Reading Progress Bar
+
+A thin line at the top of the page tracking scroll progress. Simple to implement, but noticeably improves the experience for long articles.
+
+### Page Transitions
+
+Route changes are currently hard cuts with no transition. antfu.me uses the View Transitions API for silky-smooth page transitions.
+
+## Level 3: Engineering & Advanced SEO
+
+### CI/CD
+
+No GitHub Actions currently. This means:
+- Pushing code with syntax errors won't be caught
+- Tests exist but don't run automatically
+- PRs have no automatic preview
+
+A basic CI pipeline is just:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+on: [push, pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+```
+
+### hreflang Cross-Language SEO
+
+Chinese and English posts are translations of the same content, but search engines don't know this. Adding `hreflang` alternate links in `<head>` tells Google "these two URLs are Chinese/English versions of the same article."
+
+### Content Validation
+
+MDX frontmatter has no schema validation. If you forget `date` or `title`, you won't know until runtime. Zod can validate at build time.
+
+## Gap Summary
+
+| Priority | Item | Effort | Impact |
+|----------|------|--------|--------|
+| P0 | Replace placeholder content | Low | Very High |
+| P0 | Write more articles | Medium | Very High |
+| P1 | Pagefind full-text search | Medium | High |
+| P1 | Heading anchor links | Low | High |
+| P1 | GitHub Actions CI | Low | High |
+| P2 | Reading progress bar | Low | Medium |
+| P2 | Page transition animations | Medium | Medium |
+| P2 | External link indicators | Low | Medium |
+| P2 | hreflang SEO | Low | Medium |
+| P3 | Custom MDX components | Medium | Medium |
+| P3 | Article sharing/reactions | High | Low |
+| P3 | Newsletter subscription | Medium | Low |
+
+## Conclusion
+
+The comparison reveals a pattern: **the technical gap is actually small**. My blog's architecture, SEO, i18n, and dark mode are already at the level of top blogs.
+
+The real gaps are:
+
+1. **Content** — this requires time and consistent output
+2. **Detail polish** — anchor links, progress bars, search — the "last 20%"
+3. **Ongoing maintenance** — a blog isn't a one-time build, it's a long-term project
+
+Technology is the vessel; content is the soul. The next priority should be **writing more valuable articles**, not continuing to tinker with the tech stack.
