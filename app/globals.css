@@ -1,43 +1,205 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ─── Class-based dark mode (antfu.me approach) ─── */
+@variant dark (&:where(.dark, .dark *));
+
+/* ─── Design tokens ─── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --c-bg:     #ffffff;
+  --fg:       #555555;
+  --fg-deep:  #222222;
+  --fg-deeper:#000000;
+  --fg-light: #888888;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+.dark {
+  --c-bg:     #050505;
+  --fg:       #bbbbbb;
+  --fg-deep:  #dddddd;
+  --fg-deeper:#ffffff;
+  --fg-light: #888888;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ─── Base ─── */
+html {
+  background-color: var(--c-bg);
+  overflow-y: scroll;
+  color-scheme: light;
 }
+html.dark { color-scheme: dark; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--fg);
+  font-family: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
 }
 
-/* 滑入动画 */
+/* ─── Custom scrollbar ─── */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: rgba(125, 125, 125, 0.35);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover { background: rgba(125, 125, 125, 0.6); }
+
+/* ─── View Transitions (dark mode toggle) ─── */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.35s;
+}
+
+/* ─── Slide-enter animation system (from antfu.me) ─── */
 @keyframes slide-enter {
-  from {
+  0% {
     opacity: 0;
     transform: translateY(10px);
   }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
 }
 
-.slide-enter-1 { animation: slide-enter 0.6s ease both; animation-delay: 0ms; }
-.slide-enter-2 { animation: slide-enter 0.6s ease both; animation-delay: 150ms; }
-.slide-enter-3 { animation: slide-enter 0.6s ease both; animation-delay: 300ms; }
-.slide-enter-4 { animation: slide-enter 0.6s ease both; animation-delay: 450ms; }
-.slide-enter-5 { animation: slide-enter 0.6s ease both; animation-delay: 600ms; }
+html:not(.no-sliding) .slide-enter,
+html:not(.no-sliding) .slide-enter-1,
+html:not(.no-sliding) .slide-enter-2,
+html:not(.no-sliding) .slide-enter-3,
+html:not(.no-sliding) .slide-enter-4,
+html:not(.no-sliding) .slide-enter-5,
+html:not(.no-sliding) .slide-enter-6,
+html:not(.no-sliding) .slide-enter-10,
+html:not(.no-sliding) .slide-enter-50,
+html:not(.no-sliding) .slide-enter-content > * {
+  --enter-stage: 0;
+  --enter-step: 90ms;
+  --enter-initial: 0ms;
+  animation: slide-enter 1s both 1;
+  animation-delay: calc(var(--enter-initial) + var(--enter-stage) * var(--enter-step));
+}
+
+/* Auto-stagger children inside .slide-enter-content */
+.slide-enter-content > *:nth-child(1)  { --enter-stage: 1  !important; }
+.slide-enter-content > *:nth-child(2)  { --enter-stage: 2  !important; }
+.slide-enter-content > *:nth-child(3)  { --enter-stage: 3  !important; }
+.slide-enter-content > *:nth-child(4)  { --enter-stage: 4  !important; }
+.slide-enter-content > *:nth-child(5)  { --enter-stage: 5  !important; }
+.slide-enter-content > *:nth-child(6)  { --enter-stage: 6  !important; }
+.slide-enter-content > *:nth-child(7)  { --enter-stage: 7  !important; }
+.slide-enter-content > *:nth-child(8)  { --enter-stage: 8  !important; }
+.slide-enter-content > *:nth-child(9)  { --enter-stage: 9  !important; }
+.slide-enter-content > *:nth-child(10) { --enter-stage: 10 !important; }
+.slide-enter-content > *:nth-child(11) { --enter-stage: 11 !important; }
+.slide-enter-content > *:nth-child(12) { --enter-stage: 12 !important; }
+.slide-enter-content > *:nth-child(13) { --enter-stage: 13 !important; }
+.slide-enter-content > *:nth-child(14) { --enter-stage: 14 !important; }
+.slide-enter-content > *:nth-child(15) { --enter-stage: 15 !important; }
+.slide-enter-content > *:nth-child(16) { --enter-stage: 16 !important; }
+.slide-enter-content > *:nth-child(17) { --enter-stage: 17 !important; }
+.slide-enter-content > *:nth-child(18) { --enter-stage: 18 !important; }
+.slide-enter-content > *:nth-child(19) { --enter-stage: 19 !important; }
+.slide-enter-content > *:nth-child(20) { --enter-stage: 20 !important; }
+
+/* Named stage shortcuts */
+.slide-enter-1  { --enter-stage: 1; }
+.slide-enter-2  { --enter-stage: 2; }
+.slide-enter-3  { --enter-stage: 3; }
+.slide-enter-4  { --enter-stage: 4; }
+.slide-enter-5  { --enter-stage: 5; }
+.slide-enter-6  { --enter-stage: 6; }
+.slide-enter-10 { --enter-stage: 10; }
+.slide-enter-50 { --enter-stage: 50; }
+
+/* ─── Navigation (antfu.me style) ─── */
+.nav-logo {
+  position: absolute;
+  top: 1.35rem;
+  left: 1.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+  color: var(--fg-deeper);
+  opacity: 0.75;
+  transition: opacity 0.2s ease;
+  user-select: none;
+  z-index: 10;
+}
+.nav-logo:hover { opacity: 1; }
+
+.nav-grid {
+  padding: 1.25rem 2rem;
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto max-content;
+  box-sizing: border-box;
+  align-items: center;
+}
+.nav-grid > * { margin: auto 0; }
+
+.nav-right {
+  display: flex;
+  align-items: center;
+  gap: 1.3rem;
+}
+
+.nav-link {
+  cursor: pointer;
+  text-decoration: none;
+  color: var(--fg);
+  transition: opacity 0.2s ease;
+  opacity: 0.6;
+  outline: none;
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+.nav-link:hover,
+.nav-link.active { opacity: 1; }
+
+/* ─── Prose overrides (antfu.me typography) ─── */
+
+/* Link underline animation */
+.prose a {
+  color: var(--fg-deeper);
+  font-weight: inherit;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(125, 125, 125, 0.3);
+  transition: border-color 0.3s ease-in-out;
+}
+.prose a:hover { border-bottom-color: var(--fg); }
+.prose a code   { color: inherit; }
+
+/* Headings */
+.prose h1 { color: var(--fg-deeper); font-weight: 800; }
+.prose h2 { color: var(--fg-deep); }
+.prose h3 { color: var(--fg); opacity: 0.75; }
+.prose h4 { color: var(--fg); opacity: 0.75; }
+.prose strong { color: var(--fg-deep); }
+
+/* Short decorative HR */
+.prose hr {
+  width: 50px;
+  border-color: rgba(125, 125, 125, 0.25);
+  margin-top: 2rem;
+  margin-bottom: 2rem;
+}
+
+/* Blockquote */
+.prose blockquote {
+  border-left-color: rgba(125, 125, 125, 0.3);
+  font-style: normal;
+  color: var(--fg);
+}
+
+/* Inline code */
+.prose :not(pre) > code {
+  font-family: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
+  background-color: rgba(125, 125, 125, 0.12);
+  color: var(--fg-deep);
+  border-radius: 0.25rem;
+  padding: 0.15em 0.35em;
+  font-size: 0.88em;
+  font-weight: 500;
+}

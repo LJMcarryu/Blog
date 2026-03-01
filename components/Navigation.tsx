@@ -3,38 +3,47 @@
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import LanguageSwitcher from "./LanguageSwitcher";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Navigation() {
   const t = useTranslations("nav");
   const pathname = usePathname();
 
   const navLinks = [
-    { href: "/", label: t("home") },
-    { href: "/blog", label: t("blog") },
+    { href: "/blog",     label: t("blog") },
     { href: "/projects", label: t("projects") },
-    { href: "/photos", label: t("photos") },
-    { href: "/about", label: t("about") },
+    { href: "/photos",   label: t("photos") },
+    { href: "/about",    label: t("about") },
   ];
 
+  // Prefix-match: /blog/my-post → Blog is active
+  const isActive = (href: string) => pathname.startsWith(href);
+
   return (
-    <header className="border-b border-gray-200 dark:border-gray-800">
-      <div className="max-w-3xl mx-auto px-4 h-14 flex items-center justify-between">
-        <nav className="flex items-center gap-6">
+    <header className="relative z-40">
+      {/* Site logo — absolute top-left (antfu.me style) */}
+      <Link href="/" className="nav-logo">
+        Jimmy
+      </Link>
+
+      {/* Nav: spacer | links */}
+      <div className="nav-grid">
+        {/* Empty spacer pushes the right side to the far right */}
+        <div />
+
+        <div className="nav-right">
           {navLinks.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
-              className={`text-sm font-medium transition-colors ${
-                pathname === href
-                  ? "text-gray-900 dark:text-white"
-                  : "text-gray-500 hover:text-gray-900 dark:hover:text-white"
-              }`}
+              className={`nav-link${isActive(href) ? " active" : ""}`}
             >
               {label}
             </Link>
           ))}
-        </nav>
-        <LanguageSwitcher />
+          <ThemeToggle />
+          <LanguageSwitcher />
+        </div>
       </div>
     </header>
   );

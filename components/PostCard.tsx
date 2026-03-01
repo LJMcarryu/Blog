@@ -1,26 +1,35 @@
 import { Link } from "@/i18n/navigation";
 import { Post } from "@/lib/posts";
 
-export default function PostCard({
-  post,
-  locale,
-}: {
-  post: Post;
-  locale: string;
-}) {
+export default function PostCard({ post }: { post: Post; locale: string }) {
   return (
-    <Link href={`/blog/${post.slug}`} className="group block">
-      <article className="p-5 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 transition-colors">
-        <p className="text-xs text-gray-400 mb-2">{post.date}</p>
-        <h2 className="text-xl font-semibold group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+    <Link
+      href={`/blog/${post.slug}`}
+      className="group flex items-baseline gap-5"
+      style={{ textDecoration: "none" }}
+    >
+      <time
+        className="text-xs tabular-nums shrink-0 w-24"
+        style={{ color: "var(--fg-light)" }}
+      >
+        {post.date}
+      </time>
+      <div>
+        <span
+          className="text-sm font-medium transition-colors group-hover:text-black dark:group-hover:text-white"
+          style={{ color: "var(--fg)" }}
+        >
           {post.title}
-        </h2>
+        </span>
         {post.description && (
-          <p className="text-gray-600 dark:text-gray-400 mt-2 text-sm line-clamp-2">
+          <p
+            className="text-xs mt-0.5 line-clamp-1"
+            style={{ color: "var(--fg-light)" }}
+          >
             {post.description}
           </p>
         )}
-      </article>
+      </div>
     </Link>
   );
 }

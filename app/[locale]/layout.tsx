@@ -30,11 +30,19 @@ export default async function LocaleLayout({
   const messages = (await import(`@/messages/${locale}.json`)).default;
 
   return (
-    <html lang={locale}>
-      <body className="min-h-screen bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100">
+    <html lang={locale} suppressHydrationWarning>
+      <head>
+        {/* Inline script: apply .dark class before first paint to prevent flash */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var d=localStorage.getItem('blog-color-scheme')||'auto';var sys=window.matchMedia('(prefers-color-scheme:dark)').matches;if(d==='dark'||(d==='auto'&&sys))document.documentElement.classList.add('dark')}catch(e){}})()`,
+          }}
+        />
+      </head>
+      <body className="min-h-screen antialiased">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Navigation />
-          <main className="max-w-3xl mx-auto px-4 py-8">{children}</main>
+          <main className="max-w-3xl mx-auto px-6 py-10">{children}</main>
         </NextIntlClientProvider>
       </body>
     </html>

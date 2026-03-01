@@ -13,15 +13,22 @@ export default async function BlogPage({
   const posts = getPostsByLocale(locale);
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold mb-6">{t("title")}</h1>
-      <SearchBar placeholder={t("searchPlaceholder")} />
-      <div className="mt-8 flex flex-col gap-6">
+    <div className="prose m-auto">
+      <h1 className="slide-enter-1">{t("title")}</h1>
+      <div className="not-prose slide-enter-2">
+        <SearchBar placeholder={t("searchPlaceholder")} />
+      </div>
+      <div className="not-prose mt-8 flex flex-col gap-4 slide-enter-3">
         {posts.map((post) => (
           <PostCard key={post.slug} post={post} locale={locale} />
         ))}
         {posts.length === 0 && (
-          <p className="text-gray-500 text-center py-12">{t("noResults")}</p>
+          <p
+            className="text-sm text-center py-12"
+            style={{ color: "var(--fg-light)" }}
+          >
+            {t("noResults")}
+          </p>
         )}
       </div>
     </div>

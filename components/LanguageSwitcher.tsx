@@ -14,11 +14,8 @@ export default function LanguageSwitcher() {
   };
 
   return (
-    <button
-      onClick={toggle}
-      className="text-sm font-medium px-3 py-1 rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-    >
-      {locale === "zh" ? "EN" : "中文"}
+    <button onClick={toggle} className="nav-link" title="Toggle language">
+      {locale === "zh" ? "EN" : "中"}
     </button>
   );
 }

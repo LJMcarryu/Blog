@@ -27,17 +27,26 @@ export default async function PostPage({
 
   return (
     <article>
-      <Link
-        href="/blog"
-        className="text-sm text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 mb-6 inline-block"
-      >
-        ← {t("backToList")}
-      </Link>
-      <h1 className="text-4xl font-bold mt-4 mb-2">{post.title}</h1>
-      <p className="text-sm text-gray-500 mb-8">{post.date}</p>
-      <div className="prose prose-gray dark:prose-invert max-w-none">
+      {/* Header — staggered entry */}
+      <div className="slide-enter-content prose m-auto mb-8">
+        <Link
+          href="/blog"
+          className="not-prose text-sm transition-opacity opacity-50 hover:opacity-100"
+          style={{ color: "var(--fg)" }}
+        >
+          ← {t("backToList")}
+        </Link>
+        <h1 className="mt-6 mb-2">{post.title}</h1>
+        <p className="not-prose text-sm" style={{ color: "var(--fg-light)" }}>
+          {post.date}
+        </p>
+      </div>
+
+      {/* Article body — auto-staggers each MDX element */}
+      <div className="prose m-auto slide-enter-content">
         <MDXRemote source={post.content} />
       </div>
+
       <div className="mt-16">
         <Comments />
       </div>
