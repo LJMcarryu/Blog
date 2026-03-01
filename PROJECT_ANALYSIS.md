@@ -1,7 +1,7 @@
 # 项目分析报告：My Blog
 
 > 生成日期：2026-03-01
-> 第三轮复查：2026-03-01（全部问题已修复）
+> 第四轮复查：2026-03-01（代码库审计通过，无剩余问题）
 > 分析范围：全部源代码文件、配置文件、样式文件、i18n 文件、MDX 内容
 
 ---
@@ -12,10 +12,11 @@
 2. [第一轮修复清单](#2-第一轮修复清单)
 3. [第二轮复查修复清单](#3-第二轮复查修复清单)
 4. [第三轮复查修复清单](#4-第三轮复查修复清单)
-5. [新增文件说明](#5-新增文件说明)
-6. [架构改进](#6-架构改进)
-7. [全面审计通过项](#7-全面审计通过项)
-8. [遗留事项（用户操作）](#8-遗留事项用户操作)
+5. [第四轮复查](#5-第四轮复查)
+6. [新增文件说明](#6-新增文件说明)
+7. [架构改进](#7-架构改进)
+8. [全面审计通过项](#8-全面审计通过项)
+9. [遗留事项（用户操作）](#9-遗留事项用户操作)
 
 ---
 
@@ -178,7 +179,25 @@ export const metadata: Metadata = {
 
 ---
 
-## 5. 新增文件说明
+## 5. 第四轮复查（1 项 ✅）
+
+第四轮对全部源码进行了最终审查，代码库整体状态优秀。仅发现 1 个 ESLint 警告。
+
+### 5.1 catch 块中未使用的参数 `_` — `ThemeToggle.tsx:22,50`
+
+**问题:** 两处 `catch (_) { }` 中的 `_` 参数未被使用，触发 `@typescript-eslint/no-unused-vars` 警告。
+
+**修复:** 改用 ES2019 optional catch binding 语法 `catch { }`，移除不必要的参数。✅
+
+**验证:**
+```
+✓ next build — 25/25 pages, 0 errors
+✓ eslint — 0 errors, 0 warnings
+```
+
+---
+
+## 6. 新增文件说明
 
 | 文件 | 用途 |
 |------|------|
@@ -196,7 +215,7 @@ export const metadata: Metadata = {
 
 ---
 
-## 6. 架构改进
+## 7. 架构改进
 
 ### 6.1 数据与视图分离
 所有展示数据从页面组件提取到 `data/` 目录。
@@ -220,7 +239,7 @@ export const metadata: Metadata = {
 
 ---
 
-## 7. 全面审计通过项
+## 8. 全面审计通过项
 
 | 检查项 | 状态 |
 |--------|------|
@@ -234,6 +253,7 @@ export const metadata: Metadata = {
 | 无未使用 import | ✅ |
 | 无未使用 prop | ✅ |
 | 所有类型定义精确 | ✅ |
+| 无未使用 catch 参数 | ✅ |
 | **React** | |
 | 无 index-as-key anti-pattern | ✅ |
 | Server/Client 组件划分正确 | ✅ |
@@ -266,7 +286,7 @@ export const metadata: Metadata = {
 
 ---
 
-## 8. 遗留事项（用户操作）
+## 9. 遗留事项（用户操作）
 
 以下为内容填写事项，非代码问题：
 
@@ -295,7 +315,8 @@ export const metadata: Metadata = {
 ```
 ✓ Compiled successfully
 ✓ TypeScript check passed
-✓ 25/25 static pages generated (484.7ms)
+✓ ESLint — 0 errors, 0 warnings
+✓ 25/25 static pages generated
 ✓ robots.txt + sitemap.xml generated
 ✓ All routes functional
 ```
@@ -309,4 +330,5 @@ export const metadata: Metadata = {
 | 第一轮 | 19 项 | 35 文件 | 搜索实现、SEO、数据分离、a11y |
 | 第二轮 | 7 项 | 10 文件 | NaN 排序、OG 清洗、React key、i18n error |
 | 第三轮 | 6 项 | 9 文件 | metadataBase、类型收紧、try-catch、死代码 |
-| **合计** | **32 项** | — | — |
+| 第四轮 | 1 项 | 1 文件 | ESLint 零警告（catch 参数清理） |
+| **合计** | **33 项** | — | **build 0 errors, lint 0 warnings** |

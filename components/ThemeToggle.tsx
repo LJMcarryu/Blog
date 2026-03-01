@@ -19,7 +19,7 @@ export default function ThemeToggle() {
           document.documentElement.classList.toggle("dark", shouldBeDark);
         }
         setDark(shouldBeDark);
-      } catch (_) {
+      } catch {
         setDark(document.documentElement.classList.contains("dark"));
       }
     }
@@ -47,7 +47,7 @@ export default function ThemeToggle() {
       setDark(next);
       try {
         localStorage.setItem("blog-color-scheme", next ? "dark" : "light");
-      } catch (_) {}
+      } catch {}
     };
 
     // Use View Transitions API for a smooth fade if available
