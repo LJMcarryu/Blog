@@ -11,6 +11,9 @@ export default function Navigation() {
   const navLinks = [
     { href: "/", label: t("home") },
     { href: "/blog", label: t("blog") },
+    { href: "/projects", label: t("projects") },
+    { href: "/photos", label: t("photos") },
+    { href: "/about", label: t("about") },
   ];
 
   return (

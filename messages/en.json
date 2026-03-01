@@ -1,7 +1,10 @@
 {
   "nav": {
     "home": "Home",
-    "blog": "Blog"
+    "blog": "Blog",
+    "projects": "Projects",
+    "photos": "Photos",
+    "about": "About"
   },
   "home": {
     "name": "刘佳明(Jimmy)",
@@ -17,5 +20,47 @@
     "backToList": "Back to List",
     "noResults": "No posts found",
     "searchPlaceholder": "Search posts..."
+  },
+  "about": {
+    "title": "About",
+    "subtitle": "[ Developer / Photographer / Lifelong Learner ]",
+    "bio1": "[ First paragraph: what you're currently working on, where you're based, your work or study direction ]",
+    "bio2": "[ Second paragraph: hobbies, personal style, life philosophy ]",
+    "skills": "Tech Stack",
+    "elsewhere": "More Pages",
+    "nowLink": "What I'm doing now →",
+    "usesLink": "My tools & setup →",
+    "booksLink": "My reading list →",
+    "linksLink": "Curated links →"
+  },
+  "projects": {
+    "title": "Projects",
+    "subtitle": "Things I've built",
+    "github": "Code",
+    "live": "Live"
+  },
+  "photos": {
+    "title": "Photos",
+    "subtitle": "Capturing moments through a lens",
+    "empty": "No photos yet. Add images to the public/photos/ directory to display them here."
+  },
+  "books": {
+    "title": "Books",
+    "subtitle": "Books I've read, am reading, or want to read",
+    "reading": "Reading",
+    "read": "Read",
+    "want": "Want to Read"
+  },
+  "now": {
+    "title": "Now",
+    "subtitle": "A /now page — what I'm currently focused on (last updated: March 2026)"
+  },
+  "uses": {
+    "title": "Uses",
+    "subtitle": "Hardware, software, and services I use daily"
+  },
+  "links": {
+    "title": "Links",
+    "subtitle": "A curated collection of websites, tools, and resources"
   }
 }

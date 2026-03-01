@@ -1,7 +1,10 @@
 {
   "nav": {
     "home": "首页",
-    "blog": "博客"
+    "blog": "博客",
+    "projects": "项目",
+    "photos": "摄影",
+    "about": "关于"
   },
   "home": {
     "name": "刘佳明(Jimmy)",
@@ -17,5 +20,47 @@
     "backToList": "返回列表",
     "noResults": "没有找到相关文章",
     "searchPlaceholder": "搜索文章..."
+  },
+  "about": {
+    "title": "关于我",
+    "subtitle": "[ 开发者 / 摄影爱好者 / 终身学习者 ]",
+    "bio1": "[ 第一段自我介绍：目前在做什么、所在城市、工作或学习方向 ]",
+    "bio2": "[ 第二段：兴趣爱好、个人风格、生活态度等 ]",
+    "skills": "技术栈",
+    "elsewhere": "更多页面",
+    "nowLink": "现在在做什么 →",
+    "usesLink": "我用的工具 →",
+    "booksLink": "我的书单 →",
+    "linksLink": "链接收藏 →"
+  },
+  "projects": {
+    "title": "项目",
+    "subtitle": "我构建的一些东西",
+    "github": "代码",
+    "live": "预览"
+  },
+  "photos": {
+    "title": "摄影",
+    "subtitle": "用镜头记录生活中的瞬间",
+    "empty": "还没有照片，将图片放入 public/photos/ 目录即可展示"
+  },
+  "books": {
+    "title": "书单",
+    "subtitle": "我读过、在读和想读的书",
+    "reading": "在读",
+    "read": "已读",
+    "want": "想读"
+  },
+  "now": {
+    "title": "现在",
+    "subtitle": "这是一个 /now 页面，记录我当前关注的事情（上次更新：2026年3月）"
+  },
+  "uses": {
+    "title": "我用的工具",
+    "subtitle": "日常使用的硬件、软件和服务"
+  },
+  "links": {
+    "title": "链接收藏",
+    "subtitle": "精选的网站、工具和资源"
   }
 }
