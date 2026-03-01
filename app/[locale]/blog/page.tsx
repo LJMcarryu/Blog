@@ -32,7 +32,7 @@ export default async function BlogPage({
     posts = posts.filter(
       (p) =>
         p.title.toLowerCase().includes(query) ||
-        (p.description?.toLowerCase().includes(query))
+        p.description?.toLowerCase().includes(query)
     );
   }
 

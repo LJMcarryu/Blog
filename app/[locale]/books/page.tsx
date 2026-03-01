@@ -48,9 +48,9 @@ export default async function BooksPage({
             <div key={key}>
               <h3 className="mt-8 mb-4">{label}</h3>
               <div className="not-prose flex flex-col gap-3">
-                {BOOKS[key].map((book, i) => (
+                {BOOKS[key].map((book) => (
                   <div
-                    key={i}
+                    key={book.title}
                     className="p-4 rounded-lg border border-gray-200 dark:border-gray-800"
                   >
                     <div className="flex items-start justify-between gap-4">

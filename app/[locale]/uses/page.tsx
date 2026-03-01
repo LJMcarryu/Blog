@@ -33,8 +33,8 @@ export default async function UsesPage({
           <div key={section.category}>
             <h3>{section.category}</h3>
             <div className="not-prose flex flex-col gap-3">
-              {section.items.map((item, i) => (
-                <div key={i} className="flex gap-4">
+              {section.items.map((item) => (
+                <div key={item.name} className="flex gap-4">
                   <span className="font-medium text-sm w-36 shrink-0" style={{ color: "var(--fg)" }}>
                     {item.name}
                   </span>

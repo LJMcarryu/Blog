@@ -36,7 +36,7 @@ export default async function HomePage({
           <hr />
           <p>{t("findMeOn")}</p>
           <div className="not-prose flex flex-wrap gap-x-5 gap-y-2 -mt-2">
-            {SOCIAL_LINKS.map(({ label, href }) => (
+            {SOCIAL_LINKS.filter(({ href }) => href !== "#").map(({ label, href }) => (
               <a
                 key={label}
                 href={href}

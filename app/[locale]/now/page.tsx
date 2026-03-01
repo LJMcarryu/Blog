@@ -33,8 +33,8 @@ export default async function NowPage({
           <div key={section.heading}>
             <h3>{section.heading}</h3>
             <ul>
-              {section.items.map((item, i) => (
-                <li key={i}>{item}</li>
+              {section.items.map((item) => (
+                <li key={item}>{item}</li>
               ))}
             </ul>
           </div>

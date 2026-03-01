@@ -15,12 +15,21 @@ export async function generateMetadata({
   const post = getPostBySlug(slug, locale);
   if (!post) return { title: "Not Found" };
 
+  const description =
+    post.description ||
+    post.content
+      .replace(/^import\s.*$/gm, "")
+      .replace(/[#*`~>\[\]!_-]/g, "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 160);
+
   return {
     title: post.title,
-    description: post.description || post.content.slice(0, 160),
+    description,
     openGraph: {
       title: post.title,
-      description: post.description || post.content.slice(0, 160),
+      description,
       type: "article",
       publishedTime: post.date,
     },
