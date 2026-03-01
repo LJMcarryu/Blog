@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getPostBySlug, getPostsByLocale } from "@/lib/posts";
+import { getReadingTime } from "@/lib/reading-time";
 import { MDXRemote } from "next-mdx-remote/rsc";
+import rehypePrettyCode from "rehype-pretty-code";
 import Comments from "@/components/Comments";
 
 export async function generateMetadata({
@@ -55,6 +57,8 @@ export default async function PostPage({
 
   if (!post) notFound();
 
+  const readingTime = getReadingTime(post.content, locale);
+
   return (
     <article>
       {/* Header — staggered entry */}
@@ -67,14 +71,34 @@ export default async function PostPage({
           ← {t("backToList")}
         </Link>
         <h1 className="mt-6 mb-2">{post.title}</h1>
-        <p className="not-prose text-sm" style={{ color: "var(--fg-light)" }}>
-          {post.date}
+        <p className="not-prose text-sm flex gap-3" style={{ color: "var(--fg-light)" }}>
+          <span>{post.date}</span>
+          <span>·</span>
+          <span>{readingTime}</span>
         </p>
       </div>
 
       {/* Article body — auto-staggers each MDX element */}
       <div className="prose m-auto slide-enter-content">
-        <MDXRemote source={post.content} />
+        <MDXRemote
+          source={post.content}
+          options={{
+            mdxOptions: {
+              rehypePlugins: [
+                [
+                  rehypePrettyCode,
+                  {
+                    theme: {
+                      dark: "github-dark-dimmed",
+                      light: "github-light",
+                    },
+                    keepBackground: false,
+                  },
+                ],
+              ],
+            },
+          }}
+        />
       </div>
 
       <div className="mt-16">

@@ -1,0 +1,162 @@
+---
+title: "Building My Blog from Scratch: Next.js 16 + MDX"
+date: "2026-03-01"
+description: A complete walkthrough of building a bilingual blog with Next.js 16, Tailwind CSS v4, and next-intl — from tech choices to project structure to lessons learned.
+---
+
+## Why Build Your Own Blog?
+
+There are plenty of blogging platforms out there — Dev.to, Medium, Hashnode — but I decided to build my own. The reasons are simple:
+
+1. **Full control**: Every pixel, every feature, my call
+2. **Learning by doing**: A blog is a complete full-stack project
+3. **Long-term ownership**: Platforms come and go, your domain stays
+
+## Tech Stack
+
+After evaluating the options, I settled on this stack:
+
+```typescript
+const techStack = {
+  framework: "Next.js 16",       // App Router + RSC
+  styling: "Tailwind CSS v4",    // New CSS-first config
+  i18n: "next-intl",             // Elegant internationalization
+  content: "MDX",                // Markdown + JSX
+  comments: "Giscus",            // GitHub Discussions powered
+  deploy: "Vercel",              // One-click deploy
+};
+```
+
+### Why Next.js 16?
+
+Next.js 16 introduced several key improvements:
+
+```tsx
+// Async params — the new paradigm in Next.js 16
+export default async function PostPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { locale, slug } = await params;
+  // ...
+}
+```
+
+- **Async params**: `params` and `searchParams` are now `Promise`-based, better reflecting the async nature of server rendering
+- **React Server Components**: Server-rendered by default, great performance out of the box
+- **Enhanced Metadata API**: SEO configuration becomes declarative
+
+### Tailwind CSS v4 Changes
+
+v4 dropped `tailwind.config.js` in favor of pure CSS configuration:
+
+```css
+/* globals.css — Tailwind v4's new approach */
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Class-based dark mode */
+@variant dark (&:where(.dark, .dark *));
+```
+
+All configuration lives in CSS now — no more JS config files.
+
+## Project Structure
+
+```
+app/
+  [locale]/            ← Locale routing (/zh/blog, /en/blog)
+    layout.tsx         ← Root layout + i18n Provider
+    page.tsx           ← Home page
+    blog/
+      page.tsx         ← Post list + search
+      [slug]/page.tsx  ← Post detail + comments
+content/
+  zh/                  ← Chinese MDX files
+  en/                  ← English MDX files
+lib/
+  posts.ts             ← Post loading + sorting
+```
+
+## Core Implementation
+
+### Post Loading System
+
+Using `gray-matter` to parse MDX frontmatter:
+
+```typescript
+import fs from "fs";
+import matter from "gray-matter";
+
+export function getPostsByLocale(locale: string): Post[] {
+  const dir = path.join(contentDir, locale);
+  if (!fs.existsSync(dir)) return [];
+
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".mdx"))
+    .map((filename) => {
+      try {
+        const raw = fs.readFileSync(path.join(dir, filename), "utf-8");
+        const { data, content } = matter(raw);
+        return { slug: filename.replace(/\.mdx$/, ""), ...data, content };
+      } catch {
+        return { slug: filename.replace(/\.mdx$/, ""), title: "", date: "", content: "" };
+      }
+    })
+    .sort((a, b) => {
+      const ta = a.date ? new Date(a.date).getTime() : 0;
+      const tb = b.date ? new Date(b.date).getTime() : 0;
+      return tb - ta;
+    });
+}
+```
+
+Notice the `try-catch` — this prevents a corrupted MDX file from crashing the entire list page.
+
+### Zero-Flash Dark Mode
+
+This is one of my favorite implementations. An inline script applies the theme during HTML parsing:
+
+```html
+<script>
+  (function(){
+    var d = localStorage.getItem('blog-color-scheme') || 'auto';
+    var sys = window.matchMedia('(prefers-color-scheme:dark)').matches;
+    if (d === 'dark' || (d === 'auto' && sys))
+      document.documentElement.classList.add('dark');
+  })()
+</script>
+```
+
+Combined with a `MutationObserver` to prevent React hydration from accidentally removing the `dark` class.
+
+## Lessons Learned
+
+### 1. generateStaticParams Types
+
+In Next.js 16's nested routes, child `generateStaticParams` receives **synchronous** parent params:
+
+```typescript
+// ✅ Correct: params is a plain synchronous object
+export function generateStaticParams({
+  params,
+}: {
+  params: { locale: string };
+}) {
+  return getPostsByLocale(params.locale).map((post) => ({
+    slug: post.slug,
+  }));
+}
+```
+
+### 2. Sitemap lastModified
+
+I initially set `lastModified: new Date()` for every page, causing the sitemap to change on every build. Search engines would think all pages are constantly updating. The fix: **don't set lastModified for static pages**.
+
+## Takeaways
+
+Building a blog is far more complex than expected, but the learning is proportional. Every problem solved deepens your understanding of the tech.
+
+If you want to build your own blog, my advice: **ship it first, polish later**. Perfect is the enemy of good.

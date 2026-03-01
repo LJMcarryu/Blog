@@ -1,0 +1,197 @@
+---
+title: 完美暗色模式：从零闪烁到丝滑过渡
+date: "2026-02-10"
+description: 深入解析如何实现一个零闪烁、支持系统偏好、带有丝滑过渡动画的暗色模式切换方案。
+---
+
+## 暗色模式不只是换个背景色
+
+很多网站的暗色模式实现存在一个通病：**刷新时会闪白**。用户选了暗色主题，每次进页面先亮一下再变暗，体验很差。
+
+今天我分享一套完整的暗色模式方案，解决三个核心问题：
+
+1. **零闪烁**：刷新不闪白
+2. **系统偏好**：跟随系统自动切换
+3. **丝滑过渡**：View Transitions API 实现优雅动画
+
+## 方案设计
+
+### CSS 变量系统
+
+首先定义一套设计令牌：
+
+```css
+:root {
+  --c-bg:     #ffffff;
+  --fg:       #555555;
+  --fg-deep:  #222222;
+  --fg-deeper:#000000;
+  --fg-light: #888888;
+}
+
+.dark {
+  --c-bg:     #050505;
+  --fg:       #bbbbbb;
+  --fg-deep:  #dddddd;
+  --fg-deeper:#ffffff;
+  --fg-light: #888888;
+}
+
+html {
+  background-color: var(--c-bg);
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+```
+
+用 CSS 变量而不是 Tailwind 的 `dark:` 前缀，因为变量可以在任何 CSS 中使用，包括第三方库的样式覆盖。
+
+### 零闪烁：内联阻塞脚本
+
+关键在于：**在浏览器渲染第一帧之前就确定主题**。
+
+```tsx
+// layout.tsx — 放在 <head> 中
+<script
+  dangerouslySetInnerHTML={{
+    __html: `(function(){
+      try {
+        var d = localStorage.getItem('blog-color-scheme') || 'auto';
+        var sys = window.matchMedia('(prefers-color-scheme:dark)').matches;
+        if (d === 'dark' || (d === 'auto' && sys))
+          document.documentElement.classList.add('dark');
+      } catch(e) {}
+    })()`,
+  }}
+/>
+```
+
+这段脚本是**同步阻塞**的，浏览器会在解析到它时立即执行，然后才开始渲染。所以用户永远不会看到闪烁。
+
+### React 组件同步状态
+
+```tsx
+"use client";
+import { useEffect, useState } from "react";
+
+export default function ThemeToggle() {
+  const [dark, setDark] = useState(false);
+
+  useEffect(() => {
+    function applyTheme() {
+      try {
+        const saved = localStorage.getItem("blog-color-scheme");
+        const prefersDark = window.matchMedia(
+          "(prefers-color-scheme:dark)"
+        ).matches;
+        const shouldBeDark =
+          saved === "dark" || (saved !== "light" && prefersDark);
+
+        document.documentElement.classList.toggle("dark", shouldBeDark);
+        setDark(shouldBeDark);
+      } catch {
+        setDark(document.documentElement.classList.contains("dark"));
+      }
+    }
+
+    applyTheme();
+
+    // MutationObserver：防止 React 水合时移除 dark class
+    const observer = new MutationObserver(applyTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
+  // ...
+}
+```
+
+`MutationObserver` 是整个方案的核心防御。当 React 进行服务端渲染后的水合（hydration）时，可能会重置 `<html>` 的 class 属性。Observer 在**微任务**阶段触发，比浏览器下一帧渲染更早，所以用户不会看到任何闪烁。
+
+### View Transitions API：丝滑动画
+
+```typescript
+const toggle = () => {
+  const html = document.documentElement;
+  const next = !html.classList.contains("dark");
+
+  const apply = () => {
+    html.classList.toggle("dark", next);
+    setDark(next);
+    try {
+      localStorage.setItem("blog-color-scheme", next ? "dark" : "light");
+    } catch {}
+  };
+
+  // 如果浏览器支持 View Transitions，用动画过渡
+  if ("startViewTransition" in document) {
+    (document as unknown as {
+      startViewTransition: (cb: () => void) => void;
+    }).startViewTransition(apply);
+  } else {
+    apply();
+  }
+};
+```
+
+View Transitions API 会自动捕获切换前后的页面快照，然后做一个淡入淡出的动画。效果非常丝滑。
+
+配合 CSS 控制动画时长：
+
+```css
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.35s;
+}
+```
+
+## 多语言路由下的陷阱
+
+在使用 `next-intl` 的多语��路由中，切换语言会导致整个页面组件树重新挂载。这意味着 React 可能会在新的 locale 页面渲染时丢失 `dark` class。
+
+解决方案就是上面提到的 `MutationObserver`——它会在 class 发生任何变化时立即检查并恢复正确的主题。
+
+```tsx
+// 时间线：
+// 1. 用户切换语言 zh → en
+// 2. React 卸载旧组件，挂载新组件
+// 3. 新的 <html> 可能丢失 dark class
+// 4. MutationObserver 微任务立即触发
+// 5. applyTheme() 重新添加 dark class
+// 6. 浏览器渲染 — 用户看到的始终是暗色
+```
+
+## 完整流程图
+
+```
+用户访问页面
+  ↓
+<head> 阻塞脚本执行
+  ↓
+读取 localStorage → 判断主题 → 添加 .dark class
+  ↓
+浏览器首次渲染（已经是正确主题）
+  ↓
+React 水合 → MutationObserver 就位
+  ↓
+用户点击切换 → View Transition 动画 → localStorage 持久化
+```
+
+## 总结
+
+| 技术点 | 解决的问题 |
+|--------|-----------|
+| 内联阻塞脚本 | 首屏零闪烁 |
+| MutationObserver | React 水合/路由切换保持主题 |
+| View Transitions | 丝滑切换动画 |
+| CSS 变量 | 主题色统一管理 |
+| localStorage | 用户偏好持久化 |
+
+暗色模式看似简单，实际上涉及 SSR、水合、浏览器渲染时机等深层次问题。把每个细节都做对，才能给用户最好的体验。

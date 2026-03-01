@@ -158,6 +158,90 @@ html:not(.no-sliding) .slide-enter-content > * {
 .nav-link:hover,
 .nav-link.active { opacity: 1; }
 
+/* ─── Mobile navigation ─── */
+.nav-desktop { display: flex; }
+.nav-mobile-actions { display: none; }
+.nav-hamburger { display: none; }
+
+@media (max-width: 640px) {
+  .nav-desktop { display: none !important; }
+  .nav-mobile-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .nav-hamburger { display: flex; }
+
+  .nav-mobile-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background-color: var(--c-bg);
+    border-bottom: 1px solid rgba(125, 125, 125, 0.15);
+    padding: 0.75rem 1.5rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    animation: slide-enter 0.3s both;
+  }
+
+  .nav-mobile-link {
+    display: block;
+    padding: 0.5rem 0;
+    color: var(--fg);
+    text-decoration: none;
+    font-size: 0.875rem;
+    opacity: 0.6;
+    transition: opacity 0.2s ease;
+  }
+  .nav-mobile-link:hover,
+  .nav-mobile-link.active { opacity: 1; }
+}
+
+/* ─── Code blocks (rehype-pretty-code) ─── */
+.prose pre {
+  border: 1px solid rgba(125, 125, 125, 0.15);
+  border-radius: 0.5rem;
+  padding: 1rem 1.25rem;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.7;
+  background-color: #fafafa !important;
+}
+
+.dark .prose pre {
+  background-color: #161b22 !important;
+}
+
+/* Multi-theme: show correct theme based on light/dark */
+.prose pre [data-theme="light"],
+.prose pre code[data-theme="light"] { display: block; }
+.prose pre [data-theme="dark"],
+.prose pre code[data-theme="dark"] { display: none; }
+
+.dark .prose pre [data-theme="light"],
+.dark .prose pre code[data-theme="light"] { display: none; }
+.dark .prose pre [data-theme="dark"],
+.dark .prose pre code[data-theme="dark"] { display: block; }
+
+.prose pre code {
+  background: transparent !important;
+  border: none !important;
+  padding: 0 !important;
+  font-size: inherit;
+  color: inherit;
+}
+
+/* Code block line highlighting */
+.prose pre code [data-highlighted-line] {
+  background-color: rgba(125, 125, 125, 0.1);
+  margin: 0 -1.25rem;
+  padding: 0 1.25rem;
+  display: inline-block;
+  width: calc(100% + 2.5rem);
+}
+
 /* ─── Prose overrides (antfu.me typography) ─── */
 
 /* Link underline animation */

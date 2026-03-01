@@ -1,0 +1,162 @@
+---
+title: 从零搭建个人博客：Next.js 16 + MDX 全记录
+date: "2026-03-01"
+description: 详细记录了我用 Next.js 16、Tailwind CSS v4、next-intl 搭建中英双语博客的全过程，包括技术选型、项目结构和踩坑经验。
+---
+
+## 为什么要自己搭博客？
+
+市面上有很多博客平台——掘金、知乎、Medium——但我还是决定自己搭一个。原因很简单：
+
+1. **完全掌控**：从设计到功能，每个像素都是自己说了算
+2. **技术练兵**：搭博客本身就是一个完整的全栈项目
+3. **长期积累**：平台会倒，自己的域名和内容不会
+
+## 技术选型
+
+经过对比，我选定了这套技术栈：
+
+```typescript
+const techStack = {
+  framework: "Next.js 16",       // App Router + RSC
+  styling: "Tailwind CSS v4",    // 新的 CSS-first 配置
+  i18n: "next-intl",             // 优雅的国际化方案
+  content: "MDX",                // Markdown + JSX
+  comments: "Giscus",            // 基于 GitHub Discussions
+  deploy: "Vercel",              // 一键部署
+};
+```
+
+### 为什么选 Next.js 16？
+
+Next.js 16 带来了几个关键改进：
+
+```tsx
+// App Router 的异步参数——Next.js 16 的新范式
+export default async function PostPage({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}) {
+  const { locale, slug } = await params;
+  // ...
+}
+```
+
+- **异步参数**：`params` 和 `searchParams` 现在是 `Promise`，更符合服务端渲染的异步本质
+- **React Server Components**：默认服务端渲染，性能开箱即用
+- **增强的 Metadata API**：SEO 配置变得声明式
+
+### Tailwind CSS v4 的变化
+
+v4 抛弃了 `tailwind.config.js`，改用纯 CSS 配置：
+
+```css
+/* globals.css — Tailwind v4 的新写法 */
+@import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* 基于 class 的暗色模式 */
+@variant dark (&:where(.dark, .dark *));
+```
+
+这意味着所有配置都在 CSS 里完成，不再需要 JS 配置文件。
+
+## 项目结构
+
+```
+app/
+  [locale]/            ← 语言路由 (/zh/blog, /en/blog)
+    layout.tsx         ← 根布局 + i18n Provider
+    page.tsx           ← 首页
+    blog/
+      page.tsx         ← 文章列表 + 搜索
+      [slug]/page.tsx  ← 文章详情 + 评论
+content/
+  zh/                  ← 中文 MDX 文件
+  en/                  ← 英文 MDX 文件
+lib/
+  posts.ts             ← 文章读取 + 排序
+```
+
+## 核心实现
+
+### 文章读取系统
+
+用 `gray-matter` 解析 MDX 的 frontmatter：
+
+```typescript
+import fs from "fs";
+import matter from "gray-matter";
+
+export function getPostsByLocale(locale: string): Post[] {
+  const dir = path.join(contentDir, locale);
+  if (!fs.existsSync(dir)) return [];
+
+  return fs
+    .readdirSync(dir)
+    .filter((f) => f.endsWith(".mdx"))
+    .map((filename) => {
+      try {
+        const raw = fs.readFileSync(path.join(dir, filename), "utf-8");
+        const { data, content } = matter(raw);
+        return { slug: filename.replace(/\.mdx$/, ""), ...data, content };
+      } catch {
+        return { slug: filename.replace(/\.mdx$/, ""), title: "", date: "", content: "" };
+      }
+    })
+    .sort((a, b) => {
+      const ta = a.date ? new Date(a.date).getTime() : 0;
+      const tb = b.date ? new Date(b.date).getTime() : 0;
+      return tb - ta;
+    });
+}
+```
+
+注意 `try-catch`——这是为了防止某个 MDX 文件损坏导致整个列表页崩溃。
+
+### 暗色模式的"零闪烁"方案
+
+这是我最满意的实现之一。通过内联脚本在 HTML 解析阶段就应用主题：
+
+```html
+<script>
+  (function(){
+    var d = localStorage.getItem('blog-color-scheme') || 'auto';
+    var sys = window.matchMedia('(prefers-color-scheme:dark)').matches;
+    if (d === 'dark' || (d === 'auto' && sys))
+      document.documentElement.classList.add('dark');
+  })()
+</script>
+```
+
+再配合 `MutationObserver` 防止 React 水合时意外移除 `dark` class。
+
+## 踩过的坑
+
+### 1. generateStaticParams 的类型
+
+在 Next.js 16 的嵌套路由中，子级的 `generateStaticParams` 接收的是**同步**的父参数：
+
+```typescript
+// ✅ 正确：params 是同步的普通对象
+export function generateStaticParams({
+  params,
+}: {
+  params: { locale: string };
+}) {
+  return getPostsByLocale(params.locale).map((post) => ({
+    slug: post.slug,
+  }));
+}
+```
+
+### 2. sitemap 的 lastModified
+
+最初我给每个页面都加了 `lastModified: new Date()`，结果每次构建 sitemap 都变化，搜索引擎会认为所有页面都在不断更新。正确做法是**静态页面不设置 lastModified**。
+
+## 总结
+
+搭博客的过程远比想象的复杂，但收获也更多。每解决一个问题，都是对技术理解的加深。
+
+如果你也想搭建自己的博客，我的建议是：**先做出来，再慢慢完善**。完美是优秀的敌人。

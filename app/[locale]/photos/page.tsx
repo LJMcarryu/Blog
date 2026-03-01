@@ -4,7 +4,7 @@ import Image from "next/image";
 import fs from "fs";
 import path from "path";
 
-const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif"]);
+const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".svg"]);
 
 function getPhotos(): string[] {
   const photosDir = path.join(process.cwd(), "public", "photos");

@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="abstract-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f0f23"/>
+      <stop offset="100%" style="stop-color:#1a1a3e"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#abstract-bg)"/>
+  <!-- Code brackets as art -->
+  <text x="100" y="200" font-family="monospace" font-size="120" fill="#4ade80" opacity="0.15">{</text>
+  <text x="600" y="450" font-family="monospace" font-size="120" fill="#60a5fa" opacity="0.15">}</text>
+  <!-- Geometric circles -->
+  <circle cx="400" cy="300" r="120" fill="none" stroke="#818cf8" stroke-width="1" opacity="0.3"/>
+  <circle cx="400" cy="300" r="90" fill="none" stroke="#a78bfa" stroke-width="1" opacity="0.4"/>
+  <circle cx="400" cy="300" r="60" fill="none" stroke="#c4b5fd" stroke-width="1" opacity="0.5"/>
+  <circle cx="400" cy="300" r="30" fill="#818cf8" opacity="0.1"/>
+  <!-- Floating dots (nodes) -->
+  <circle cx="250" cy="180" r="4" fill="#4ade80" opacity="0.8"/>
+  <circle cx="550" cy="200" r="4" fill="#60a5fa" opacity="0.8"/>
+  <circle cx="320" cy="420" r="4" fill="#f472b6" opacity="0.8"/>
+  <circle cx="500" cy="380" r="4" fill="#fbbf24" opacity="0.8"/>
+  <circle cx="200" cy="350" r="3" fill="#818cf8" opacity="0.6"/>
+  <circle cx="600" cy="150" r="3" fill="#34d399" opacity="0.6"/>
+  <!-- Connection lines -->
+  <line x1="250" y1="180" x2="400" y2="300" stroke="#4ade80" stroke-width="0.5" opacity="0.3"/>
+  <line x1="550" y1="200" x2="400" y2="300" stroke="#60a5fa" stroke-width="0.5" opacity="0.3"/>
+  <line x1="320" y1="420" x2="400" y2="300" stroke="#f472b6" stroke-width="0.5" opacity="0.3"/>
+  <line x1="500" y1="380" x2="400" y2="300" stroke="#fbbf24" stroke-width="0.5" opacity="0.3"/>
+  <line x1="250" y1="180" x2="550" y2="200" stroke="#818cf8" stroke-width="0.3" opacity="0.2"/>
+  <line x1="320" y1="420" x2="500" y2="380" stroke="#a78bfa" stroke-width="0.3" opacity="0.2"/>
+  <!-- Code snippet decoration -->
+  <rect x="150" y="480" width="8" height="2" rx="1" fill="#4ade80" opacity="0.4"/>
+  <rect x="165" y="480" width="30" height="2" rx="1" fill="#818cf8" opacity="0.3"/>
+  <rect x="200" y="480" width="20" height="2" rx="1" fill="#60a5fa" opacity="0.3"/>
+  <rect x="150" y="488" width="15" height="2" rx="1" fill="#f472b6" opacity="0.3"/>
+  <rect x="170" y="488" width="40" height="2" rx="1" fill="#fbbf24" opacity="0.3"/>
+  <rect x="150" y="496" width="25" height="2" rx="1" fill="#4ade80" opacity="0.3"/>
+  <rect x="180" y="496" width="10" height="2" rx="1" fill="#818cf8" opacity="0.3"/>
+</svg>

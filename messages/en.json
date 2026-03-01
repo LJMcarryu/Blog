@@ -8,8 +8,8 @@
   },
   "home": {
     "name": "刘佳明(Jimmy)",
-    "tagline": "[ A brief tagline about yourself, e.g. Full-stack Developer / Open Source Enthusiast ]",
-    "bio": "[ Write your personal bio here. Introduce your work experience, technical focus, and personal interests. ]",
+    "tagline": "Full-stack Developer / Open Source Enthusiast / Lifelong Learner",
+    "bio": "Passionate about coding and technical writing. Currently focused on web development, exploring new technologies and best practices. I believe code can change the world and words can connect minds.",
     "findMeOn": "Find me on",
     "latestPosts": "Latest Posts",
     "viewAll": "All Posts →"
@@ -22,9 +22,9 @@
   },
   "about": {
     "title": "About",
-    "subtitle": "[ Developer / Photographer / Lifelong Learner ]",
-    "bio1": "[ First paragraph: what you're currently working on, where you're based, your work or study direction ]",
-    "bio2": "[ Second paragraph: hobbies, personal style, life philosophy ]",
+    "subtitle": "Developer / Photographer / Lifelong Learner",
+    "bio1": "I'm Jimmy, a full-stack developer focused on the React ecosystem and modern web technologies. I love solving real problems with code.",
+    "bio2": "Outside of work, I enjoy photography, reading, and exploring new tech. I believe continuous learning is the only way to stay sharp — this blog is where I learn and share.",
     "skills": "Tech Stack",
     "elsewhere": "More Pages",
     "nowLink": "What I'm doing now →",

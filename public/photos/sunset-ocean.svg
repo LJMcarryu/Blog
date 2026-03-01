@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="sunset-sky" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#2d1b69"/>
+      <stop offset="25%" style="stop-color:#8b3a62"/>
+      <stop offset="50%" style="stop-color:#e8734a"/>
+      <stop offset="75%" style="stop-color:#f4a261"/>
+      <stop offset="100%" style="stop-color:#f7d794"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#sunset-sky)"/>
+  <!-- Sun -->
+  <circle cx="400" cy="380" r="60" fill="#f7d794" opacity="0.9"/>
+  <circle cx="400" cy="380" r="80" fill="#f4a261" opacity="0.2"/>
+  <circle cx="400" cy="380" r="100" fill="#e8734a" opacity="0.1"/>
+  <!-- Clouds -->
+  <ellipse cx="200" cy="180" rx="80" ry="20" fill="#8b3a62" opacity="0.4"/>
+  <ellipse cx="180" cy="175" rx="50" ry="15" fill="#8b3a62" opacity="0.3"/>
+  <ellipse cx="600" cy="220" rx="100" ry="25" fill="#8b3a62" opacity="0.35"/>
+  <ellipse cx="620" cy="215" rx="60" ry="18" fill="#8b3a62" opacity="0.25"/>
+  <!-- Ocean -->
+  <rect y="400" width="800" height="200" fill="#1a0a3e" opacity="0.7"/>
+  <!-- Sun reflection path -->
+  <path d="M370,400 Q385,450 360,480 Q390,470 400,500 Q410,470 440,480 Q415,450 430,400" fill="#f4a261" opacity="0.3"/>
+  <!-- Waves -->
+  <path d="M0,430 Q100,420 200,430 Q300,440 400,430 Q500,420 600,430 Q700,440 800,430 L800,435 Q700,445 600,435 Q500,425 400,435 Q300,445 200,435 Q100,425 0,435 Z" fill="#2d1b69" opacity="0.3"/>
+  <path d="M0,460 Q100,450 200,460 Q300,470 400,460 Q500,450 600,460 Q700,470 800,460 L800,465 Q700,475 600,465 Q500,455 400,465 Q300,475 200,465 Q100,455 0,465 Z" fill="#2d1b69" opacity="0.25"/>
+  <!-- Birds -->
+  <path d="M250,150 Q255,145 260,150" stroke="#1a0a3e" stroke-width="1.5" fill="none" opacity="0.6"/>
+  <path d="M270,140 Q275,135 280,140" stroke="#1a0a3e" stroke-width="1.5" fill="none" opacity="0.5"/>
+  <path d="M240,160 Q243,157 246,160" stroke="#1a0a3e" stroke-width="1" fill="none" opacity="0.4"/>
+</svg>

@@ -38,6 +38,8 @@ export default async function LocaleLayout({
   return (
     <html lang={locale} suppressHydrationWarning>
       <head>
+        {/* RSS feed discovery */}
+        <link rel="alternate" type="application/rss+xml" title="Jimmy's Blog RSS" href="/feed.xml" />
         {/* Inline script: apply .dark class before first paint to prevent flash */}
         <script
           dangerouslySetInnerHTML={{

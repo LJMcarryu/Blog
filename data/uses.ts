@@ -8,37 +8,38 @@ export interface UsesSection {
   items: UsesItem[];
 }
 
-// ✏️ 填写你使用的工具 / Fill in your tools and setup
-
 const ZH_USES: UsesSection[] = [
   {
     category: "硬件",
     items: [
-      { name: "[ 电脑型号 ]", desc: "[ 例：MacBook Pro 14\" M3 / 自组台式机 ]" },
-      { name: "[ 手机型号 ]", desc: "[ 例：iPhone 15 Pro ]" },
-      { name: "[ 外设 ]", desc: "[ 例：机械键盘、显示器等 ]" },
+      { name: "Windows 台式机", desc: "日常开发和游戏" },
+      { name: "机械键盘", desc: "码字利器，段落轴手感很棒" },
+      { name: "27\" 4K 显示器", desc: "代码和设计都需要大屏" },
     ],
   },
   {
     category: "编辑器 & 终端",
     items: [
-      { name: "[ 编辑器 ]", desc: "[ 例：VS Code，使用 One Dark Pro 主题 ]" },
-      { name: "[ 终端 ]", desc: "[ 例：Windows Terminal / iTerm2 ]" },
-      { name: "[ 字体 ]", desc: "[ 例：JetBrains Mono ]" },
+      { name: "VS Code", desc: "主力编辑器，搭配 GitHub Theme" },
+      { name: "Windows Terminal", desc: "配合 Git Bash 使用" },
+      { name: "JetBrains Mono", desc: "等宽字体，连字符看着舒服" },
     ],
   },
   {
     category: "开发工具",
     items: [
-      { name: "[ 工具名 ]", desc: "[ 工具用途描述 ]" },
-      { name: "[ 工具名 ]", desc: "[ 工具用途描述 ]" },
+      { name: "Git", desc: "版本控制，每天都在用" },
+      { name: "Docker", desc: "本地开发环境容器化" },
+      { name: "Postman", desc: "API 调试必备" },
+      { name: "Claude Code", desc: "AI 编程助手，写代码效率翻倍" },
     ],
   },
   {
     category: "日常应用",
     items: [
-      { name: "[ 应用名 ]", desc: "[ 应用用途描述 ]" },
-      { name: "[ 应用名 ]", desc: "[ 应用用途描述 ]" },
+      { name: "Notion", desc: "笔记和项目管理" },
+      { name: "Figma", desc: "UI 设计和原型" },
+      { name: "Excalidraw", desc: "快速画架构图和流程图" },
     ],
   },
 ];
@@ -47,31 +48,34 @@ const EN_USES: UsesSection[] = [
   {
     category: "Hardware",
     items: [
-      { name: "[ Computer ]", desc: "[ e.g. MacBook Pro 14\" M3 / Custom Desktop ]" },
-      { name: "[ Phone ]", desc: "[ e.g. iPhone 15 Pro ]" },
-      { name: "[ Peripherals ]", desc: "[ e.g. Mechanical keyboard, monitor, etc. ]" },
+      { name: "Windows Desktop", desc: "Daily development and gaming" },
+      { name: "Mechanical Keyboard", desc: "Great for typing, tactile switches" },
+      { name: "27\" 4K Monitor", desc: "Big screen for code and design" },
     ],
   },
   {
     category: "Editor & Terminal",
     items: [
-      { name: "[ Editor ]", desc: "[ e.g. VS Code with One Dark Pro theme ]" },
-      { name: "[ Terminal ]", desc: "[ e.g. Windows Terminal / iTerm2 ]" },
-      { name: "[ Font ]", desc: "[ e.g. JetBrains Mono ]" },
+      { name: "VS Code", desc: "Primary editor with GitHub Theme" },
+      { name: "Windows Terminal", desc: "Paired with Git Bash" },
+      { name: "JetBrains Mono", desc: "Monospace font with ligatures" },
     ],
   },
   {
     category: "Dev Tools",
     items: [
-      { name: "[ Tool name ]", desc: "[ What you use it for ]" },
-      { name: "[ Tool name ]", desc: "[ What you use it for ]" },
+      { name: "Git", desc: "Version control, used daily" },
+      { name: "Docker", desc: "Containerized local dev environment" },
+      { name: "Postman", desc: "Essential for API debugging" },
+      { name: "Claude Code", desc: "AI coding assistant, doubles productivity" },
     ],
   },
   {
     category: "Apps",
     items: [
-      { name: "[ App name ]", desc: "[ What you use it for ]" },
-      { name: "[ App name ]", desc: "[ What you use it for ]" },
+      { name: "Notion", desc: "Notes and project management" },
+      { name: "Figma", desc: "UI design and prototyping" },
+      { name: "Excalidraw", desc: "Quick architecture and flow diagrams" },
     ],
   },
 ];

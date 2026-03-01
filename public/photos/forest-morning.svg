@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="forest-bg" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#f0f9ff"/>
+      <stop offset="60%" style="stop-color:#e0f2fe"/>
+      <stop offset="100%" style="stop-color:#bae6fd"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#forest-bg)"/>
+  <!-- Distant mountains -->
+  <polygon points="0,350 120,250 240,350" fill="#94a3b8" opacity="0.3"/>
+  <polygon points="180,350 350,220 520,350" fill="#94a3b8" opacity="0.25"/>
+  <polygon points="450,350 620,260 800,350" fill="#94a3b8" opacity="0.3"/>
+  <!-- Ground -->
+  <rect y="420" width="800" height="180" fill="#15803d" opacity="0.15"/>
+  <ellipse cx="400" cy="420" rx="450" ry="30" fill="#15803d" opacity="0.1"/>
+  <!-- Trees (minimalist style) -->
+  <!-- Tree 1 -->
+  <line x1="150" y1="420" x2="150" y2="300" stroke="#1e3a2b" stroke-width="3" opacity="0.6"/>
+  <polygon points="120,320 150,250 180,320" fill="#166534" opacity="0.5"/>
+  <polygon points="125,350 150,280 175,350" fill="#15803d" opacity="0.5"/>
+  <!-- Tree 2 -->
+  <line x1="300" y1="420" x2="300" y2="280" stroke="#1e3a2b" stroke-width="4" opacity="0.7"/>
+  <polygon points="260,310 300,220 340,310" fill="#166534" opacity="0.6"/>
+  <polygon points="265,350 300,260 335,350" fill="#15803d" opacity="0.55"/>
+  <polygon points="270,390 300,300 330,390" fill="#22c55e" opacity="0.4"/>
+  <!-- Tree 3 (foreground, larger) -->
+  <line x1="500" y1="420" x2="500" y2="250" stroke="#1e3a2b" stroke-width="5" opacity="0.8"/>
+  <polygon points="450,290 500,190 550,290" fill="#166534" opacity="0.7"/>
+  <polygon points="455,340 500,240 545,340" fill="#15803d" opacity="0.6"/>
+  <polygon points="460,390 500,290 540,390" fill="#22c55e" opacity="0.5"/>
+  <!-- Tree 4 -->
+  <line x1="680" y1="420" x2="680" y2="310" stroke="#1e3a2b" stroke-width="3" opacity="0.6"/>
+  <polygon points="655,340 680,270 705,340" fill="#166534" opacity="0.5"/>
+  <polygon points="658,375 680,310 702,375" fill="#15803d" opacity="0.45"/>
+  <!-- Small trees in background -->
+  <line x1="80" y1="420" x2="80" y2="370" stroke="#1e3a2b" stroke-width="2" opacity="0.3"/>
+  <polygon points="68,385 80,355 92,385" fill="#166534" opacity="0.3"/>
+  <line x1="720" y1="420" x2="720" y2="380" stroke="#1e3a2b" stroke-width="2" opacity="0.3"/>
+  <polygon points="710,395 720,365 730,395" fill="#166534" opacity="0.3"/>
+  <!-- Path -->
+  <path d="M350,600 Q380,500 400,450 Q420,420 450,420 Q480,420 500,430" stroke="#d4a373" stroke-width="20" fill="none" opacity="0.15" stroke-linecap="round"/>
+  <!-- Sun rays -->
+  <circle cx="650" cy="80" r="30" fill="#fbbf24" opacity="0.3"/>
+  <circle cx="650" cy="80" r="50" fill="#fbbf24" opacity="0.1"/>
+</svg>

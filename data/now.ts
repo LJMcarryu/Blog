@@ -3,43 +3,61 @@ export interface NowSection {
   items: string[];
 }
 
-// ✏️ 更新你的"现在"内容，中英文分别编辑 / Edit what you're doing now
-
 const ZH_CONTENT: NowSection[] = [
   {
     heading: "正在做",
-    items: ["[ 当前项目或工作内容 ]", "[ 正在学习的技术或技能 ]"],
+    items: [
+      "打磨个人博客，添加代码高亮、RSS 和更多功能",
+      "学习 Rust 和系统编程",
+      "探索 AI 辅助编程工作流",
+    ],
   },
   {
     heading: "正在读",
-    items: ["[ 书名 · 作者 ]"],
+    items: [
+      "《Designing Data-Intensive Applications》· Martin Kleppmann",
+      "《深入理解 TypeScript》· Basarat Ali Syed",
+    ],
   },
   {
     heading: "正在听",
-    items: ["[ 歌手 / 专辑 ]"],
+    items: ["Lofi Hip Hop · 写代码的 BGM", "Joe Hisaishi · 久石让的钢琴曲"],
   },
   {
     heading: "最近在思考",
-    items: ["[ 最近在思考的话题或问题 ]"],
+    items: [
+      "如何在 AI 时代保持核心竞争力",
+      "开源项目的可持续发展模式",
+    ],
   },
 ];
 
 const EN_CONTENT: NowSection[] = [
   {
     heading: "Working on",
-    items: ["[ Current project / work ]", "[ Something I'm learning ]"],
+    items: [
+      "Polishing my personal blog — adding code highlighting, RSS, and more",
+      "Learning Rust and systems programming",
+      "Exploring AI-assisted coding workflows",
+    ],
   },
   {
     heading: "Reading",
-    items: ["[ Book title · Author ]"],
+    items: [
+      "Designing Data-Intensive Applications · Martin Kleppmann",
+      "Deep Dive into TypeScript · Basarat Ali Syed",
+    ],
   },
   {
     heading: "Listening to",
-    items: ["[ Artist / Album ]"],
+    items: ["Lofi Hip Hop · Coding BGM", "Joe Hisaishi · Piano collections"],
   },
   {
     heading: "Thinking about",
-    items: ["[ A topic or question I've been pondering ]"],
+    items: [
+      "Staying competitive in the age of AI",
+      "Sustainable models for open-source projects",
+    ],
   },
 ];
 
