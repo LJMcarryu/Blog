@@ -177,7 +177,7 @@ export default async function BlogPage({ params }) {
 |------|------|
 | `Navigation.tsx` | 使用 `usePathname()` 判断当前路由高亮 |
 | `LanguageSwitcher.tsx` | 使用 `useLocale()`、`useRouter()` |
-| `ThemeToggle.tsx` | 使用 `useState`、`useEffect`、操作 `document` |
+| `ThemeToggle.tsx` | 使用 `useState`、`useEffect`、`MutationObserver`、操作 `document` |
 | `SearchBar.tsx` | 使用 `useState`、表单事件 |
 | `Comments.tsx` | 使用 `useEffect` 动态注入 Giscus 脚本 |
 
@@ -259,6 +259,10 @@ CSS 变量 --c-bg / --fg / --fg-deep 等切换值
 
 ### 防闪烁（FOUC 预防）
 
+采用两层防闪烁机制：
+
+**第一层：内联脚本（首次加载）**
+
 在 `app/[locale]/layout.tsx` 的 `<head>` 中注入内联脚本，在首次渲染前读取 localStorage 并立即设置 `.dark` 类：
 
 ```html
@@ -276,6 +280,10 @@ CSS 变量 --c-bg / --fg / --fg-deep 等切换值
 ```
 
 `suppressHydrationWarning` 用于抑制 React hydration 时 class 不匹配的警告（服务端渲染时 html 没有 `.dark` 类，客户端脚本添加后会有短暂不一致）。
+
+**第二层：MutationObserver（软导航保护）**
+
+切换语言时 `router.replace` 触发软导航，内联脚本不会重新执行，且 React RSC 协调可能移除 `<html>` 上的 `.dark` 类。`ThemeToggle` 组件通过 `MutationObserver` 监听 `<html>` 的 `class` 属性变化，一旦 `.dark` 类被意外移除，立即从 `localStorage` 读取偏好并恢复。由于 `MutationObserver` 回调作为微任务执行（在浏览器绘制之前），用户不会看到白色闪烁。
 
 ### Tailwind v4 配置
 

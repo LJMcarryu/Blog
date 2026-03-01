@@ -95,6 +95,10 @@
 
 脚本在 HTML 解析完成、首次渲染之前运行，避免出现"亮色闪烁"（FOUC）。
 
+**语言切换时的暗色模式保持：**
+
+切换语言触发软导航（`router.replace`），内联脚本不会重新执行，且 React RSC 协调可能移除 `<html>` 上的 `.dark` 类。`ThemeToggle` 组件通过 `MutationObserver` 监听 `<html>` 的 `class` 属性变化，一旦被移除就从 `localStorage` 读取偏好并立即恢复。`MutationObserver` 回调作为微任务在浏览器绘制之前执行，因此不会出现白色闪烁。
+
 **Tailwind v4 的类名暗色变体**（`app/globals.css`）：
 
 ```css
@@ -351,6 +355,7 @@ const navLinks = [
 - 切换时操作 `document.documentElement.classList` 上的 `.dark` 类
 - 通过 `localStorage.setItem("blog-color-scheme", ...)` 持久化
 - 支持 View Transitions API 平滑过渡（浏览器不支持时降级为直接切换）
+- 使用 `MutationObserver` 监听 `<html>` 的 class 变化，防止切换语言时 React 协调移除 `.dark` 类（回调在浏览器绘制前执行，无白色闪烁）
 - 使用 `nav-link` CSS 类，与导航链接视觉一致（opacity 0.6 → 1）
 
 ---
