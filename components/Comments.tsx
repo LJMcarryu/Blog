@@ -3,17 +3,23 @@
 import { useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
 
-const GISCUS_REPO = "LJMcarryu/Blog";
-const GISCUS_REPO_ID = "R_kgDORbknjA";
-const GISCUS_CATEGORY = "Announcements";
-const GISCUS_CATEGORY_ID = "DIC_kwDORbknjM4C3c0j";
+const GISCUS_REPO = process.env.NEXT_PUBLIC_GISCUS_REPO || "LJMcarryu/Blog";
+const GISCUS_REPO_ID = process.env.NEXT_PUBLIC_GISCUS_REPO_ID || "R_kgDORbknjA";
+const GISCUS_CATEGORY = process.env.NEXT_PUBLIC_GISCUS_CATEGORY || "Announcements";
+const GISCUS_CATEGORY_ID = process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID || "DIC_kwDORbknjM4C3c0j";
 
 export default function Comments() {
   const ref = useRef<HTMLDivElement>(null);
   const locale = useLocale();
 
   useEffect(() => {
-    if (!ref.current || ref.current.hasChildNodes()) return;
+    const container = ref.current;
+    if (!container) return;
+
+    // Clear previous Giscus instance when locale changes
+    while (container.firstChild) {
+      container.removeChild(container.firstChild);
+    }
 
     const script = document.createElement("script");
     script.src = "https://giscus.app/client.js";
@@ -31,7 +37,7 @@ export default function Comments() {
     script.setAttribute("crossorigin", "anonymous");
     script.async = true;
 
-    ref.current.appendChild(script);
+    container.appendChild(script);
   }, [locale]);
 
   return <div ref={ref} />;

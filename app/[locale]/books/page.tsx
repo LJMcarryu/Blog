@@ -1,31 +1,16 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { BOOKS, type BookStatus } from "@/data/books";
 
-type BookStatus = "reading" | "read" | "want";
-
-interface Book {
-  title: string;
-  author: string;
-  rating?: number; // 1–5，仅"已读"填写
-  note?: string;
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "books" });
+  return { title: t("title") };
 }
-
-// ✏️ 在这里填写你的书单 / Edit your book list here
-const BOOKS: Record<BookStatus, Book[]> = {
-  reading: [
-    { title: "[ 书名 / Book Title ]", author: "[ 作者 / Author ]" },
-  ],
-  read: [
-    {
-      title: "[ 书名 / Book Title ]",
-      author: "[ 作者 / Author ]",
-      rating: 5,
-      note: "[ 一句话评价 / One-line review ]",
-    },
-  ],
-  want: [
-    { title: "[ 书名 / Book Title ]", author: "[ 作者 / Author ]" },
-  ],
-};
 
 function Stars({ count }: { count: number }) {
   return (
@@ -51,9 +36,9 @@ export default async function BooksPage({
   ];
 
   return (
-    <div className="prose prose-gray dark:prose-invert m-auto">
+    <div className="prose m-auto">
       <h1 className="slide-enter-1">{t("title")}</h1>
-      <p className="not-prose text-base text-gray-500 dark:text-gray-400 slide-enter-2">
+      <p className="not-prose text-base slide-enter-2" style={{ color: "var(--fg-light)" }}>
         {t("subtitle")}
       </p>
 
@@ -71,7 +56,7 @@ export default async function BooksPage({
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-medium text-sm">{book.title}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <p className="text-xs mt-0.5" style={{ color: "var(--fg-light)" }}>
                           {book.author}
                         </p>
                       </div>
@@ -80,7 +65,7 @@ export default async function BooksPage({
                       )}
                     </div>
                     {book.note && (
-                      <p className="text-xs text-gray-500 mt-2 italic">
+                      <p className="text-xs mt-2 italic" style={{ color: "var(--fg-light)" }}>
                         {book.note}
                       </p>
                     )}

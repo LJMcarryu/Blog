@@ -1,7 +1,7 @@
 import { Link } from "@/i18n/navigation";
 import { Post } from "@/lib/posts";
 
-export default function PostCard({ post }: { post: Post; locale: string }) {
+export default function PostCard({ post }: { post: Post }) {
   return (
     <Link
       href={`/blog/${post.slug}`}

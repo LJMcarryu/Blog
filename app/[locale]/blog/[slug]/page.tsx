@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
@@ -5,12 +6,32 @@ import { getPostBySlug, getPostsByLocale } from "@/lib/posts";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import Comments from "@/components/Comments";
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string; slug: string }>;
+}): Promise<Metadata> {
+  const { locale, slug } = await params;
+  const post = getPostBySlug(slug, locale);
+  if (!post) return { title: "Not Found" };
+
+  return {
+    title: post.title,
+    description: post.description || post.content.slice(0, 160),
+    openGraph: {
+      title: post.title,
+      description: post.description || post.content.slice(0, 160),
+      type: "article",
+      publishedTime: post.date,
+    },
+  };
+}
+
 export function generateStaticParams({
   params,
 }: {
   params: { locale: string };
 }) {
-  if (!params?.locale) return [];
   return getPostsByLocale(params.locale).map((post) => ({ slug: post.slug }));
 }
 

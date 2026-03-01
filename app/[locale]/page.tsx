@@ -1,13 +1,7 @@
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 import { getPostsByLocale } from "@/lib/posts";
-
-// ✏️ 填写你的社交链接
-const SOCIAL_LINKS = [
-  { label: "GitHub",     href: "https://github.com/LJMcarryu" },
-  { label: "Twitter / X", href: "#" },
-  { label: "Email",      href: "mailto:your@email.com" },
-];
+import { SOCIAL_LINKS } from "@/data/social-links";
 
 export default async function HomePage({
   params,

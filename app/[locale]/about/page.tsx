@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
 
@@ -13,6 +14,16 @@ const SKILLS = [
   "Docker",
 ];
 
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "about" });
+  return { title: t("title") };
+}
+
 export default async function AboutPage({
   params,
 }: {
@@ -22,9 +33,9 @@ export default async function AboutPage({
   const t = await getTranslations({ locale, namespace: "about" });
 
   return (
-    <div className="prose prose-gray dark:prose-invert m-auto">
+    <div className="prose m-auto">
       <h1 className="slide-enter-1">{t("title")}</h1>
-      <p className="not-prose text-base text-gray-500 dark:text-gray-400 slide-enter-2">
+      <p className="not-prose text-base slide-enter-2" style={{ color: "var(--fg-light)" }}>
         {t("subtitle")}
       </p>
 
@@ -39,7 +50,8 @@ export default async function AboutPage({
           {SKILLS.map((skill) => (
             <span
               key={skill}
-              className="px-3 py-1 text-sm rounded-full border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400"
+              className="px-3 py-1 text-sm rounded-full border border-gray-200 dark:border-gray-700"
+              style={{ color: "var(--fg-light)" }}
             >
               {skill}
             </span>
@@ -53,25 +65,29 @@ export default async function AboutPage({
         <div className="not-prose flex flex-col gap-3">
           <Link
             href="/now"
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
+            style={{ color: "var(--fg-light)" }}
           >
             {t("nowLink")}
           </Link>
           <Link
             href="/uses"
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
+            style={{ color: "var(--fg-light)" }}
           >
             {t("usesLink")}
           </Link>
           <Link
             href="/books"
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
+            style={{ color: "var(--fg-light)" }}
           >
             {t("booksLink")}
           </Link>
           <Link
             href="/links"
-            className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
+            style={{ color: "var(--fg-light)" }}
           >
             {t("linksLink")}
           </Link>

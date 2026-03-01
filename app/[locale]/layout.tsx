@@ -6,7 +6,10 @@ import Navigation from "@/components/Navigation";
 import "../globals.css";
 
 export const metadata: Metadata = {
-  title: "My Blog",
+  title: {
+    default: "Jimmy's Blog",
+    template: "%s | Jimmy's Blog",
+  },
   description: "个人博客 | Personal Blog",
 };
 

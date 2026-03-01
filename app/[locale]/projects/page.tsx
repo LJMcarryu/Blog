@@ -1,26 +1,16 @@
+import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
+import { PROJECTS } from "@/data/projects";
 
-// ✏️ 在这里添加你的项目 / Add your projects here
-const PROJECTS = [
-  {
-    name: "个人博客 / Personal Blog",
-    description: {
-      zh: "用 Next.js 15 + Tailwind CSS v4 构建的中英双语个人博客，支持 MDX 文章和 Giscus 评论。",
-      en: "A bilingual personal blog built with Next.js 15 + Tailwind CSS v4, supporting MDX posts and Giscus comments.",
-    },
-    tech: ["Next.js", "TypeScript", "Tailwind CSS", "MDX", "next-intl"],
-    github: "https://github.com/LJMcarryu/Blog",
-    live: "#",
-  },
-  // 在下方继续添加项目...
-  // {
-  //   name: "项目名称",
-  //   description: { zh: "中文描述", en: "English description" },
-  //   tech: ["Tech1", "Tech2"],
-  //   github: "https://github.com/...",
-  //   live: "https://...",
-  // },
-];
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: string }>;
+}): Promise<Metadata> {
+  const { locale } = await params;
+  const t = await getTranslations({ locale, namespace: "projects" });
+  return { title: t("title") };
+}
 
 export default async function ProjectsPage({
   params,
@@ -31,9 +21,9 @@ export default async function ProjectsPage({
   const t = await getTranslations({ locale, namespace: "projects" });
 
   return (
-    <div className="prose prose-gray dark:prose-invert m-auto">
+    <div className="prose m-auto">
       <h1 className="slide-enter-1">{t("title")}</h1>
-      <p className="not-prose text-base text-gray-500 dark:text-gray-400 slide-enter-2">
+      <p className="not-prose text-base slide-enter-2" style={{ color: "var(--fg-light)" }}>
         {t("subtitle")}
       </p>
 
@@ -44,7 +34,7 @@ export default async function ProjectsPage({
             className="p-5 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
           >
             <h2 className="text-lg font-semibold mb-2">{project.name}</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+            <p className="text-sm mb-3" style={{ color: "var(--fg-light)" }}>
               {project.description[locale as "zh" | "en"] ??
                 project.description.en}
             </p>
@@ -52,7 +42,8 @@ export default async function ProjectsPage({
               {project.tech.map((tech) => (
                 <span
                   key={tech}
-                  className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
+                  className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800"
+                  style={{ color: "var(--fg-light)" }}
                 >
                   {tech}
                 </span>
@@ -64,7 +55,8 @@ export default async function ProjectsPage({
                   href={project.github}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
+                  style={{ color: "var(--fg-light)" }}
                 >
                   {t("github")} ↗
                 </a>
@@ -74,7 +66,8 @@ export default async function ProjectsPage({
                   href={project.live}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors"
+                  className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
+                  style={{ color: "var(--fg-light)" }}
                 >
                   {t("live")} ↗
                 </a>

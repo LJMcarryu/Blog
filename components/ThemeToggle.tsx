@@ -51,9 +51,8 @@ export default function ThemeToggle() {
     };
 
     // Use View Transitions API for a smooth fade if available
-    if (typeof document !== "undefined" && "startViewTransition" in document) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (document as any).startViewTransition(apply);
+    if ("startViewTransition" in document) {
+      (document as unknown as { startViewTransition: (cb: () => void) => void }).startViewTransition(apply);
     } else {
       apply();
     }
