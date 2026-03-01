@@ -7,6 +7,7 @@ export interface Post {
   title: string;
   date: string;
   description?: string;
+  tags?: string[];
   content: string;
 }
 
@@ -31,6 +32,7 @@ export function getPostsByLocale(locale: string): Post[] {
           title: data.title ?? slug,
           date: data.date ?? "",
           description: data.description ?? "",
+          tags: Array.isArray(data.tags) ? data.tags : [],
           content,
         };
       } catch {
@@ -39,6 +41,7 @@ export function getPostsByLocale(locale: string): Post[] {
           title: slug,
           date: "",
           description: "",
+          tags: [],
           content: "",
         };
       }
@@ -64,6 +67,7 @@ export function getPostBySlug(slug: string, locale: string): Post | null {
       title: data.title ?? slug,
       date: data.date ?? "",
       description: data.description ?? "",
+      tags: Array.isArray(data.tags) ? data.tags : [],
       content,
     };
   } catch {

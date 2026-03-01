@@ -3,6 +3,9 @@ import { NextIntlClientProvider, hasLocale } from "next-intl";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import Navigation from "@/components/Navigation";
+import Footer from "@/components/Footer";
+import BackToTop from "@/components/BackToTop";
+import Lightbox from "@/components/Lightbox";
 import "../globals.css";
 
 export const metadata: Metadata = {
@@ -47,10 +50,13 @@ export default async function LocaleLayout({
           }}
         />
       </head>
-      <body className="min-h-screen antialiased">
+      <body className="min-h-screen antialiased flex flex-col">
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Navigation />
-          <main className="max-w-3xl mx-auto px-6 py-10">{children}</main>
+          <main className="max-w-3xl mx-auto px-6 py-10 flex-1 w-full">{children}</main>
+          <Footer />
+          <BackToTop />
+          <Lightbox />
         </NextIntlClientProvider>
       </body>
     </html>

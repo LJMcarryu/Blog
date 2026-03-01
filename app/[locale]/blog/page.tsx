@@ -19,14 +19,27 @@ export default async function BlogPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; tag?: string }>;
 }) {
   const { locale } = await params;
-  const { q } = await searchParams;
+  const { q, tag } = await searchParams;
   const t = await getTranslations({ locale, namespace: "blog" });
 
-  let posts = getPostsByLocale(locale);
+  const allPosts = getPostsByLocale(locale);
 
+  // Collect all unique tags
+  const allTags = Array.from(
+    new Set(allPosts.flatMap((p) => p.tags ?? []))
+  ).sort();
+
+  let posts = allPosts;
+
+  // Filter by tag
+  if (tag) {
+    posts = posts.filter((p) => p.tags?.includes(tag));
+  }
+
+  // Filter by search query
   if (q) {
     const query = q.toLowerCase();
     posts = posts.filter(
@@ -42,6 +55,30 @@ export default async function BlogPage({
       <div className="not-prose slide-enter-2">
         <SearchBar placeholder={t("searchPlaceholder")} />
       </div>
+
+      {/* Tag filter */}
+      {allTags.length > 0 && (
+        <div className="not-prose mt-4 flex flex-wrap gap-2 slide-enter-2">
+          <a
+            href={q ? `?q=${encodeURIComponent(q)}` : "?"}
+            className="tag-pill"
+            data-active={!tag ? "true" : undefined}
+          >
+            {locale === "zh" ? "全部" : "All"}
+          </a>
+          {allTags.map((t) => (
+            <a
+              key={t}
+              href={`?tag=${encodeURIComponent(t)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              className="tag-pill"
+              data-active={tag === t ? "true" : undefined}
+            >
+              {t}
+            </a>
+          ))}
+        </div>
+      )}
+
       <div className="not-prose mt-8 flex flex-col gap-4 slide-enter-3">
         {posts.map((post) => (
           <PostCard key={post.slug} post={post} />

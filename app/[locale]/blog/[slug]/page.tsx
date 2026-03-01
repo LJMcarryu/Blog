@@ -7,6 +7,8 @@ import { getReadingTime } from "@/lib/reading-time";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypePrettyCode from "rehype-pretty-code";
 import Comments from "@/components/Comments";
+import TableOfContents from "@/components/TableOfContents";
+import CodeCopyButton from "@/components/CodeCopyButton";
 
 export async function generateMetadata({
   params,
@@ -59,6 +61,12 @@ export default async function PostPage({
 
   const readingTime = getReadingTime(post.content, locale);
 
+  // Get prev/next posts
+  const allPosts = getPostsByLocale(locale);
+  const currentIndex = allPosts.findIndex((p) => p.slug === slug);
+  const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
+  const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
+
   return (
     <article>
       {/* Header — staggered entry */}
@@ -71,11 +79,30 @@ export default async function PostPage({
           ← {t("backToList")}
         </Link>
         <h1 className="mt-6 mb-2">{post.title}</h1>
-        <p className="not-prose text-sm flex gap-3" style={{ color: "var(--fg-light)" }}>
+        <p className="not-prose text-sm flex flex-wrap items-center gap-3" style={{ color: "var(--fg-light)" }}>
           <span>{post.date}</span>
           <span>·</span>
           <span>{readingTime}</span>
+          {post.tags && post.tags.length > 0 && (
+            <>
+              <span>·</span>
+              {post.tags.map((tag) => (
+                <Link
+                  key={tag}
+                  href={`/blog?tag=${encodeURIComponent(tag)}`}
+                  className="tag-pill-sm"
+                >
+                  {tag}
+                </Link>
+              ))}
+            </>
+          )}
         </p>
+      </div>
+
+      {/* Table of Contents */}
+      <div className="prose m-auto slide-enter-content">
+        <TableOfContents />
       </div>
 
       {/* Article body — auto-staggers each MDX element */}
@@ -99,7 +126,43 @@ export default async function PostPage({
             },
           }}
         />
+        <CodeCopyButton />
       </div>
+
+      {/* Prev / Next navigation */}
+      {(prevPost || nextPost) && (
+        <nav className="prose m-auto mt-12 not-prose" aria-label="Post navigation">
+          <hr className="mb-6" style={{ width: "50px", borderColor: "rgba(125,125,125,0.25)" }} />
+          <div className="flex justify-between gap-4 text-sm">
+            <div className="flex-1">
+              {prevPost && (
+                <Link
+                  href={`/blog/${prevPost.slug}`}
+                  className="post-nav-link"
+                >
+                  <span className="post-nav-label">
+                    ← {locale === "zh" ? "上一篇" : "Previous"}
+                  </span>
+                  <span className="post-nav-title">{prevPost.title}</span>
+                </Link>
+              )}
+            </div>
+            <div className="flex-1 text-right">
+              {nextPost && (
+                <Link
+                  href={`/blog/${nextPost.slug}`}
+                  className="post-nav-link"
+                >
+                  <span className="post-nav-label">
+                    {locale === "zh" ? "下一篇" : "Next"} →
+                  </span>
+                  <span className="post-nav-title">{nextPost.title}</span>
+                </Link>
+              )}
+            </div>
+          </div>
+        </nav>
+      )}
 
       <div className="mt-16">
         <Comments />

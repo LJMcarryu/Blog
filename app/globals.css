@@ -287,3 +287,217 @@ html:not(.no-sliding) .slide-enter-content > * {
   font-size: 0.88em;
   font-weight: 500;
 }
+
+/* ─── Tag pills ─── */
+.tag-pill {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(125, 125, 125, 0.2);
+  color: var(--fg-light);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.tag-pill:hover {
+  border-color: var(--fg);
+  color: var(--fg);
+}
+.tag-pill[data-active="true"] {
+  background-color: var(--fg-deeper);
+  color: var(--c-bg);
+  border-color: var(--fg-deeper);
+}
+
+.tag-pill-sm {
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  background-color: rgba(125, 125, 125, 0.1);
+  color: var(--fg-light);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+.tag-pill-sm:hover {
+  color: var(--fg);
+  background-color: rgba(125, 125, 125, 0.2);
+}
+
+/* ─── Table of Contents ─── */
+.toc {
+  border-left: 2px solid rgba(125, 125, 125, 0.15);
+  padding-left: 1rem;
+  margin-bottom: 2rem;
+}
+.toc ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.toc li {
+  margin: 0;
+  padding: 0;
+}
+.toc a {
+  display: block;
+  padding: 0.15rem 0;
+  font-size: 0.8rem;
+  color: var(--fg-light);
+  text-decoration: none;
+  border-bottom: none !important;
+  transition: color 0.2s ease;
+}
+.toc a:hover { color: var(--fg-deep); }
+.toc a.toc-active { color: var(--fg-deeper); font-weight: 500; }
+
+/* ─── Code copy button ─── */
+.copy-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  border-radius: 0.25rem;
+  border: 1px solid rgba(125, 125, 125, 0.2);
+  background: var(--c-bg);
+  color: var(--fg-light);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  z-index: 1;
+}
+pre:hover .copy-btn { opacity: 1; }
+.copy-btn:hover {
+  color: var(--fg);
+  border-color: var(--fg);
+}
+.copy-btn.copied {
+  color: #22c55e;
+  border-color: #22c55e;
+}
+
+/* ─── Post prev/next navigation ─── */
+.post-nav-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  text-decoration: none !important;
+  border-bottom: none !important;
+  transition: opacity 0.2s ease;
+  opacity: 0.6;
+}
+.post-nav-link:hover { opacity: 1; }
+.post-nav-label {
+  font-size: 0.75rem;
+  color: var(--fg-light);
+}
+.post-nav-title {
+  font-size: 0.875rem;
+  color: var(--fg-deep);
+}
+
+/* ─── Back to top button ─── */
+.back-to-top {
+  position: fixed;
+  bottom: 2rem;
+  right: 2rem;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(125, 125, 125, 0.2);
+  background: var(--c-bg);
+  color: var(--fg-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  opacity: 0.6;
+  z-index: 50;
+  animation: slide-enter 0.3s both;
+}
+.back-to-top:hover {
+  opacity: 1;
+  border-color: var(--fg);
+  color: var(--fg);
+}
+
+/* ─── Lightbox overlay ─── */
+.lightbox-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: zoom-out;
+  animation: fade-in 0.2s both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+}
+
+.lightbox-close {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: color 0.2s ease;
+  z-index: 101;
+}
+.lightbox-close:hover { color: #fff; }
+
+.lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 0.5rem;
+  cursor: default;
+}
+
+/* Make photos clickable */
+.photos-grid img,
+article .prose img {
+  cursor: zoom-in;
+}
+
+/* ─── Site footer ─── */
+.site-footer {
+  border-top: 1px solid rgba(125, 125, 125, 0.1);
+  padding: 2rem 1.5rem;
+  margin-top: 4rem;
+}
+
+.site-footer-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.site-footer-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.site-footer-links a {
+  font-size: 0.8rem;
+  color: var(--fg-light);
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+.site-footer-links a:hover { color: var(--fg-deep); }
+
+.site-footer p {
+  font-size: 0.75rem;
+  color: var(--fg-light);
+  opacity: 0.6;
+  margin: 0;
+}

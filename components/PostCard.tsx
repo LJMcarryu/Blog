@@ -21,6 +21,22 @@ export default function PostCard({ post }: { post: Post }) {
         >
           {post.title}
         </span>
+        {post.tags && post.tags.length > 0 && (
+          <span className="inline-flex gap-1.5 ml-2">
+            {post.tags.map((tag) => (
+              <span
+                key={tag}
+                className="text-xs px-1.5 py-0.5 rounded"
+                style={{
+                  color: "var(--fg-light)",
+                  backgroundColor: "rgba(125, 125, 125, 0.1)",
+                }}
+              >
+                {tag}
+              </span>
+            ))}
+          </span>
+        )}
         {post.description && (
           <p
             className="text-xs mt-0.5 line-clamp-1"

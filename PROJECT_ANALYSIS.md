@@ -1,7 +1,7 @@
 # 项目分析报告：My Blog
 
 > 生成日期：2026-03-01
-> 第五轮更新：2026-03-01（第一梯队功能实现 + 内容填充）
+> 第六轮更新：2026-03-01（第二梯队功能实现）
 > 分析范围：全部源代码文件、配置文件、样式文件、i18n 文件、MDX 内容
 
 ---
@@ -14,10 +14,11 @@
 4. [第三轮复查修复清单](#4-第三轮复查修复清单)
 5. [第四轮复查](#5-第四轮复查)
 6. [第五轮：第一梯队功能实现](#6-第五轮第一梯队功能实现)
-7. [新增文件说明](#7-新增文件说明)
-8. [架构改进](#8-架构改进)
-9. [全面审计通过项](#9-全面审计通过项)
-10. [遗留事项](#10-遗留事项)
+7. [第六轮：第二梯队功能实现](#7-第六轮第二梯队功能实现)
+8. [新增文件说明](#8-新增文件说明)
+9. [架构改进](#9-架构改进)
+10. [全面审计通过项](#10-全面审计通过项)
+11. [遗留事项](#11-遗留事项)
 
 ---
 
@@ -235,7 +236,96 @@
 
 ---
 
-## 7. 新增文件说明
+## 7. 第六轮：第二梯队功能实现（7 项 ✅）
+
+### 7.1 标签/分类系统
+
+**文件:** `lib/posts.ts`, `content/**/*.mdx`, `components/PostCard.tsx`, `app/[locale]/blog/page.tsx`, `app/[locale]/blog/[slug]/page.tsx`
+
+**实现:**
+- `Post` 接口新增 `tags?: string[]` 字段
+- 所有 8 个 MDX 文件添加 `tags` frontmatter（如 `["React", "TypeScript", "教程"]`）
+- `PostCard` 在标题右侧显示标签 pill
+- 博客列表页顶部显示标签过滤栏（全部 / 按标签），支持 `?tag=React` URL 参数
+- 博客文章页标题下方显示可点击标签，链接到筛选结果
+- 搜索和标签过滤可同时使用
+
+### 7.2 目录组件 (TOC)
+
+**文件:** `components/TableOfContents.tsx`
+
+**实现:**
+- 客户端组件，延迟 150ms 后扫描 `<article>` 内的 h2/h3
+- 为无 id 的 heading 自动生成 slug（支持中英文字符）
+- `IntersectionObserver` 实时追踪当前可见的 heading
+- 左侧竖线装饰 + 高亮当前 heading
+- h3 级别缩进显示
+- 少于 2 个 heading 时不显示
+- 点击平滑滚动到对应章节
+- 符合 React 19 ESLint 规则（无 setState in effect、无 ref in render）
+
+### 7.3 代码块复制按钮
+
+**文件:** `components/CodeCopyButton.tsx`, `app/globals.css`
+
+**实现:**
+- 客户端组件，延迟 100ms 后为所有 `article pre` 注入复制按钮
+- 默认隐藏，鼠标悬停 `pre` 时淡入显示
+- 点击复制后显示 "Copied!" 绿色反馈，2 秒后恢复
+- 使用 `navigator.clipboard` API
+- 支持 try-catch 错误处理
+
+### 7.4 上一篇/下��篇导航
+
+**文件:** `app/[locale]/blog/[slug]/page.tsx`
+
+**实现:**
+- 从排序后的文章列表中查找当前文章位置
+- 在评论区上方显示上一篇（更早）和下一篇（更新）
+- 左侧显示上一篇，右侧显示下一篇
+- 支持中英文标签（"← 上一篇" / "← Previous"）
+- 悬停时透明度变化
+
+### 7.5 返回顶部按钮
+
+**文件:** `components/BackToTop.tsx`, `app/[locale]/layout.tsx`, `app/globals.css`
+
+**实现:**
+- 固定在右下角，滚动超过 400px 后出现
+- 圆形按钮 + 向上箭头图标
+- 点击平滑滚动到顶部
+- 出现时带 `slide-enter` 动画
+- `aria-label="Back to top"`
+- passive scroll listener
+
+### 7.6 图片 Lightbox
+
+**文件:** `components/Lightbox.tsx`, `app/[locale]/layout.tsx`, `app/[locale]/photos/page.tsx`, `app/globals.css`
+
+**实现:**
+- 全局组件，挂载在 layout 中
+- 点击 `article` 或 `.photos-grid` 内的图片触发
+- 暗色半透明遮罩 + 居中大图
+- 点击遮罩或按 `Escape` 关闭
+- 右上角关闭按钮
+- 淡入动画
+- 图片 `cursor: zoom-in`，遮罩 `cursor: zoom-out`
+- `role="dialog"` + `aria-label`
+
+### 7.7 网站底部 Footer
+
+**文件:** `components/Footer.tsx`, `app/[locale]/layout.tsx`, `app/globals.css`
+
+**实现:**
+- 显示社交链接（过滤 `href="#"`）+ RSS 链接
+- 底部版权信息 `© {year} Jimmy's Blog`
+- `body` 改为 `flex flex-col`，`main` 加 `flex-1`，footer 始终在底部
+- 居中布局 + 响应式 flex-wrap
+- 悬停颜色变化
+
+---
+
+## 8. 新增文件说明
 
 | 文件 | 用途 |
 |------|------|
@@ -252,6 +342,16 @@
 | `app/[locale]/not-found.tsx` | 自定义 404 页面（中英文） |
 | `app/[locale]/blog/[slug]/error.tsx` | 博客文章错误边界（中英文） |
 | `lib/reading-time.ts` | 阅读时间计算（中/英文） |
+| `components/TableOfContents.tsx` | 目录组件（IntersectionObserver） |
+| `components/CodeCopyButton.tsx` | 代码块复制按钮 |
+| `components/BackToTop.tsx` | 返回顶部浮动按钮 |
+| `components/Lightbox.tsx` | 图片灯箱组件 |
+| `components/Footer.tsx` | 网站底部 Footer |
+| `content/*/building-my-blog.mdx` | 博客搭建记录（中/英） |
+| `content/*/react-hooks-guide.mdx` | React Hooks 指南（中/英） |
+| `content/*/dark-mode-implementation.mdx` | 暗色模式实现（中/英） |
+| `public/photos/*.svg` | 4 张 SVG 插画照片 |
+| `.env.example` | 环境变量模板 |
 | `content/zh/building-my-blog.mdx` | 博客搭建记录（中文��� |
 | `content/en/building-my-blog.mdx` | 博客搭建记录（英文） |
 | `content/zh/react-hooks-guide.mdx` | React Hooks 指南（中文） |
@@ -263,12 +363,12 @@
 
 ---
 
-## 8. 架构改进
+## 9. 架构改进
 
-### 8.1 数据与视图分离
+### 9.1 数据与视图分离
 所有展示数据从页面组件提取到 `data/` 目录。
 
-### 8.2 SEO 完善
+### 9.2 SEO 完善
 - `metadataBase` 设置绝对 URL 基准
 - 根布局 title template: `"%s | Jimmy's Blog"`
 - 每页 `generateMetadata()` 返回本地化标题
@@ -277,24 +377,125 @@
 - RSS Feed 自动生成 + `<link rel="alternate">` 发现
 - favicon 动态生成
 
-### 8.3 容错与健壮性
+### 9.3 容错与健壮性
 - `lib/posts.ts` 文件读取 + frontmatter 解析均有 try-catch
 - 空日期排序回退到时间戳 0
 - `href="#"` 链接在渲染时过滤
 
-### 8.4 类型安全
+### 9.4 类型安全
 - Project description: `Record<"zh" | "en", string>`
+- Post tags: `tags?: string[]` with `Array.isArray` guard
 - ThemeToggle: `as unknown as { startViewTransition }` 替代 `as any`
 - generateStaticParams 签名与 Next.js 16 一致
 
-### 8.5 代码高亮
+### 9.5 代码高亮 + 复制
 - `rehype-pretty-code` + `shiki` 构建时高亮（零运行时开销）
 - 双主题自动跟随 light/dark 模式
 - CSS `[data-theme]` 选择器控制显示
+- 代码块复制按钮（悬停显示，点击反馈）
 
-### 8.6 响应式设计
+### 9.6 响应式设计
 - 640px 断点：桌面导航 → 汉堡菜单
 - 下拉菜单带动画 + 主题色适配
+
+### 9.7 用户体验增强
+- 标签系统：文章分类标签 + URL 参数过滤
+- 目录组件：自动生成 + IntersectionObserver 滚动高亮
+- 上一篇/下一篇：文章底部双向导航
+- 返回顶部：浮动按钮 + 滚动检测
+- 图片灯箱：点击放大 + Escape 关闭
+- 网站 Footer：社交链接 + RSS + 版权
+
+---
+
+## 10. 全面审计通过项
+
+| 检查项 | 状态 |
+|--------|------|
+| **安全** | |
+| XSS 防护 | ✅ 无 dangerouslySetInnerHTML 风险（仅暗色模式脚本） |
+| 外部链接 rel="noopener noreferrer" | ✅ 全部外链已设置 |
+| 无硬编码密钥/凭证 | ✅ |
+| **TypeScript** | |
+| 严格模式启用 | ✅ |
+| 无 `as any` 类型断言 | ✅ |
+| 无未使用 import | ✅ |
+| 所有类型定义精确 | ✅ |
+| **React** | |
+| 无 index-as-key anti-pattern | ✅ |
+| Server/Client 组件划分正确 | ✅ |
+| 所有 useEffect 正确清理 | ✅ |
+| 无 setState-in-effect 违规 | ✅ |
+| **无障碍** | |
+| 所有装饰性 SVG 有 aria-hidden | ✅ |
+| 所有交互元素有 aria-label | ✅ |
+| 图片有 alt 文本 | ✅ |
+| 语义化 HTML（header/main/article/nav/footer） | ✅ |
+| Lightbox role="dialog" | ✅ |
+| TOC nav aria-label | ✅ |
+| **SEO** | |
+| 所有页面有 generateMetadata | ✅ |
+| metadataBase 已设置 | ✅ |
+| OpenGraph 博客文章 metadata | ✅ |
+| robots.txt + sitemap.xml 已生成 | ✅ |
+| RSS Feed 可用 | ✅ |
+| favicon 已生成 | ✅ |
+| **i18n** | |
+| zh/en 消息文件键值一致 | ✅ |
+| 阅读时间 + 上下篇导航支持中英文 | ✅ |
+| **内容** | |
+| 4 篇技术博客（中英双语，含标签） | ✅ |
+| 数据文件内容完整 | ✅ |
+
+---
+
+## 11. 遗留事项
+
+### 用户操作
+
+| 事项 | 说明 |
+|------|------|
+| 填写社交链接 | 编辑 `data/social-links.ts`，将 `#` 替换为实际 URL |
+| 创建 `.env.local` | 基于 `.env.example` 创建，填入实际站点 URL |
+| 替换照片 | 将真实照片放入 `public/photos/`，替换示例 SVG |
+| 部署到 Vercel | `vercel` 一键部署 |
+
+### 建议后续增强（第三梯队）
+
+| 事项 | 说明 |
+|------|------|
+| OG 图片生成 | `app/og/route.tsx` 动态生成社交分享图 |
+| JSON-LD 结构化数据 | 文章页添加 Schema.org 标记 |
+| 网站分析 | 集成 Umami / Plausible |
+| 单元测试 | 为 `lib/posts.ts` 等核心模块编写测试 |
+| 博客分页 | 文章增多后添加分页 |
+| Pagefind 全文搜索 | 替代当前 URL query 搜索 |
+
+---
+
+## 构建验证
+
+```
+✓ Compiled successfully
+✓ TypeScript check passed
+✓ ESLint — 0 errors, 0 warnings
+✓ 33 routes generated (including feed.xml, icon, robots.txt, sitemap.xml)
+✓ All routes functional
+```
+
+---
+
+## 修复与功能统计
+
+| 轮次 | 项数 | 影响文件 | 关键改进 |
+|------|------|----------|----------|
+| 第一轮 | 19 项 | 35 文件 | 搜索实现、SEO、数据分离、a11y |
+| 第二轮 | 7 项 | 10 文件 | NaN 排序、OG 清洗、React key、i18n error |
+| 第三轮 | 6 项 | 9 文件 | metadataBase、类型收紧、try-catch、死代码 |
+| 第四轮 | 1 项 | 1 文件 | ESLint 零警告（catch 参数清理） |
+| 第五轮 | 6 项 | 25+ 文件 | 代码高亮、RSS、阅读时间、favicon、移动导航、内容 |
+| 第六轮 | 7 项 | 15+ 文件 | 标签系统、TOC、复制按钮、上下篇、返回顶部、灯箱、Footer |
+| **合计** | **46 项** | — | **全功能博客，build 0 errors, lint 0 warnings** |
 
 ---
 

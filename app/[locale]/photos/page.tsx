@@ -51,7 +51,7 @@ export default async function PhotosPage({
           <p className="text-sm" style={{ color: "var(--fg-light)" }}>{t("empty")}</p>
         </div>
       ) : (
-        <div className="not-prose mt-8 columns-2 sm:columns-3 gap-3 slide-enter-3">
+        <div className="not-prose mt-8 columns-2 sm:columns-3 gap-3 slide-enter-3 photos-grid">
           {photos.map((src) => (
             <div key={src} className="break-inside-avoid mb-3">
               <Image
