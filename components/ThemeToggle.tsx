@@ -1,27 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 
 export default function ThemeToggle() {
   const [dark, setDark] = useState(false);
-  const pathname = usePathname();
 
-  // Apply theme from localStorage after every navigation (including locale switch)
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("blog-color-scheme");
-      const prefersDark = window.matchMedia(
-        "(prefers-color-scheme:dark)"
-      ).matches;
-      const shouldBeDark =
-        saved === "dark" || (saved !== "light" && prefersDark);
-      document.documentElement.classList.toggle("dark", shouldBeDark);
-      setDark(shouldBeDark);
-    } catch (_) {
-      setDark(document.documentElement.classList.contains("dark"));
+    function applyTheme() {
+      try {
+        const saved = localStorage.getItem("blog-color-scheme");
+        const prefersDark = window.matchMedia(
+          "(prefers-color-scheme:dark)"
+        ).matches;
+        const shouldBeDark =
+          saved === "dark" || (saved !== "light" && prefersDark);
+        const isDark = document.documentElement.classList.contains("dark");
+        if (shouldBeDark !== isDark) {
+          document.documentElement.classList.toggle("dark", shouldBeDark);
+        }
+        setDark(shouldBeDark);
+      } catch (_) {
+        setDark(document.documentElement.classList.contains("dark"));
+      }
     }
-  }, [pathname]);
+
+    applyTheme();
+
+    // MutationObserver fires as a microtask (before browser paint),
+    // so when React reconciliation strips the "dark" class on locale switch,
+    // we re-apply it instantly — no white flash, no SSR issues.
+    const observer = new MutationObserver(applyTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   const toggle = () => {
     const html = document.documentElement;
