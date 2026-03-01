@@ -4,12 +4,12 @@
     "blog": "Blog"
   },
   "home": {
-    "greeting": "Hi, I'm",
     "name": "刘佳明(Jimmy)",
-    "bio": "Welcome to my personal blog, where I share thoughts on tech and life.",
-    "viewPosts": "View Posts",
+    "tagline": "[ A brief tagline about yourself, e.g. Full-stack Developer / Open Source Enthusiast ]",
+    "bio": "[ Write your personal bio here. Introduce your work experience, technical focus, and personal interests. ]",
+    "findMeOn": "Find me on",
     "latestPosts": "Latest Posts",
-    "viewAll": "View All →"
+    "viewAll": "All Posts →"
   },
   "blog": {
     "title": "All Posts",
