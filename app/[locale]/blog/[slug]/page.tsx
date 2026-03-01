@@ -6,6 +6,7 @@ import { getPostBySlug, getPostsByLocale } from "@/lib/posts";
 import { getReadingTime } from "@/lib/reading-time";
 import { MDXRemote } from "next-mdx-remote/rsc";
 import rehypePrettyCode from "rehype-pretty-code";
+import remarkGfm from "remark-gfm";
 import Comments from "@/components/Comments";
 import TableOfContents from "@/components/TableOfContents";
 import CodeCopyButton from "@/components/CodeCopyButton";
@@ -138,6 +139,7 @@ export default async function PostPage({
           source={post.content}
           options={{
             mdxOptions: {
+              remarkPlugins: [remarkGfm],
               rehypePlugins: [
                 [
                   rehypePrettyCode,
