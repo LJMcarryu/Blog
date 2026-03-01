@@ -5,9 +5,11 @@
   },
   "home": {
     "greeting": "Hi, I'm",
-    "name": "Your Name",
+    "name": "刘佳明(Jimmy)",
     "bio": "Welcome to my personal blog, where I share thoughts on tech and life.",
-    "viewPosts": "View Posts"
+    "viewPosts": "View Posts",
+    "latestPosts": "Latest Posts",
+    "viewAll": "View All →"
   },
   "blog": {
     "title": "All Posts",

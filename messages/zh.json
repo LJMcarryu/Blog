@@ -5,9 +5,11 @@
   },
   "home": {
     "greeting": "你好，我是",
-    "name": "你的名字",
+    "name": "刘佳明(Jimmy)",
     "bio": "这里是我的个人博客，记录技术与生活的思考。",
-    "viewPosts": "查看文章"
+    "viewPosts": "查看文章",
+    "latestPosts": "最新文章",
+    "viewAll": "查看全部 →"
   },
   "blog": {
     "title": "所有文章",
