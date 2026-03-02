@@ -49,13 +49,22 @@ export async function generateMetadata({
   };
 }
 
-export function generateStaticParams({
-  params,
-}: {
-  params: { locale: string };
-}) {
-  return getPostsByLocale(params.locale).map((post) => ({ slug: post.slug }));
+export async function generateStaticParams() {
+  const locales = ["zh", "en"];
+  const params: { locale: string; slug: string }[] = [];
+
+  for (const locale of locales) {
+    const posts = getPostsByLocale(locale);
+    posts.forEach((post) => {
+      params.push({ locale, slug: post.slug });
+    });
+  }
+
+  return params;
 }
+
+export const dynamicParams = false; // 404 for unknown slugs
+export const dynamic = 'force-static'; // Force static generation
 
 export default async function PostPage({
   params,

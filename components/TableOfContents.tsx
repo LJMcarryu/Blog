@@ -33,6 +33,8 @@ export default function TableOfContents() {
   const [activeId, setActiveId] = useState("");
 
   useEffect(() => {
+    let observer: IntersectionObserver | null = null;
+
     // Delay slightly to ensure MDX content is rendered
     const timer = setTimeout(() => {
       const items = getHeadings();
@@ -40,7 +42,7 @@ export default function TableOfContents() {
 
       setHeadings(items);
 
-      const observer = new IntersectionObserver(
+      observer = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
             if (entry.isIntersecting) {
@@ -52,14 +54,12 @@ export default function TableOfContents() {
       );
 
       const article = document.querySelector("article");
-      article?.querySelectorAll("h2, h3").forEach((node) => observer.observe(node));
-
-      // Store for cleanup
-      (timer as unknown as { observer: IntersectionObserver }).observer = observer;
+      article?.querySelectorAll("h2, h3").forEach((node) => observer?.observe(node));
     }, 150);
 
     return () => {
       clearTimeout(timer);
+      observer?.disconnect();
     };
   }, []);
 
