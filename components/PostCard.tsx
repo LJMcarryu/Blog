@@ -16,8 +16,8 @@ export default function PostCard({ post }: { post: Post }) {
       </time>
       <div>
         <span
-          className="text-sm font-medium transition-colors group-hover:text-black dark:group-hover:text-white"
-          style={{ color: "var(--fg)" }}
+          className="text-sm font-medium transition-opacity group-hover:opacity-100"
+          style={{ color: "var(--fg)", opacity: 0.75 }}
         >
           {post.title}
         </span>

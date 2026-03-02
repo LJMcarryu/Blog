@@ -47,7 +47,7 @@ export default async function PhotosPage({
       </p>
 
       {photos.length === 0 ? (
-        <div className="not-prose mt-8 text-center py-20 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 slide-enter-3">
+        <div className="not-prose mt-8 text-center py-20 rounded-xl border border-dashed slide-enter-3" style={{ borderColor: "rgba(125, 125, 125, 0.3)" }}>
           <p className="text-sm" style={{ color: "var(--fg-light)" }}>{t("empty")}</p>
         </div>
       ) : (

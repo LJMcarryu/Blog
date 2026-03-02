@@ -14,7 +14,7 @@ export async function generateMetadata({
 
 function Stars({ count }: { count: number }) {
   return (
-    <span className="text-yellow-400 text-xs" aria-label={`${count} stars`}>
+    <span className="text-xs" style={{ color: "#facc15" }} aria-label={`${count} stars`}>
       {"★".repeat(count)}
       {"☆".repeat(5 - count)}
     </span>
@@ -51,7 +51,8 @@ export default async function BooksPage({
                 {BOOKS[key].map((book) => (
                   <div
                     key={book.title}
-                    className="p-4 rounded-lg border border-gray-200 dark:border-gray-800"
+                    className="p-4 rounded-lg border"
+                    style={{ borderColor: "rgba(125, 125, 125, 0.2)" }}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>

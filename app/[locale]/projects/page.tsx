@@ -31,7 +31,10 @@ export default async function ProjectsPage({
         {PROJECTS.map((project) => (
           <div
             key={project.name}
-            className="p-5 rounded-xl border border-gray-200 dark:border-gray-800 hover:border-gray-400 dark:hover:border-gray-600 transition-colors"
+            className="p-5 rounded-xl border transition-colors"
+            style={{
+              borderColor: "rgba(125, 125, 125, 0.2)"
+            }}
           >
             <h2 className="text-lg font-semibold mb-2">{project.name}</h2>
             <p className="text-sm mb-3" style={{ color: "var(--fg-light)" }}>
@@ -41,8 +44,11 @@ export default async function ProjectsPage({
               {project.tech.map((tech) => (
                 <span
                   key={tech}
-                  className="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-800"
-                  style={{ color: "var(--fg-light)" }}
+                  className="px-2 py-0.5 text-xs rounded-full"
+                  style={{
+                    color: "var(--fg-light)",
+                    backgroundColor: "rgba(125, 125, 125, 0.1)"
+                  }}
                 >
                   {tech}
                 </span>
@@ -54,8 +60,8 @@ export default async function ProjectsPage({
                   href={project.github}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
-                  style={{ color: "var(--fg-light)" }}
+                  className="text-sm transition-opacity opacity-60 hover:opacity-100"
+                  style={{ color: "var(--fg)" }}
                 >
                   {t("github")} ↗
                 </a>
@@ -65,8 +71,8 @@ export default async function ProjectsPage({
                   href={project.live}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
-                  style={{ color: "var(--fg-light)" }}
+                  className="text-sm transition-opacity opacity-60 hover:opacity-100"
+                  style={{ color: "var(--fg)" }}
                 >
                   {t("live")} ↗
                 </a>

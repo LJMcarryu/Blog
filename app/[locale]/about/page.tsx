@@ -50,8 +50,11 @@ export default async function AboutPage({
           {SKILLS.map((skill) => (
             <span
               key={skill}
-              className="px-3 py-1 text-sm rounded-full border border-gray-200 dark:border-gray-700"
-              style={{ color: "var(--fg-light)" }}
+              className="px-3 py-1 text-sm rounded-full border"
+              style={{
+                color: "var(--fg-light)",
+                borderColor: "rgba(125, 125, 125, 0.2)"
+              }}
             >
               {skill}
             </span>
@@ -65,29 +68,29 @@ export default async function AboutPage({
         <div className="not-prose flex flex-col gap-3">
           <Link
             href="/now"
-            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
-            style={{ color: "var(--fg-light)" }}
+            className="text-sm transition-opacity opacity-60 hover:opacity-100"
+            style={{ color: "var(--fg)" }}
           >
             {t("nowLink")}
           </Link>
           <Link
             href="/uses"
-            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
-            style={{ color: "var(--fg-light)" }}
+            className="text-sm transition-opacity opacity-60 hover:opacity-100"
+            style={{ color: "var(--fg)" }}
           >
             {t("usesLink")}
           </Link>
           <Link
             href="/books"
-            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
-            style={{ color: "var(--fg-light)" }}
+            className="text-sm transition-opacity opacity-60 hover:opacity-100"
+            style={{ color: "var(--fg)" }}
           >
             {t("booksLink")}
           </Link>
           <Link
             href="/links"
-            className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
-            style={{ color: "var(--fg-light)" }}
+            className="text-sm transition-opacity opacity-60 hover:opacity-100"
+            style={{ color: "var(--fg)" }}
           >
             {t("linksLink")}
           </Link>

@@ -7,18 +7,18 @@
 /* ─── Design tokens ─── */
 :root {
   --c-bg:     #ffffff;
-  --fg:       #555555;
-  --fg-deep:  #222222;
+  --fg:       #333333;
+  --fg-deep:  #111111;
   --fg-deeper:#000000;
-  --fg-light: #888888;
+  --fg-light: #666666;
 }
 
 .dark {
-  --c-bg:     #050505;
-  --fg:       #bbbbbb;
-  --fg-deep:  #dddddd;
+  --c-bg:     #000000;
+  --fg:       #e0e0e0;
+  --fg-deep:  #eeeeee;
   --fg-deeper:#ffffff;
-  --fg-light: #888888;
+  --fg-light: #a8a8a8;
 }
 
 /* ─── Base ─── */
@@ -201,6 +201,7 @@ html:not(.no-sliding) .slide-enter-content > * {
 
 /* ─── Code blocks (rehype-pretty-code) ─── */
 .prose pre {
+  position: relative;
   border: 1px solid rgba(125, 125, 125, 0.15);
   border-radius: 0.5rem;
   padding: 1rem 1.25rem;
@@ -214,23 +215,44 @@ html:not(.no-sliding) .slide-enter-content > * {
   background-color: #161b22 !important;
 }
 
-/* Multi-theme: show correct theme based on light/dark */
-.prose pre [data-theme="light"],
-.prose pre code[data-theme="light"] { display: block; }
-.prose pre [data-theme="dark"],
-.prose pre code[data-theme="dark"] { display: none; }
+/* Language label on code blocks */
+.prose pre > code[data-language]::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 0.15rem 0.6rem;
+  font-size: 0.65rem;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--fg-light);
+  opacity: 0.6;
+  border-bottom-right-radius: 0.375rem;
+  border-top-left-radius: 0.375rem;
+  background: rgba(125, 125, 125, 0.08);
+  pointer-events: none;
+  user-select: none;
+}
 
-.dark .prose pre [data-theme="light"],
-.dark .prose pre code[data-theme="light"] { display: none; }
-.dark .prose pre [data-theme="dark"],
-.dark .prose pre code[data-theme="dark"] { display: block; }
+/* Dual-theme: apply correct Shiki CSS variable per mode */
+.prose pre code span {
+  color: var(--shiki-light) !important;
+}
+.dark .prose pre code span {
+  color: var(--shiki-dark) !important;
+}
 
 .prose pre code {
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
   font-size: inherit;
-  color: inherit;
+  color: #0a0a0a;
+}
+
+.dark .prose pre code {
+  color: #f0f0f0;
 }
 
 /* Code block line highlighting */
@@ -280,12 +302,23 @@ html:not(.no-sliding) .slide-enter-content > * {
 /* Inline code */
 .prose :not(pre) > code {
   font-family: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
-  background-color: rgba(125, 125, 125, 0.12);
-  color: var(--fg-deep);
+  background-color: rgba(125, 125, 125, 0.12) !important;
+  color: var(--fg-deep) !important;
   border-radius: 0.25rem;
-  padding: 0.15em 0.35em;
+  padding: 0.15em 0.35em !important;
   font-size: 0.88em;
   font-weight: 500;
+  border: 1px solid rgba(125, 125, 125, 0.15);
+}
+
+.prose :not(pre) > code::before,
+.prose :not(pre) > code::after {
+  content: "" !important;
+}
+
+.dark .prose :not(pre) > code {
+  background-color: rgba(125, 125, 125, 0.2) !important;
+  border-color: rgba(125, 125, 125, 0.25);
 }
 
 /* ─── Tag pills ─── */
@@ -353,7 +386,7 @@ html:not(.no-sliding) .slide-enter-content > * {
 /* ─── Code copy button ─── */
 .copy-btn {
   position: absolute;
-  top: 0.5rem;
+  top: 0.35rem;
   right: 0.5rem;
   padding: 0.25rem 0.5rem;
   font-size: 0.7rem;

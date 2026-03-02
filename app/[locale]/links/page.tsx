@@ -41,7 +41,7 @@ export default async function LinksPage({
                   rel="noopener noreferrer"
                   className="flex items-baseline gap-4 group"
                 >
-                  <span className="text-sm font-medium group-hover:text-gray-900 dark:group-hover:text-white transition-colors w-36 shrink-0" style={{ color: "var(--fg)" }}>
+                  <span className="text-sm font-medium transition-opacity group-hover:opacity-100 w-36 shrink-0" style={{ color: "var(--fg)", opacity: 0.75 }}>
                     {link.title} ↗
                   </span>
                   <span className="text-sm" style={{ color: "var(--fg-light)" }}>{link.desc}</span>

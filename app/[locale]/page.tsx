@@ -42,8 +42,8 @@ export default async function HomePage({
                 href={href}
                 target={href.startsWith("mailto") ? "_self" : "_blank"}
                 rel="noopener noreferrer"
-                style={{ color: "var(--fg-light)" }}
-                className="text-sm transition-colors hover:text-gray-900 dark:hover:text-white"
+                className="text-sm transition-opacity opacity-60 hover:opacity-100"
+                style={{ color: "var(--fg)" }}
               >
                 {label}
               </a>
@@ -70,8 +70,8 @@ export default async function HomePage({
                     {post.date}
                   </time>
                   <span
-                    className="text-sm transition-colors group-hover:text-black dark:group-hover:text-white"
-                    style={{ color: "var(--fg)" }}
+                    className="text-sm transition-opacity group-hover:opacity-100"
+                    style={{ color: "var(--fg)", opacity: 0.75 }}
                   >
                     {post.title}
                   </span>

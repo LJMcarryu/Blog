@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale } from "next-intl";
 
 const GISCUS_REPO = process.env.NEXT_PUBLIC_GISCUS_REPO || "LJMcarryu/Blog";
@@ -11,12 +11,31 @@ const GISCUS_CATEGORY_ID = process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID || "DIC_kw
 export default function Comments() {
   const ref = useRef<HTMLDivElement>(null);
   const locale = useLocale();
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+
+  // Monitor theme changes
+  useEffect(() => {
+    const updateTheme = () => {
+      const isDark = document.documentElement.classList.contains("dark");
+      setTheme(isDark ? "dark" : "light");
+    };
+
+    updateTheme();
+
+    const observer = new MutationObserver(updateTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const container = ref.current;
     if (!container) return;
 
-    // Clear previous Giscus instance when locale changes
+    // Clear previous Giscus instance when locale or theme changes
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
@@ -32,13 +51,13 @@ export default function Comments() {
     script.setAttribute("data-reactions-enabled", "1");
     script.setAttribute("data-emit-metadata", "0");
     script.setAttribute("data-input-position", "bottom");
-    script.setAttribute("data-theme", "preferred_color_scheme");
+    script.setAttribute("data-theme", theme);
     script.setAttribute("data-lang", locale === "zh" ? "zh-CN" : "en");
     script.setAttribute("crossorigin", "anonymous");
     script.async = true;
 
     container.appendChild(script);
-  }, [locale]);
+  }, [locale, theme]);
 
   return <div ref={ref} />;
 }

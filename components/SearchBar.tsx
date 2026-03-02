@@ -22,10 +22,16 @@ export default function SearchBar({ placeholder }: { placeholder: string }) {
         onChange={(e) => setQuery(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
-        className="w-full px-4 py-2 pl-10 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-gray-400 text-sm"
+        className="w-full px-4 py-2 pl-10 rounded-lg border focus:outline-none focus:ring-2 text-sm"
+        style={{
+          borderColor: "rgba(125, 125, 125, 0.2)",
+          backgroundColor: "rgba(125, 125, 125, 0.05)",
+          color: "var(--fg)",
+        }}
       />
       <svg
-        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+        className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4"
+        style={{ color: "var(--fg-light)" }}
         fill="none"
         stroke="currentColor"
         viewBox="0 0 24 24"
