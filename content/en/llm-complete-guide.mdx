@@ -1,0 +1,383 @@
+---
+title: "The Complete History of LLMs: From RNN to GPT"
+date: "2026-03-07"
+description: "A comprehensive guide for developers who want to systematically learn about large language models — from NLP origins to the Transformer revolution, mainstream model comparisons, and core concepts like RLHF, RAG, and Agents."
+tags: ["AI", "LLM", "Deep Learning", "Tutorial"]
+---
+
+## Introduction
+
+LLMs have been in the spotlight for over two years now, and information is everywhere — but most of it is either too academic (formulas on page one) or too fragmented (covering just one model or trick).
+
+I've been looking for a single article that tells the full story of LLMs from start to finish — not a paper survey, but a technical map from a developer's perspective. Couldn't find one I liked, so I wrote it myself.
+
+This article is for developers with programming experience who want to understand the big picture. After reading, you'll know: where LLMs came from, how they work, who the major players are, what the core concepts mean, and how to start learning.
+
+---
+
+## 1. A Brief History of NLP: From Rules to Neural Networks
+
+Before we talk about LLMs, let's quickly trace the evolution of NLP (Natural Language Processing). This history helps you understand why the Transformer was a paradigm shift.
+
+```
+1950s ──── Rule-based systems (hand-written grammar rules, brittle but explainable)
+  │
+1990s ──── Statistical methods (TF-IDF, n-grams, Naive Bayes)
+  │         └─ Probability replaced rules, but features were all hand-crafted
+  │
+2003  ──── Neural language models (Bengio — learning word representations)
+  │
+2013  ──── Word2Vec ⭐ (The word vector revolution)
+  │         └─ "King - Man + Woman ≈ Queen"
+  │
+2014  ──── Seq2Seq (Encoder-Decoder, machine translation breakthrough)
+  │
+2015  ──── Attention mechanism (stop treating every word equally)
+  │
+2017  ──── Transformer ⭐⭐⭐ (Changed everything)
+  │
+2018+ ──── BERT, GPT series, the LLM era begins
+```
+
+### Key Milestones
+
+**Word2Vec (2013)** was the first moment ordinary developers felt "AI understands language." It mapped each word to a vector (say, 300 dimensions), where semantically similar words were close together. Even more remarkably, vector arithmetic captured semantic relationships.
+
+**Seq2Seq + Attention (2014-2015)** solved the "input a sequence, output another sequence" problem (e.g., translation). The Attention mechanism let the model "look back" at the most relevant parts of the input when generating each word, instead of compressing the entire input into a single fixed vector.
+
+These two breakthroughs directly paved the way for the Transformer.
+
+---
+
+## 2. Transformer: The Paper That Changed Everything (2017)
+
+In 2017, Google published "Attention Is All You Need," introducing the Transformer architecture. Bold title — but it delivered.
+
+### 2.1 Core Idea: Self-Attention
+
+Models before Transformer (RNN/LSTM) processed text sequentially — one word at a time, like reading a sentence left to right. This caused two problems: slow training (no parallelism) and long-range dependencies getting lost (forgetting the beginning by the end).
+
+Self-Attention takes a completely different approach. Imagine reading this sentence:
+
+> "The cat sat on the mat because it was tired."
+
+When you read "it," your brain automatically links it to "cat." Self-Attention does exactly this — it lets every word in a sentence directly "see" every other word and compute their relevance.
+
+No sequential processing. All words handled simultaneously, relationships computed in one step. That's why Transformers can train in parallel, an order of magnitude faster than RNNs.
+
+### 2.2 Encoder vs Decoder
+
+The original Transformer has two parts:
+
+```
+┌─────────────┐    ┌─────────────┐
+│   Encoder   │───→│   Decoder   │
+│(understand) │    │ (generate)  │
+└─────────────┘    └─────────────┘
+```
+
+- **Encoder**: Reads the entire input, produces contextual representations. Each word sees all other words (bidirectional).
+- **Decoder**: Generates output step by step. Each word only sees preceding words (unidirectional), plus the Encoder's output.
+
+Later models chose different combinations based on their goals:
+- Encoder only → BERT (excels at understanding)
+- Decoder only → GPT (excels at generation)
+- Both → T5 (translation, summarization)
+
+### 2.3 Tokenization: How Models "Read" Text
+
+Models don't process raw text directly. They first split text into tokens. The mainstream method is BPE (Byte Pair Encoding):
+
+- "unhappiness" → ["un", "happiness"] or ["un", "happ", "iness"]
+- Chinese is typically split by character or subword: "大语言模型" → ["大", "语言", "模型"]
+
+Different models use different tokenizers, which is why the same text consumes different token counts across models.
+
+---
+
+## 3. LLM Evolution: Three Paths
+
+After Transformer, LLMs evolved along three routes:
+
+### 3.1 Encoder Path: Understanding
+
+**BERT (2018)** was the first model that made people exclaim "NLP has been revolutionized." Using the Encoder architecture, it pre-trained via "fill in the blank" (Masked Language Model) — randomly masking words and having the model predict them.
+
+```
+Input:  The weather today is [MASK] nice
+Predict: [MASK] → very
+```
+
+BERT excels at understanding tasks: text classification, sentiment analysis, QA, named entity recognition. RoBERTa and DeBERTa optimized training strategies but kept the core architecture.
+
+### 3.2 Decoder Path: Generation (Mainstream)
+
+The GPT series took a different road — Decoder only, trained by "predicting the next word":
+
+```
+Input:  The weather today is
+Predict: → very → nice → .
+```
+
+Looks simple, but when the model is large enough and the data plentiful enough, this simple objective produces astonishing capabilities.
+
+- **GPT-1 (2018)**: 117M parameters, proved the "pre-train + fine-tune" paradigm
+- **GPT-2 (2019)**: 1.5B parameters, generation quality so good OpenAI initially withheld release
+- **GPT-3 (2020)**: 175B parameters, demonstrated few-shot ability (no fine-tuning needed, just give examples)
+- **GPT-4 (2023)**: Multimodal, comprehensive capability leap
+- **GPT-4o / o1 / o3 (2024-2025)**: Native multimodal, enhanced Chain of Thought reasoning
+
+### 3.3 Encoder-Decoder Path
+
+T5 (Google, 2019) unified all NLP tasks into a "text-to-text" format:
+
+```
+Translation:     "translate English to French: Hello" → "Bonjour"
+Summarization:   "summarize: [long text]" → "[summary]"
+Classification:  "classify: I love this movie" → "positive"
+```
+
+BART (Meta) follows the same path. These models excel at translation and summarization but have been gradually overtaken by pure Decoder models in general conversation.
+
+### 3.4 Scaling Laws: Bigger Is (Actually) Better
+
+In 2020, OpenAI published the Scaling Laws paper, revealing a pattern: model performance follows a power law with three factors —
+
+1. **Parameters** (model size)
+2. **Data** (training data)
+3. **Compute** (training compute)
+
+Scale all three proportionally, and performance keeps improving — with no clear ceiling in sight. That's why companies are racing to stack parameters and hoard GPUs.
+
+### 3.5 Emergent Abilities
+
+Even more fascinating: when model scale crosses certain thresholds, capabilities appear that smaller models completely lack — multi-step reasoning, code generation, math problem-solving. These abilities weren't explicitly trained; they "emerged."
+
+This is why LLMs are both exciting and unsettling: we've built systems that exceed expectations, but we don't fully understand why they can do what they do.
+
+---
+
+## 4. The LLM Landscape
+
+As of early 2026, here's the major model landscape:
+
+| Model | Company | Parameters | Open Source | Key Strengths |
+|-------|---------|-----------|-------------|---------------|
+| GPT-4o | OpenAI | Undisclosed | No | Native multimodal, fast |
+| o1 / o3 | OpenAI | Undisclosed | No | Enhanced reasoning, math/code |
+| Claude 4 series | Anthropic | Undisclosed | No | Long context (200K), safety alignment leader |
+| Gemini 2.5 | Google | Undisclosed | No | Strong multimodal, 1M token context |
+| LLaMA 3 | Meta | 8B-405B | Yes | Open-source benchmark, rich ecosystem |
+| DeepSeek V3 / R1 | DeepSeek | 671B (MoE) | Yes | Exceptional cost-efficiency, strong reasoning |
+| Qwen 2.5 | Alibaba | 0.5B-72B | Yes | Excellent Chinese, full size range |
+| Mistral Large | Mistral | Undisclosed | Partial | European contender, efficiency-focused |
+| GLM-4 | Zhipu AI | Undisclosed | Partial | Native Chinese, strong tool use |
+
+**Key trends:**
+
+- **Open vs Closed**: Open-source models (LLaMA, DeepSeek, Qwen) are rapidly closing the gap with closed-source
+- **MoE Architecture**: DeepSeek V3 has 671B parameters but only activates 37B, dramatically reducing inference cost
+- **Reasoning Enhancement**: o1/o3 and DeepSeek R1 represent the "let the model think longer" direction
+- **Long Context**: From 4K → 32K → 128K → 200K → 1M, context windows keep expanding
+
+---
+
+## 5. Core Concepts Explained
+
+This section breaks down the most important concepts in the LLM space. For each one: what it is, why it matters, and how it's used.
+
+### 5.1 Pre-training → Fine-tuning → Alignment
+
+LLM training has three stages:
+
+```
+Stage 1: Pre-training
+  └─ Train on massive text data, learn "language" itself
+  └─ Output: Base Model — can continue text, but can't converse
+
+Stage 2: Instruction Fine-tuning (SFT)
+  └─ Train on "instruction-response" pairs
+  └─ Output: A model that understands instructions and can chat
+
+Stage 3: Alignment
+  └─ RLHF / RLAIF / Constitutional AI
+  └─ Output: A safe, helpful, and honest model
+```
+
+The ChatGPT and Claude you use have gone through all three stages. A base model is like a scholar who's read every book but has no social skills; an aligned model is a knowledgeable and tactful assistant.
+
+### 5.2 RLHF and Constitutional AI
+
+**RLHF (Reinforcement Learning from Human Feedback)** was one of the key technologies behind ChatGPT's success:
+
+1. Human annotators rank multiple model responses (which is better)
+2. These rankings train a "reward model"
+3. Reinforcement learning optimizes the model toward "human preferences"
+
+**Constitutional AI** is Anthropic's (Claude's company) approach: using a set of "constitutional principles" (e.g., "be honest," "don't be harmful") to guide model self-improvement, reducing dependence on human annotation.
+
+### 5.3 Prompt Engineering
+
+Prompt Engineering is the core skill for interacting with LLMs. Key techniques:
+
+- **System Prompt**: Set the model's role and behavioral rules
+- **Few-shot**: Provide examples so the model understands your desired format and style
+- **Chain of Thought (CoT)**: Ask the model to "think step by step," significantly improving reasoning accuracy
+- **ReAct**: Combine Reasoning and Acting, enabling the model to use tools
+
+```
+# CoT Example
+Q: A room has 3 windows, each window has 2 panes of glass. How many panes total?
+
+Without CoT: 6 (direct answer, sometimes wrong)
+
+With CoT:
+- The room has 3 windows
+- Each window has 2 panes
+- 3 × 2 = 6 panes
+Answer: 6
+```
+
+### 5.4 RAG: Retrieval-Augmented Generation
+
+RAG solves two LLM pain points:
+
+1. **Knowledge freshness**: Model training data has a cutoff date; RAG can plug in the latest information
+2. **Hallucination**: Models may fabricate facts; RAG grounds answers in retrieved real documents
+
+```
+User question → Retrieve relevant docs → Feed docs + question to model → Generate evidence-based answer
+```
+
+RAG is the most common approach for enterprise LLM deployment because it doesn't require fine-tuning — just maintain a good knowledge base.
+
+### 5.5 Function Calling & Tool Use
+
+LLMs can only generate text natively, but through Function Calling, they can invoke external tools:
+
+```
+User: What's the weather in Beijing today?
+Model: (decides to call weather API) → get_weather(city="Beijing")
+System: (executes API, returns result) → Sunny, 25°C
+Model: It's sunny in Beijing today, 25°C.
+```
+
+This transforms models from "can only talk" to "can take action" — a foundational capability for building AI applications.
+
+### 5.6 Agents: From Conversation to Autonomous Execution
+
+Agents are the advanced form of LLMs — no longer single Q&A, but autonomous planning and multi-step task execution:
+
+```
+User: Analyze this CSV file, find the top-selling product, and generate a chart
+
+Agent execution:
+1. Read the CSV file
+2. Analyze data structure
+3. Write analysis code
+4. Execute code to generate chart
+5. Summarize findings and present results
+```
+
+Claude Code is a textbook Agent — you give it a task, and it reads code, writes code, runs tests, and fixes errors on its own.
+
+### 5.7 MCP: Model Context Protocol
+
+MCP is an open protocol proposed by Anthropic to standardize how models connect to external tools and data sources. Think of it as "USB for AI":
+
+- Unified tool description format
+- Standardized invocation protocol
+- Any model can connect to any MCP server
+
+Write one MCP server (say, connecting to a database), and every MCP-compatible model can use it.
+
+### 5.8 Multimodal
+
+Early LLMs only handled text. Today's mainstream models are going multimodal:
+
+- **Text + Image**: GPT-4o, Claude 4, Gemini (image understanding, image generation)
+- **Text + Audio**: GPT-4o native voice conversation
+- **Text + Video**: Gemini supports video understanding
+- **Text + Code Execution**: Claude Code, ChatGPT Code Interpreter
+
+Multimodal isn't simply stitching multiple models together — it's unified understanding of different modalities within a single model.
+
+---
+
+## 6. Limitations and Challenges
+
+LLMs are powerful but far from perfect. Understanding limitations helps you use them better.
+
+### 6.1 Hallucination
+
+Models will confidently fabricate nonexistent facts, fake citations, and made-up data. This isn't a bug — it's an inherent feature of generative models. They optimize for "looks plausible," not "factually correct."
+
+**Mitigation**: RAG, asking models to cite sources, human review of critical information.
+
+### 6.2 Context Window Limits
+
+While context windows keep expanding (Claude is at 200K tokens), they're still finite. When processing very long documents, model attention to middle sections degrades (the "Lost in the Middle" problem).
+
+### 6.3 Inference Cost
+
+LLM inference requires substantial GPU resources. GPT-4 class models cost tens of dollars per million output tokens. This is why DeepSeek's cost-efficient approach has generated enormous interest.
+
+### 6.4 Safety and Alignment
+
+Ensuring models don't output harmful content and can't be maliciously exploited is an ongoing challenge. Alignment techniques (RLHF, Constitutional AI) are improving but far from solved.
+
+### 6.5 Data Privacy
+
+Using cloud-based LLMs means your data is sent to third-party servers. For sensitive data, consider local deployment (open-source models like LLaMA, Qwen) or APIs with data protection commitments.
+
+---
+
+## 7. A Systematic Learning Path
+
+If you want to learn LLMs systematically, here's my recommended path:
+
+### Phase 1: Getting Started (1-2 weeks)
+
+| Goal | Resources |
+|------|-----------|
+| Understand Transformers | 3Blue1Brown's "But what is a GPT?" video series |
+| Intuitive understanding of Attention | Jay Alammar's "The Illustrated Transformer" |
+| Make your first API call | OpenAI / Anthropic official docs — build a simple chatbot |
+| Learn Prompt techniques | Anthropic's Prompt Engineering guide |
+
+The goal here is building intuition. Don't get stuck on the math.
+
+### Phase 2: Intermediate (1-2 months)
+
+| Goal | Resources |
+|------|-----------|
+| Deep Prompt Engineering | Learn CoT, Few-shot, ReAct patterns |
+| Practice RAG | Build a RAG app with LangChain / LlamaIndex |
+| Try Fine-tuning | Fine-tune an open-source model with LoRA (e.g., LLaMA 3 8B) |
+| Understand Agents | Read AutoGPT / CrewAI source code, understand the Agent loop |
+
+The focus here is hands-on work. Don't just watch tutorials — write code, run experiments.
+
+### Phase 3: Going Deep (Ongoing)
+
+| Goal | Resources |
+|------|-----------|
+| Read core papers | Attention Is All You Need, GPT-3, InstructGPT, Constitutional AI |
+| Train a small model | Andrej Karpathy's nanoGPT / minbpe |
+| Agent development | Build real tools with Claude Code / OpenAI Agents SDK |
+| Track the frontier | Follow arXiv, AI researchers on Twitter/X |
+
+This phase has no endpoint. The LLM field has new developments every week. Staying curious and hands-on matters more than anything.
+
+---
+
+## 8. Conclusion
+
+From rule-based systems in the 1950s to today's GPT-4 and Claude 4, NLP has traveled over 70 years. But the real paradigm shift happened after Transformer appeared in 2017 — in just a few years, LLMs went from academic experiments to tools that are changing how everyone works.
+
+Understanding this history isn't for passing exams — it's for having a stable coordinate system in a rapidly changing field. When you know why Attention matters, what RLHF does, and what problem RAG solves, you can better judge which new technologies deserve attention and which are just noise.
+
+The rest is up to you. Pick a direction, write your first line of code, run your first experiment. The world of LLMs is vast, but the entry point is right there in your terminal.
+
+
+
