@@ -8,8 +8,8 @@
   },
   "home": {
     "name": "刘佳明(Jimmy)",
-    "tagline": "Full-stack Developer / Open Source Enthusiast / Lifelong Learner",
-    "bio": "Passionate about coding and technical writing. Currently focused on web development, exploring new technologies and best practices. I believe code can change the world and words can connect minds.",
+    "tagline": "Mobile Developer / Lifelong Learner",
+    "bio": "Passionate about coding and technical writing. Currently focused on mobile development, exploring new technologies and best practices. I believe code can change the world and words can connect minds.",
     "findMeOn": "Find me on",
     "latestPosts": "Latest Posts",
     "viewAll": "All Posts →"
@@ -22,8 +22,8 @@
   },
   "about": {
     "title": "About",
-    "subtitle": "Developer / Photographer / Lifelong Learner",
-    "bio1": "I'm Jimmy, a full-stack developer focused on the React ecosystem and modern web technologies. I love solving real problems with code.",
+    "subtitle": "Mobile Developer / Photographer / Lifelong Learner",
+    "bio1": "I'm Jimmy, a mobile developer. I love solving real problems with code and exploring the mobile ecosystem.",
     "bio2": "Outside of work, I enjoy photography, reading, and exploring new tech. I believe continuous learning is the only way to stay sharp — this blog is where I learn and share.",
     "skills": "Tech Stack",
     "elsewhere": "More Pages",
