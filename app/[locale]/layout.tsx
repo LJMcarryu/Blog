@@ -61,7 +61,7 @@ export default async function LocaleLayout({
         {/* Inline script: apply .dark class before first paint to prevent flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var d=localStorage.getItem('blog-color-scheme')||'auto';var sys=window.matchMedia('(prefers-color-scheme:dark)').matches;if(d==='dark'||(d==='auto'&&sys))document.documentElement.classList.add('dark')}catch(e){}})()`,
+            __html: `(function(){try{var d=localStorage.getItem('blog-color-scheme')||'dark';var sys=window.matchMedia('(prefers-color-scheme:dark)').matches;if(d==='dark'||(d==='auto'&&sys))document.documentElement.classList.add('dark')}catch(e){}})()`,
           }}
         />
       </head>
