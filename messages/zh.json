@@ -21,7 +21,9 @@
     "searchPlaceholder": "搜索文章...",
     "allTags": "全部",
     "prevPost": "上一篇",
-    "nextPost": "下一篇"
+    "nextPost": "下一篇",
+    "prevPage": "← 上一页",
+    "nextPage": "下一页 →"
   },
   "about": {
     "title": "关于我",

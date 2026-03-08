@@ -1,20 +1,19 @@
 interface PaginationProps {
   currentPage: number;
   totalPages: number;
-  locale: string;
   baseHref: string;
+  prevLabel: string;
+  nextLabel: string;
 }
 
 export default function Pagination({
   currentPage,
   totalPages,
-  locale,
   baseHref,
+  prevLabel,
+  nextLabel,
 }: PaginationProps) {
   if (totalPages <= 1) return null;
-
-  const prevLabel = locale === "zh" ? "← 上一页" : "← Previous";
-  const nextLabel = locale === "zh" ? "下一页 →" : "Next →";
 
   function pageHref(page: number) {
     const separator = baseHref.includes("?") ? "&" : "?";

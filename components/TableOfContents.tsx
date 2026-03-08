@@ -33,16 +33,15 @@ export default function TableOfContents() {
   const [activeId, setActiveId] = useState("");
 
   useEffect(() => {
-    let observer: IntersectionObserver | null = null;
+    let intersectionObserver: IntersectionObserver | null = null;
 
-    // Delay slightly to ensure MDX content is rendered
-    const timer = setTimeout(() => {
+    function init() {
       const items = getHeadings();
       if (items.length < 2) return;
 
       setHeadings(items);
 
-      observer = new IntersectionObserver(
+      intersectionObserver = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
             if (entry.isIntersecting) {
@@ -54,12 +53,24 @@ export default function TableOfContents() {
       );
 
       const article = document.querySelector("article");
-      article?.querySelectorAll("h2, h3").forEach((node) => observer?.observe(node));
-    }, 150);
+      article?.querySelectorAll("h2, h3").forEach((node) => intersectionObserver?.observe(node));
+    }
+
+    // Try immediately, then watch for MDX content to render
+    init();
+
+    const article = document.querySelector("article");
+    const mutationObserver = article
+      ? new MutationObserver(() => {
+          intersectionObserver?.disconnect();
+          init();
+        })
+      : null;
+    mutationObserver?.observe(article!, { childList: true, subtree: true });
 
     return () => {
-      clearTimeout(timer);
-      observer?.disconnect();
+      mutationObserver?.disconnect();
+      intersectionObserver?.disconnect();
     };
   }, []);
 

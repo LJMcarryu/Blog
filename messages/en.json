@@ -21,7 +21,9 @@
     "searchPlaceholder": "Search posts...",
     "allTags": "All",
     "prevPost": "Previous",
-    "nextPost": "Next"
+    "nextPost": "Next",
+    "prevPage": "← Previous",
+    "nextPage": "Next →"
   },
   "about": {
     "title": "About",

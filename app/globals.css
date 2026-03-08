@@ -17,6 +17,7 @@
   --fg-deeper:#000000;
   --fg-light: #666666;
   --code-bg:  #fafafa;
+  --star:     #facc15;
 }
 
 .dark {
@@ -26,6 +27,7 @@
   --fg-deeper:#ffffff;
   --fg-light: #a8a8a8;
   --code-bg:  #161b22;
+  --star:     #facc15;
 }
 
 /* ─── Base ─── */

@@ -26,14 +26,16 @@ export default function ThemedVideo() {
   return (
     <>
       <video
-        autoPlay muted loop playsInline
+        autoPlay={dark} muted loop playsInline
+        preload={dark ? "auto" : "none"}
         className={baseClass}
         style={{ visibility: dark ? "visible" : "hidden" }}
       >
         <source src="/home_bg_video_dark.mp4" type="video/mp4" />
       </video>
       <video
-        autoPlay muted loop playsInline
+        autoPlay={!dark} muted loop playsInline
+        preload={dark ? "none" : "auto"}
         className={baseClass}
         style={{ visibility: dark ? "hidden" : "visible" }}
       >

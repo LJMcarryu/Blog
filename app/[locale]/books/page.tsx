@@ -14,7 +14,7 @@ export async function generateMetadata({
 
 function Stars({ count }: { count: number }) {
   return (
-    <span className="text-xs" style={{ color: "#facc15" }} aria-label={`${count} stars`}>
+    <span className="text-xs" style={{ color: "var(--star)" }} aria-label={`${count} stars`}>
       {"★".repeat(count)}
       {"☆".repeat(5 - count)}
     </span>

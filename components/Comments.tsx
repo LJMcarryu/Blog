@@ -12,12 +12,12 @@ export default function Comments() {
   const ref = useRef<HTMLDivElement>(null);
   const locale = useLocale();
   const [theme, setTheme] = useState<"light" | "dark">("light");
+  const initialized = useRef(false);
 
   // Monitor theme changes
   useEffect(() => {
     const updateTheme = () => {
-      const isDark = document.documentElement.classList.contains("dark");
-      setTheme(isDark ? "dark" : "light");
+      setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
     };
 
     updateTheme();
@@ -31,14 +31,12 @@ export default function Comments() {
     return () => observer.disconnect();
   }, []);
 
+  // Initialize Giscus once
   useEffect(() => {
     const container = ref.current;
-    if (!container) return;
+    if (!container || initialized.current) return;
 
-    // Clear previous Giscus instance when locale or theme changes
-    while (container.firstChild) {
-      container.removeChild(container.firstChild);
-    }
+    initialized.current = true;
 
     const script = document.createElement("script");
     script.src = "https://giscus.app/client.js";
@@ -58,6 +56,17 @@ export default function Comments() {
 
     container.appendChild(script);
   }, [locale, theme]);
+
+  // Update theme via postMessage (avoids recreating the iframe)
+  useEffect(() => {
+    const iframe = ref.current?.querySelector<HTMLIFrameElement>("iframe.giscus-frame");
+    if (!iframe) return;
+
+    iframe.contentWindow?.postMessage(
+      { giscus: { setConfig: { theme } } },
+      "https://giscus.app"
+    );
+  }, [theme]);
 
   return <div ref={ref} />;
 }

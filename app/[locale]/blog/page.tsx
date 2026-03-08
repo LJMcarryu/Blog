@@ -115,8 +115,9 @@ export default async function BlogPage({
         <Pagination
           currentPage={safePage}
           totalPages={totalPages}
-          locale={locale}
           baseHref={baseHref}
+          prevLabel={t("prevPage")}
+          nextLabel={t("nextPage")}
         />
       )}
     </div>
