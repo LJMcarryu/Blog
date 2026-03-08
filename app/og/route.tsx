@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
 import type { NextRequest } from "next/server";
+import { routing } from "@/i18n/routing";
 
 export const runtime = "edge";
 
@@ -9,7 +10,8 @@ const OG_FG = "#ffffff";
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const title = (searchParams.get("title") || "Jimmy's Blog").slice(0, 100);
-  const locale = searchParams.get("locale") || "zh";
+  const rawLocale = searchParams.get("locale") || "zh";
+  const locale = (routing.locales as readonly string[]).includes(rawLocale) ? rawLocale : "zh";
 
   const subtitle = locale === "zh" ? "Jimmy 的个人博客" : "Jimmy's Blog";
 

@@ -17,6 +17,7 @@ export async function GET() {
   const latestDate = allPosts.reduce((latest, post) => {
     if (!post.date) return latest;
     const d = new Date(post.date);
+    if (isNaN(d.getTime())) return latest;
     return d > latest ? d : latest;
   }, new Date(0));
 
@@ -27,7 +28,11 @@ export async function GET() {
       <link>${baseUrl}/${post.locale}/blog/${post.slug}</link>
       <guid isPermaLink="true">${baseUrl}/${post.locale}/blog/${post.slug}</guid>
       <description><![CDATA[${escapeCdata(post.description || "")}]]></description>
-      <author>Jimmy</author>
+      <author>Jimmy</author>${
+        post.tags?.length
+          ? "\n" + post.tags.map((tag: string) => `      <category>${escapeCdata(tag)}</category>`).join("\n")
+          : ""
+      }
       <language>${post.locale === "zh" ? "zh-CN" : "en-US"}</language>${
         post.date
           ? `\n      <pubDate>${new Date(post.date).toUTCString()}</pubDate>`

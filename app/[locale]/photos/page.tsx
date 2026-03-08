@@ -8,11 +8,16 @@ const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".av
 
 function getPhotos(): string[] {
   const photosDir = path.join(process.cwd(), "public", "photos");
-  if (!fs.existsSync(photosDir)) return [];
-  return fs
-    .readdirSync(photosDir)
-    .filter((f) => IMAGE_EXTENSIONS.has(path.extname(f).toLowerCase()))
-    .map((f) => `/photos/${f}`);
+  try {
+    if (!fs.existsSync(photosDir)) return [];
+    return fs
+      .readdirSync(photosDir)
+      .filter((f) => IMAGE_EXTENSIONS.has(path.extname(f).toLowerCase()))
+      .map((f) => `/photos/${f}`);
+  } catch {
+    console.warn("[photos] Failed to read photos directory");
+    return [];
+  }
 }
 
 function altFromPath(src: string): string {

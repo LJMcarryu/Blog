@@ -92,6 +92,7 @@ export default function Lightbox() {
   if (!src) return null;
 
   return (
+    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- Escape key handler registered via document listener above
     <div
       ref={overlayRef}
       className="lightbox-overlay"
@@ -106,7 +107,7 @@ export default function Lightbox() {
           <line x1="6" y1="6" x2="18" y2="18" />
         </svg>
       </button>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
+      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions -- stopPropagation prevents overlay close */}
       <img
         src={src}
         alt={alt}

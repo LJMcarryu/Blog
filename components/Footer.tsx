@@ -12,7 +12,7 @@ export default function Footer() {
               key={label}
               href={href}
               target={href.startsWith("mailto") ? undefined : "_blank"}
-              rel="noopener noreferrer"
+              rel={href.startsWith("mailto") ? undefined : "noopener noreferrer"}
             >
               {label}
             </a>

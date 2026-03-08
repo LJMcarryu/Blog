@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 13 Rounds, 90+ Improvements"
+title: "Blog Code Optimization Log: 14 Rounds, 100+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 13 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 14 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 13 rounds of iteration, I completed 90+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 14 rounds of iteration, I completed 100+ improvements.
 
 ---
 
@@ -544,9 +544,50 @@ Line 73 used `mutationObserver?.observe(article!, ...)` — a non-null assertion
 
 ---
 
+## Round 14: Deep Review and Robustness Hardening
+
+Another comprehensive code review covering security, accessibility, robustness, and SEO.
+
+### Mobile Navigation Keyboard Support
+
+The mobile hamburger menu had no keyboard close mechanism, and screen reader users weren't informed when the menu opened. Two improvements:
+
+1. Press `Escape` to close the menu
+2. Auto-focus the first link when the menu opens
+
+### RSS Feed Enhancements
+
+- Added `<category>` tags for each post's tags, enabling RSS readers to categorize content
+- Added `isNaN` check to prevent invalid dates from corrupting `lastBuildDate`
+
+### OG Image Route Locale Validation
+
+The `/og` route's `locale` parameter previously accepted any string. Now validates against `routing.locales`, falling back to `"zh"` for invalid values.
+
+### Environment URL Validation
+
+`getSiteUrl()` now validates URL format with `new URL()` and strips trailing slashes, preventing double-slash URLs like `https://example.com//zh/blog/...`.
+
+### Dark Mode Script Robustness
+
+The inline script's `catch` block was empty — in private browsing mode where `localStorage` is unavailable, users would see a theme flash. The `catch` block now falls back to the `prefers-color-scheme` media query.
+
+### Security Header Addition
+
+Added `X-XSS-Protection: 0` — the modern best practice is to disable the browser's built-in XSS filter (relying on CSP instead).
+
+### Other Small Fixes
+
+- Added `type="button"` to `error.tsx` retry button to prevent form submission in form contexts
+- Removed unnecessary `rel="noopener noreferrer"` from `mailto` links in Footer
+- Added `role="search"` to SearchBar form and `autoComplete="off"` to the input
+- Wrapped photos page `fs.readdirSync` in `try-catch` to handle permission errors gracefully
+
+---
+
 ## Summary
 
-13 rounds, 90+ improvements, 20+ files touched. Key wins:
+14 rounds, 100+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
 - **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n, `prefers-reduced-motion`, `focus-visible` rings, print styles

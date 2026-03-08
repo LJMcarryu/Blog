@@ -15,13 +15,14 @@ export default function SearchBar({ placeholder }: { placeholder: string }) {
   };
 
   return (
-    <form onSubmit={handleSearch} className="relative">
+    <form onSubmit={handleSearch} className="relative" role="search">
       <input
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
+        autoComplete="off"
         className="w-full px-4 py-2 pl-10 rounded-lg border focus:outline-none focus:ring-2 focus:ring-current text-sm"
         style={{
           borderColor: "var(--border)",

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import LanguageSwitcher from "./LanguageSwitcher";
@@ -11,6 +11,7 @@ export default function Navigation() {
   const ta = useTranslations("a11y");
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLElement>(null);
 
   const navLinks = [
     { href: "/blog",     label: t("blog") },
@@ -21,6 +22,20 @@ export default function Navigation() {
 
   // Prefix-match: /blog/my-post → Blog is active
   const isActive = (href: string) => pathname.startsWith(href);
+
+  // Close mobile menu on Escape key; focus first link when opened
+  useEffect(() => {
+    if (!open) return;
+
+    const firstLink = menuRef.current?.querySelector<HTMLElement>("a");
+    firstLink?.focus();
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   return (
     <header className="relative z-40">
@@ -88,7 +103,7 @@ export default function Navigation() {
 
       {/* Mobile dropdown menu */}
       {open && (
-        <nav id="mobile-menu" className="nav-mobile-menu" aria-label="Mobile navigation">
+        <nav id="mobile-menu" ref={menuRef} className="nav-mobile-menu" aria-label="Mobile navigation">
           {navLinks.map(({ href, label }) => (
             <Link
               key={href}
