@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 9 Rounds, 55+ Improvements"
+title: "Blog Code Optimization Log: 10 Rounds, 60+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 9 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 10 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 9 rounds of iteration, I completed 55+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 10 rounds of iteration, I completed 60+ improvements.
 
 ---
 
@@ -366,9 +366,59 @@ The star rating component in `books/page.tsx` had a hardcoded English `aria-labe
 
 ---
 
+## Round 10: Accessibility and Pagination
+
+This round focused on accessibility gaps, pagination scalability, and remaining hardcoded strings.
+
+### LanguageSwitcher aria-label Fix
+
+`LanguageSwitcher.tsx` had a hardcoded `aria-label` of `"Switch to English"` / `"切换到中文"`, despite already having `t("toggleLang")` from `useTranslations("a11y")`. Replaced with the i18n value directly.
+
+### Hamburger Menu aria-label i18n
+
+`Navigation.tsx`'s hamburger button had hardcoded `"Close menu"` / `"Open menu"` aria-labels. Added `a11y.openMenu` and `a11y.closeMenu` i18n keys and switched to `ta("closeMenu")` / `ta("openMenu")`.
+
+### Pagination Ellipsis
+
+The original `Pagination.tsx` rendered every page number — fine for 5 pages, but creates excessive DOM nodes at scale. Refactored to show an ellipsis pattern when total pages exceed 7, displaying only the current page's neighbors:
+
+```typescript
+function getPageRange(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [1];
+  if (current > 3) pages.push("...");
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (current < total - 2) pages.push("...");
+  pages.push(total);
+  return pages;
+}
+```
+
+Also added `aria-label="Page N"` to each page link for screen reader clarity.
+
+### TOC aria-current
+
+The active TOC link used a CSS class but had no `aria-current="location"` attribute. Screen readers now correctly identify the current section.
+
+### Lightbox Dynamic aria-label
+
+The Lightbox dialog had a static `aria-label="Image preview"`. Changed to use the actual image's `alt` text, so screen readers describe the lightbox content accurately.
+
+### RSS lastBuildDate
+
+The RSS feed was missing the `lastBuildDate` element. Added it for RSS 2.0 compliance.
+
+### books.ts Encoding Fix
+
+`data/books.ts` had a garbled Unicode replacement character in "虽然有些过时" (the character "些" was corrupted). Fixed to the correct Chinese text.
+
+---
+
 ## Summary
 
-9 rounds, 55+ improvements, 20+ files touched. Key wins:
+10 rounds, 60+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
 - **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n

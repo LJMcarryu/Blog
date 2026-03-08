@@ -1,13 +1,13 @@
 ---
-title: "博客代码优化实录：9 轮迭代，55+ 项改进"
+title: "博客代码优化实录：10 轮迭代，60+ 项改进"
 date: "2026-03-08"
-description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从���全加固到设计令牌体系，9 轮迭代的完整实录。
+description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，10 轮迭代的完整实录。
 tags: ["代码审查", "性能优化", "Next.js"]
 ---
 
 ## 背景
 
-[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，9 轮迭代下来一共完成了 55+ 项改进。
+[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，10 轮迭代下来一共完成了 60+ 项改进。
 
 ---
 
@@ -366,9 +366,57 @@ prevKeyRef.current = key;
 
 ---
 
+## 第十轮：无障碍与分页优化
+
+第十轮审查聚焦在无障碍遗漏、分页组件的可扩展性，以及散落的硬编码文案。
+
+### LanguageSwitcher aria-label 修复
+
+`LanguageSwitcher.tsx` 的 `aria-label` 写死了 `"Switch to English"` / `"切换到中文"`，但组件已经通过 `useTranslations("a11y")` 拿到了 `t("toggleLang")`。直接复用即可，消除硬编码。
+
+### 汉堡菜单 aria-label i18n
+
+`Navigation.tsx` 的汉堡按钮 `aria-label` 写死了 `"Close menu"` / `"Open menu"`。新增 `a11y.openMenu` 和 `a11y.closeMenu` 两个 i18n key，改为 `ta("closeMenu")` / `ta("openMenu")`。
+
+### 分页组件省略号
+
+原来的 `Pagination.tsx` 渲染所有页码，文章多了会产生大量 DOM 节点。重构为省略号模式：页数超过 7 时，只显示当前页附近的页码，其余用 `…` 代替。同时给每个页码链接添加 `aria-label="Page N"`。
+
+```typescript
+function getPageRange(current: number, total: number): (number | "...")[] {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+  const pages: (number | "...")[] = [1];
+  if (current > 3) pages.push("...");
+  const start = Math.max(2, current - 1);
+  const end = Math.min(total - 1, current + 1);
+  for (let i = start; i <= end; i++) pages.push(i);
+  if (current < total - 2) pages.push("...");
+  pages.push(total);
+  return pages;
+}
+```
+
+### TOC aria-current
+
+`TableOfContents.tsx` 的激活链接只用 CSS class 标记，屏幕阅读器无法感知。添加 `aria-current="location"` 属性。
+
+### Lightbox 动态 aria-label
+
+Lightbox 的 `aria-label` 写死了 `"Image preview"`，改为使用实际图片的 `alt` 文本，让屏幕阅读器能准确描述弹窗内容。
+
+### RSS lastBuildDate
+
+RSS feed 缺少 `lastBuildDate` 元素，补充后符合 RSS 2.0 规范。
+
+### books.ts 乱码修复
+
+`data/books.ts` 中 "虽然有些过时" 的 "些" 字因编码问题变成了乱码（Unicode 替换字符），修复为正确的中文。
+
+---
+
 ## 总结
 
-9 轮迭代，55+ 项改进，涉及 20+ 个文件。主要收获：
+10 轮迭代，60+ 项改进，涉及 20+ 个文件。主要收获：
 
 - **安全性**：添加了响应头、禁用了 X-Powered-By、OG 参数校验
 - **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性、UI 文案 i18n

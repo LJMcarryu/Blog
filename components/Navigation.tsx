@@ -8,6 +8,7 @@ import ThemeToggle from "./ThemeToggle";
 
 export default function Navigation() {
   const t = useTranslations("nav");
+  const ta = useTranslations("a11y");
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -52,7 +53,7 @@ export default function Navigation() {
           <button
             onClick={() => setOpen(!open)}
             className="nav-link nav-hamburger"
-            aria-label={open ? "Close menu" : "Open menu"}
+            aria-label={open ? ta("closeMenu") : ta("openMenu")}
             aria-expanded={open}
             aria-controls="mobile-menu"
           >

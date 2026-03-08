@@ -92,7 +92,7 @@ export default function Lightbox() {
       onClick={close}
       role="dialog"
       aria-modal="true"
-      aria-label="Image preview"
+      aria-label={alt}
     >
       <button ref={closeBtnRef} className="lightbox-close" onClick={close} aria-label="Close">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

@@ -27,7 +27,7 @@ export const BOOKS: Record<BookStatus, Book[]> = {
       author: "Douglas Crockford",
       rating: 4,
       note: {
-        zh: "虽然有��过时，但核心理念依然受用",
+        zh: "虽然有些过时，但核心理念依然受用",
         en: "Somewhat dated, but the core ideas still hold up",
       },
     },

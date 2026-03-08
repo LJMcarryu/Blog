@@ -88,6 +88,7 @@ export default function TableOfContents() {
             <a
               href={`#${h.id}`}
               className={activeId === h.id ? "toc-active" : ""}
+              aria-current={activeId === h.id ? "location" : undefined}
               onClick={(e) => {
                 e.preventDefault();
                 document.getElementById(h.id)?.scrollIntoView({ behavior: "smooth" });

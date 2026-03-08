@@ -85,6 +85,8 @@
     "copyCode": "Copy code",
     "copied": "Copied!",
     "copyFailed": "Failed",
-    "toggleLang": "Toggle language"
+    "toggleLang": "Toggle language",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
   }
 }

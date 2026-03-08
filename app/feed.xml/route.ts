@@ -31,6 +31,7 @@ export async function GET() {
     <link>${baseUrl}</link>
     <description>Jimmy's personal blog — mobile development, tech, and more</description>
     <language>zh</language>
+    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
 ${items}
   </channel>

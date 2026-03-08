@@ -15,7 +15,7 @@ export default function LanguageSwitcher() {
   };
 
   return (
-    <button onClick={toggle} className="nav-link" title={t("toggleLang")} aria-label={locale === "zh" ? "Switch to English" : "切换到中文"}>
+    <button onClick={toggle} className="nav-link" title={t("toggleLang")} aria-label={t("toggleLang")}>
       {locale === "zh" ? "EN" : "中"}
     </button>
   );
