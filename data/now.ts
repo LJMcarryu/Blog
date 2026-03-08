@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/routing";
+
 export interface NowSection {
   heading: string;
   items: string[];
@@ -61,6 +63,6 @@ const EN_CONTENT: NowSection[] = [
   },
 ];
 
-export function getNowByLocale(locale: string): NowSection[] {
+export function getNowByLocale(locale: Locale): NowSection[] {
   return locale === "zh" ? ZH_CONTENT : EN_CONTENT;
 }

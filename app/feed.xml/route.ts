@@ -2,6 +2,10 @@ import { routing } from "@/i18n/routing";
 import { getPostsByLocale } from "@/lib/posts";
 import { getSiteUrl } from "@/lib/env";
 
+function escapeCdata(str: string): string {
+  return str.replace(/]]>/g, "]]]]><![CDATA[>");
+}
+
 export async function GET() {
   const baseUrl = getSiteUrl();
 
@@ -9,13 +13,21 @@ export async function GET() {
     getPostsByLocale(locale).map((post) => ({ ...post, locale }))
   );
 
+  // Use the most recent post date as lastBuildDate
+  const latestDate = allPosts.reduce((latest, post) => {
+    if (!post.date) return latest;
+    const d = new Date(post.date);
+    return d > latest ? d : latest;
+  }, new Date(0));
+
   const items = allPosts
     .map(
       (post) => `    <item>
-      <title><![CDATA[${post.title}]]></title>
+      <title><![CDATA[${escapeCdata(post.title)}]]></title>
       <link>${baseUrl}/${post.locale}/blog/${post.slug}</link>
       <guid isPermaLink="true">${baseUrl}/${post.locale}/blog/${post.slug}</guid>
-      <description><![CDATA[${post.description || ""}]]></description>${
+      <description><![CDATA[${escapeCdata(post.description || "")}]]></description>
+      <author>Jimmy</author>${
         post.date
           ? `\n      <pubDate>${new Date(post.date).toUTCString()}</pubDate>`
           : ""
@@ -29,9 +41,9 @@ export async function GET() {
   <channel>
     <title>Jimmy's Blog</title>
     <link>${baseUrl}</link>
-    <description>Jimmy's personal blog — mobile development, tech, and more</description>
-    <language>zh</language>
-    <lastBuildDate>${new Date().toUTCString()}</lastBuildDate>
+    <description>Jimmy's personal blog</description>
+    <language>zh-CN</language>
+    <lastBuildDate>${latestDate.getTime() > 0 ? latestDate.toUTCString() : new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
 ${items}
   </channel>

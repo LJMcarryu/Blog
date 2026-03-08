@@ -11,7 +11,7 @@ import Comments from "@/components/Comments";
 import TableOfContents from "@/components/TableOfContents";
 import CodeCopyButton from "@/components/CodeCopyButton";
 import { getSiteUrl } from "@/lib/env";
-import { routing } from "@/i18n/routing";
+import { routing, type Locale } from "@/i18n/routing";
 
 export async function generateMetadata({
   params,
@@ -19,7 +19,7 @@ export async function generateMetadata({
   params: Promise<{ locale: string; slug: string }>;
 }): Promise<Metadata> {
   const { locale, slug } = await params;
-  const post = getPostBySlug(slug, locale);
+  const post = getPostBySlug(slug, locale as Locale);
   if (!post) return { title: "Not Found" };
 
   const description =
@@ -31,12 +31,14 @@ export async function generateMetadata({
       .trim()
       .slice(0, 160);
 
+  const siteUrl = getSiteUrl();
+
   return {
     title: post.title,
     description,
     authors: [{ name: "Jimmy" }],
     alternates: {
-      canonical: `/${locale}/blog/${slug}`,
+      canonical: `${siteUrl}/${locale}/blog/${slug}`,
       languages: { zh: `/zh/blog/${slug}`, en: `/en/blog/${slug}` },
     },
     openGraph: {
@@ -79,15 +81,15 @@ export default async function PostPage({
 }) {
   const { locale, slug } = await params;
   const t = await getTranslations({ locale, namespace: "blog" });
-  const post = getPostBySlug(slug, locale);
+  const post = getPostBySlug(slug, locale as Locale);
 
   if (!post) notFound();
 
-  const readingMinutes = getReadingTime(post.content, locale);
+  const readingMinutes = getReadingTime(post.content, locale as Locale);
   const readingTime = t("readingTime", { minutes: readingMinutes });
 
   // Get prev/next posts
-  const allPosts = getPostsByLocale(locale);
+  const allPosts = getPostsByLocale(locale as Locale);
   const currentIndex = allPosts.findIndex((p) => p.slug === slug);
   const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
   const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
@@ -98,6 +100,7 @@ export default async function PostPage({
     "@type": "Article",
     headline: post.title,
     datePublished: post.date,
+    dateModified: post.date,
     description: post.description || "",
     url: `${siteUrl}/${locale}/blog/${slug}`,
     author: {

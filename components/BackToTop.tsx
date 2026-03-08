@@ -8,8 +8,15 @@ export default function BackToTop() {
   const t = useTranslations("a11y");
 
   useEffect(() => {
+    let ticking = false;
     function onScroll() {
-      setVisible(window.scrollY > 400);
+      if (!ticking) {
+        ticking = true;
+        requestAnimationFrame(() => {
+          setVisible(window.scrollY > 400);
+          ticking = false;
+        });
+      }
     }
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);

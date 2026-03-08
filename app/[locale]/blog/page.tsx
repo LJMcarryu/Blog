@@ -4,6 +4,7 @@ import { getPostsByLocale } from "@/lib/posts";
 import PostCard from "@/components/PostCard";
 import SearchBar from "@/components/SearchBar";
 import Pagination from "@/components/Pagination";
+import type { Locale } from "@/i18n/routing";
 
 const POSTS_PER_PAGE = 10;
 
@@ -28,7 +29,7 @@ export default async function BlogPage({
   const { q, tag, page } = await searchParams;
   const t = await getTranslations({ locale, namespace: "blog" });
 
-  const allPosts = getPostsByLocale(locale);
+  const allPosts = getPostsByLocale(locale as Locale);
 
   // Collect all unique tags
   const allTags = Array.from(

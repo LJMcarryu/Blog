@@ -1,13 +1,13 @@
 ---
-title: "博客代码优化实录：11 轮迭代，70+ 项改进"
+title: "博客代码优化实录：12 轮迭代，80+ 项改进"
 date: "2026-03-08"
-description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，11 ���迭代的完整实录。
+description: "上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，12 轮迭代的完整实录。"
 tags: ["代码审查", "性能优化", "Next.js"]
 ---
 
 ## 背景
 
-[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，11 轮迭代下来一共完成了 70+ 项改进。
+[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，12 轮迭代下来一共完成了 80+ 项改进。
 
 ---
 
@@ -448,9 +448,61 @@ RSS feed 缺少 `lastBuildDate` 元素，补充后符合 RSS 2.0 规范。
 
 ---
 
+## 第十二轮：深度审查与类型安全强化
+
+第十二轮是一次全面的深度审查，覆盖了性能、SEO、类型安全和无障碍四个维度。
+
+### BackToTop 滚动节流
+
+`BackToTop.tsx` 的滚动监听器在每次 scroll 事件时都调用 `setVisible()`，每秒可能触发 60+ 次状态更新。改用 `requestAnimationFrame` 节流，确保每帧最多更新一次：
+
+```typescript
+let ticking = false;
+function onScroll() {
+  if (!ticking) {
+    ticking = true;
+    requestAnimationFrame(() => {
+      setVisible(window.scrollY > 400);
+      ticking = false;
+    });
+  }
+}
+```
+
+### CodeCopyButton type 属性
+
+动态创建的复制按钮缺少 `type="button"` 属性，在某些上下文中可能被当作 `type="submit"` 处理。添加 `btn.type = "button"` 修复。
+
+### RSS Feed 修复
+
+RSS feed 存在多个问题：
+- `<language>` 硬编码为 `zh`，改为 `zh-CN`
+- 缺少 `<author>` 标签
+- CDATA 内容未转义 `]]>`，可��导致 XML 格式错误
+- `lastBuildDate` 每次请求都用当前时间，改为使用最新文章的发布日期
+
+### SEO 修复
+
+- 博客文章的 canonical URL 是相对路径（`/zh/blog/slug`），搜索引擎可能无法正确识别。改为绝对 URL（`https://example.com/zh/blog/slug`）
+- JSON-LD 结构化数据缺少 `dateModified` 字段，补充后与 `datePublished` 保持一致
+
+### 全局 Locale 类型安全
+
+`lib/posts.ts`、`lib/reading-time.ts`、`data/links.ts`、`data/now.ts`、`data/uses.ts` 的 locale 参数都是 `string` 类型，无法在编译时捕获无效 locale。统一改为 `Locale` 类型（从 `i18n/routing.ts` 导入），同时 `data/books.ts` 和 `data/projects.ts` 的 `Record<"zh" | "en", string>` 也改为 `Record<Locale, string>`。
+
+### CSS 清理
+
+移除了未使用的 `.slide-enter-6` 和 `.slide-enter-10` CSS 类及其对应的动画选择器。
+
+### Lightbox 焦点陷阱完善
+
+焦点陷阱的选择器只包含 `button`、`[href]`、`[tabindex]`，遗漏了 `input`、`select`、`textarea`。虽然当前 Lightbox 内没有表单元素，但作为通用焦点陷阱应该覆盖所有可交互元素。
+
+---
+
 ## 总结
 
-11 轮迭代，70+ 项改进，涉及 20+ 个文件。主要收获：
+12 轮迭代，80+ 项改进，涉及 20+ 个文件。主要收获：
 
 - **安全性**：添加了响应头、禁用了 X-Powered-By、OG 参数校验
 - **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性、UI 文案 i18n

@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/routing";
+
 export interface UsesItem {
   name: string;
   desc: string;
@@ -80,6 +82,6 @@ const EN_USES: UsesSection[] = [
   },
 ];
 
-export function getUsesByLocale(locale: string): UsesSection[] {
+export function getUsesByLocale(locale: Locale): UsesSection[] {
   return locale === "zh" ? ZH_USES : EN_USES;
 }

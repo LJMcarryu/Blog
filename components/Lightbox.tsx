@@ -59,7 +59,7 @@ export default function Lightbox() {
       if (!overlay) return;
 
       const focusable = overlay.querySelectorAll<HTMLElement>(
-        'button, [href], [tabindex]:not([tabindex="-1"])'
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
       );
       if (focusable.length === 0) return;
 

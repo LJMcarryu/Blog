@@ -89,8 +89,6 @@ html:not(.no-sliding) .slide-enter-2,
 html:not(.no-sliding) .slide-enter-3,
 html:not(.no-sliding) .slide-enter-4,
 html:not(.no-sliding) .slide-enter-5,
-html:not(.no-sliding) .slide-enter-6,
-html:not(.no-sliding) .slide-enter-10,
 html:not(.no-sliding) .slide-enter-50,
 html:not(.no-sliding) .slide-enter-content > * {
   --enter-stage: 0;
@@ -129,8 +127,6 @@ html:not(.no-sliding) .slide-enter-content > * {
 .slide-enter-3  { --enter-stage: 3; }
 .slide-enter-4  { --enter-stage: 4; }
 .slide-enter-5  { --enter-stage: 5; }
-.slide-enter-6  { --enter-stage: 6; }
-.slide-enter-10 { --enter-stage: 10; }
 .slide-enter-50 { --enter-stage: 50; }
 
 /* ─── Navigation (antfu.me style) ─── */

@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/routing";
+
 export interface LinkItem {
   title: string;
   url: string;
@@ -77,6 +79,6 @@ const EN_LINKS: LinkSection[] = [
   },
 ];
 
-export function getLinksByLocale(locale: string): LinkSection[] {
+export function getLinksByLocale(locale: Locale): LinkSection[] {
   return locale === "zh" ? ZH_LINKS : EN_LINKS;
 }

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { getLinksByLocale } from "@/data/links";
+import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata({
   params,
@@ -19,7 +20,7 @@ export default async function LinksPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "links" });
-  const links = getLinksByLocale(locale);
+  const links = getLinksByLocale(locale as Locale);
 
   return (
     <div className="prose m-auto">

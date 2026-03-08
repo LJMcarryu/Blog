@@ -1,6 +1,8 @@
+import type { Locale } from "@/i18n/routing";
+
 export interface Project {
   name: string;
-  description: Record<"zh" | "en", string>;
+  description: Record<Locale, string>;
   tech: string[];
   github: string;
   live: string;

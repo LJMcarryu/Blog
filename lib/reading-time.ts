@@ -1,3 +1,5 @@
+import type { Locale } from "@/i18n/routing";
+
 /**
  * Calculate reading time for a post.
  * Chinese text: ~400 characters/min
@@ -5,7 +7,7 @@
  *
  * Returns the estimated minutes (minimum 1).
  */
-export function getReadingTime(content: string, locale: string): number {
+export function getReadingTime(content: string, locale: Locale): number {
   // Strip MDX/markdown syntax
   const clean = content
     .replace(/^import\s.*$/gm, "")

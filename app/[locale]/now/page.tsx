@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { getNowByLocale } from "@/data/now";
+import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata({
   params,
@@ -19,7 +20,7 @@ export default async function NowPage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "now" });
-  const content = getNowByLocale(locale);
+  const content = getNowByLocale(locale as Locale);
 
   return (
     <div className="prose m-auto">

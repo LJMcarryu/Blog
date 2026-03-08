@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 11 Rounds, 70+ Improvements"
+title: "Blog Code Optimization Log: 12 Rounds, 80+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 11 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 12 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 11 rounds of iteration, I completed 70+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 12 rounds of iteration, I completed 80+ improvements.
 
 ---
 
@@ -450,9 +450,61 @@ The blog page's "All" tag filter linked to `?` when no search query was active, 
 
 ---
 
+## Round 12: Deep Review and Type Safety Hardening
+
+Round 12 was a comprehensive deep review covering performance, SEO, type safety, and accessibility.
+
+### BackToTop Scroll Throttling
+
+`BackToTop.tsx`'s scroll listener called `setVisible()` on every scroll event — potentially 60+ state updates per second. Added `requestAnimationFrame` throttling to ensure at most one update per frame:
+
+```typescript
+let ticking = false;
+function onScroll() {
+  if (!ticking) {
+    ticking = true;
+    requestAnimationFrame(() => {
+      setVisible(window.scrollY > 400);
+      ticking = false;
+    });
+  }
+}
+```
+
+### CodeCopyButton type Attribute
+
+The dynamically created copy button was missing `type="button"`, which could cause it to be treated as `type="submit"` in certain contexts. Added `btn.type = "button"`.
+
+### RSS Feed Fixes
+
+The RSS feed had several issues:
+- `<language>` was hardcoded as `zh`, changed to `zh-CN`
+- Missing `<author>` tags on items
+- CDATA content didn't escape `]]>`, which could break XML parsing
+- `lastBuildDate` used the current time on every request, changed to use the most recent post's publish date
+
+### SEO Fixes
+
+- Blog post canonical URLs were relative (`/zh/blog/slug`), which search engines may not resolve correctly. Changed to absolute URLs (`https://example.com/zh/blog/slug`)
+- JSON-LD structured data was missing `dateModified`. Added it to match `datePublished`
+
+### Global Locale Type Safety
+
+The `locale` parameter in `lib/posts.ts`, `lib/reading-time.ts`, `data/links.ts`, `data/now.ts`, and `data/uses.ts` was typed as `string`, providing no compile-time validation. Changed all to use the `Locale` type from `i18n/routing.ts`. Also updated `data/books.ts` and `data/projects.ts` from `Record<"zh" | "en", string>` to `Record<Locale, string>`.
+
+### CSS Cleanup
+
+Removed unused `.slide-enter-6` and `.slide-enter-10` CSS classes and their corresponding animation selectors.
+
+### Lightbox Focus Trap Improvement
+
+The focus trap selector only included `button`, `[href]`, and `[tabindex]`, missing `input`, `select`, and `textarea`. While the current Lightbox doesn't contain form elements, a robust focus trap should cover all interactive elements.
+
+---
+
 ## Summary
 
-11 rounds, 70+ improvements, 20+ files touched. Key wins:
+12 rounds, 80+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
 - **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n

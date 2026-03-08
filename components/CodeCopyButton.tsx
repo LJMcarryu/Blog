@@ -16,6 +16,7 @@ export default function CodeCopyButton() {
 
         const btn = document.createElement("button");
         btn.className = "copy-btn";
+        btn.type = "button";
         btn.setAttribute("aria-label", copyLabel);
         btn.textContent = copyLabel;
 

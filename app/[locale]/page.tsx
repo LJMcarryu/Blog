@@ -3,6 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { getPostsByLocale } from "@/lib/posts";
 import { SOCIAL_LINKS } from "@/data/social-links";
 import ThemedVideo from "@/components/ThemedVideo";
+import type { Locale } from "@/i18n/routing";
 
 export default async function HomePage({
   params,
@@ -11,7 +12,7 @@ export default async function HomePage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "home" });
-  const recentPosts = getPostsByLocale(locale).slice(0, 5);
+  const recentPosts = getPostsByLocale(locale as Locale).slice(0, 5);
 
   return (
     <div className="relative min-h-screen w-screen -ml-[calc((100vw-100%)/2)] overflow-hidden">

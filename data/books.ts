@@ -1,10 +1,12 @@
+import type { Locale } from "@/i18n/routing";
+
 export type BookStatus = "reading" | "read" | "want";
 
 export interface Book {
   title: string;
   author: string;
   rating?: number; // 1–5，仅"已读"填写
-  note?: Record<"zh" | "en", string>;
+  note?: Record<Locale, string>;
 }
 
 export const BOOKS: Record<BookStatus, Book[]> = {

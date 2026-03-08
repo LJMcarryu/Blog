@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { getPostsByLocale, getPostBySlug } from "../posts";
+import type { Locale } from "@/i18n/routing";
 
 describe("getPostsByLocale", () => {
   it("returns posts sorted by date (newest first)", () => {
@@ -13,7 +14,7 @@ describe("getPostsByLocale", () => {
   });
 
   it("returns empty array for missing locale directory", () => {
-    const posts = getPostsByLocale("nonexistent");
+    const posts = getPostsByLocale("nonexistent" as Locale);
     expect(posts).toEqual([]);
   });
 
@@ -50,7 +51,7 @@ describe("getPostBySlug", () => {
   });
 
   it("returns null for non-existent locale", () => {
-    const post = getPostBySlug("building-my-blog", "nonexistent");
+    const post = getPostBySlug("building-my-blog", "nonexistent" as Locale);
     expect(post).toBeNull();
   });
 

@@ -23,8 +23,8 @@ export default function Comments() {
     // Clear previous instance on locale change
     container.innerHTML = "";
 
-    const isDark = document.documentElement.classList.contains("dark");
-    const giscusTheme = isDark ? "dark" : "light";
+    // Read current theme from DOM (avoids stale closure — theme updates handled by postMessage below)
+    const giscusTheme = document.documentElement.classList.contains("dark") ? "dark" : "light";
 
     const script = document.createElement("script");
     script.src = "https://giscus.app/client.js";

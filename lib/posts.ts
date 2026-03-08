@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import matter from "gray-matter";
+import type { Locale } from "@/i18n/routing";
 
 export interface Post {
   slug: string;
@@ -13,7 +14,7 @@ export interface Post {
 
 const contentDir = path.join(process.cwd(), "content");
 
-export function getPostsByLocale(locale: string): Post[] {
+export function getPostsByLocale(locale: Locale): Post[] {
   const dir = path.join(contentDir, locale);
 
   if (!fs.existsSync(dir)) return [];
@@ -54,7 +55,7 @@ export function getPostsByLocale(locale: string): Post[] {
     });
 }
 
-export function getPostBySlug(slug: string, locale: string): Post | null {
+export function getPostBySlug(slug: string, locale: Locale): Post | null {
   const filePath = path.join(contentDir, locale, `${slug}.mdx`);
 
   if (!fs.existsSync(filePath)) return null;
