@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useLocale } from "next-intl";
+import { useDarkMode } from "@/hooks/useDarkMode";
 
 const GISCUS_REPO = process.env.NEXT_PUBLIC_GISCUS_REPO || "LJMcarryu/Blog";
 const GISCUS_REPO_ID = process.env.NEXT_PUBLIC_GISCUS_REPO_ID || "R_kgDORbknjA";
@@ -11,24 +12,8 @@ const GISCUS_CATEGORY_ID = process.env.NEXT_PUBLIC_GISCUS_CATEGORY_ID || "DIC_kw
 export default function Comments() {
   const ref = useRef<HTMLDivElement>(null);
   const locale = useLocale();
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-
-  // Monitor theme changes
-  useEffect(() => {
-    const updateTheme = () => {
-      setTheme(document.documentElement.classList.contains("dark") ? "dark" : "light");
-    };
-
-    updateTheme();
-
-    const observer = new MutationObserver(updateTheme);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
+  const dark = useDarkMode();
+  const theme = dark ? "dark" : "light";
 
   // Initialize Giscus (re-create on locale change for language switch)
   useEffect(() => {

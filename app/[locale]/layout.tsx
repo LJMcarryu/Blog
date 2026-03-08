@@ -30,6 +30,10 @@ export const metadata: Metadata = {
     template: "%s | Jimmy's Blog",
   },
   description: "Personal blog by Jimmy — mobile development, tech, and more",
+  alternates: {
+    canonical: "/",
+    languages: { zh: "/zh", en: "/en" },
+  },
   openGraph: {
     type: "website",
     siteName: "Jimmy's Blog",

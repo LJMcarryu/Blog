@@ -75,5 +75,14 @@
     "title": "Something went wrong",
     "fallback": "An error occurred while rendering this page.",
     "retry": "Try again"
+  },
+  "a11y": {
+    "lightMode": "Switch to light mode",
+    "darkMode": "Switch to dark mode",
+    "backToTop": "Back to top",
+    "copyCode": "Copy code",
+    "copied": "Copied!",
+    "copyFailed": "Failed",
+    "toggleLang": "Toggle language"
   }
 }

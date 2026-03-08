@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 7 Rounds, 45+ Improvements"
+title: "Blog Code Optimization Log: 8 Rounds, 50+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 7 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 8 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 7 rounds of iteration, I completed 45+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 8 rounds of iteration, I completed 50+ improvements.
 
 ---
 
@@ -261,14 +261,91 @@ Changed the RSS `<description>` from Chinese-only to English (`"Jimmy's personal
 
 ---
 
+## Round 8: Architecture and i18n Completion
+
+This round focused on three areas: code reuse, i18n coverage, and SEO.
+
+### Extract `useDarkMode` Hook
+
+`ThemedVideo.tsx` and `Comments.tsx` each created their own MutationObserver to track dark mode state — identical logic. Extracted to `hooks/useDarkMode.ts`:
+
+```typescript
+export function useDarkMode(): boolean {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const sync = () =>
+      setDark(document.documentElement.classList.contains("dark"));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return dark;
+}
+```
+
+Each component shed ~15 lines of boilerplate. `ThemeToggle` keeps its own logic since it also writes to localStorage and applies the class.
+
+### UI Component i18n Completion
+
+Four client components had hardcoded English interaction labels:
+
+- `ThemeToggle` — "Switch to light/dark mode"
+- `BackToTop` — "Back to top"
+- `CodeCopyButton` — "Copy" / "Copied!" / "Failed"
+- `LanguageSwitcher` — "Toggle language"
+
+Added an `a11y` namespace to manage all accessibility and interaction labels:
+
+```json
+{
+  "a11y": {
+    "lightMode": "Switch to light mode",
+    "darkMode": "Switch to dark mode",
+    "backToTop": "Back to top",
+    "copyCode": "Copy code",
+    "copied": "Copied!",
+    "copyFailed": "Failed",
+    "toggleLang": "Toggle language"
+  }
+}
+```
+
+### SEO: Canonical and Alternate URLs
+
+No `alternates` metadata was set, so search engines could treat `/zh/blog/xxx` and `/en/blog/xxx` as duplicate content. Added canonical and alternate links to both the root layout and blog post pages:
+
+```typescript
+alternates: {
+  canonical: `/${locale}/blog/${slug}`,
+  languages: { zh: `/zh/blog/${slug}`, en: `/en/blog/${slug}` },
+},
+```
+
+### TableOfContents Optimization
+
+The MutationObserver previously re-initialized the IntersectionObserver on every DOM change (including when CodeCopyButton inserts buttons). Added heading ID caching to skip re-init when headings haven't actually changed:
+
+```typescript
+const key = items.map((h) => h.id).join(",");
+if (key === prevKeyRef.current) return;
+prevKeyRef.current = key;
+```
+
+---
+
 ## Summary
 
-7 rounds, 45+ improvements, 20+ files touched. Key wins:
+8 rounds, 50+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
-- **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility
-- **Performance**: MutationObserver over setTimeout, Giscus postMessage, conditional video loading
+- **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n
+- **Performance**: MutationObserver over setTimeout, Giscus postMessage, conditional video loading, TOC caching
 - **Consistency**: 18 CSS design tokens, full i18n coverage, centralized env handling
-- **Maintainability**: Data file extraction, type safety, error logging, redundant code cleanup
+- **Maintainability**: useDarkMode hook, data file extraction, type safety, error logging, redundant code cleanup
+- **SEO**: canonical/alternate URLs, structured data, RSS normalization
 
 A code review isn't just about finding problems — it's about establishing conventions. Once a project has unified design tokens, i18n coverage, and error handling patterns, future development naturally follows those standards.

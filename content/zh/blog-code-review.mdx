@@ -192,6 +192,33 @@ RSS feed 的 `<description>` 使用纯中文，但 feed 实际包含中英文两
 
 ---
 
+## 第四轮审查：架构与 i18n
+
+### 重复的暗色模式监听逻辑
+
+`ThemedVideo.tsx`、`Comments.tsx` 和 `ThemeToggle.tsx` 三个组件各自创建了 MutationObserver 监听 `document.documentElement` 的 class 变化。前两个的逻辑完全相同，应该提取为共享的 `useDarkMode` Hook。
+
+### UI 组件交互文案硬编码英文
+
+四个客户端组件的 aria-label 和按钮文案是硬编码英文，没有走 i18n：
+
+- `ThemeToggle` — "Switch to light/dark mode"
+- `BackToTop` — "Back to top"
+- `CodeCopyButton` — "Copy" / "Copied!" / "Failed" / "Copy code"
+- `LanguageSwitcher` — "Toggle language"
+
+中文用户看到的是英文交互提示，体验不一致。
+
+### 缺少 canonical 和 alternate URL
+
+布局和文章页面都没有设置 `alternates` 元数据。搜索引擎可能把 `/zh/blog/xxx` 和 `/en/blog/xxx` 当作重复内容，影响 SEO 收录。
+
+### TableOfContents 不必要的重建
+
+MutationObserver 在每次 DOM 变化时都重新初始化 IntersectionObserver，包括 CodeCopyButton 插入按钮时。应该缓存 heading 列表，只在标题实际变化时才重建。
+
+---
+
 ## 优化清单总览
 
 | 优先级 | 问题 | 文件 |
@@ -223,16 +250,21 @@ RSS feed 的 `<description>` 使用纯中文，但 feed 实际包含中英文两
 | 🟡 中 | Giscus 语言切换失效 | `Comments.tsx` |
 | 🟢 低 | CSS 变量冗余声明（.dark 重复 11 个） | `globals.css` |
 | 🟢 低 | RSS 描述语言不当 | `feed.xml/route.ts` |
+| 🟡 中 | 重复的暗色模式监听逻辑 | `ThemedVideo.tsx`, `Comments.tsx` |
+| 🟡 中 | UI 组件交互文案硬编码英文 | `ThemeToggle.tsx` 等 |
+| 🟡 中 | 缺少 canonical/alternate URL | `layout.tsx`, `blog/[slug]/page.tsx` |
+| 🟢 低 | TableOfContents 不必要的重建 | `TableOfContents.tsx` |
 
 ---
 
 ## 总结
 
-整体来看，项目架构清晰，Next.js App Router + next-intl 的组合用得比较规范，暗色模式和动画系统也做得不错。经过三轮审查，主要的优化空间集中在四个方面：
+整体来看，项目架构清晰，Next.js App Router + next-intl 的组合用得比较规范，暗色模式和动画系统也做得不错。经过四轮审查，主要的优化空间集中在五个方面：
 
 1. **性能**：视频资源压缩是最大的收益点
 2. **健壮性**：错误处理和环境变量校验需要补齐
 3. **一致性**：CSS 变量体系需要彻底贯穿，不能留死角
-4. **可访问性**：aria 属性、焦点管理、语义标记需要逐一补齐
+4. **可访问性**：aria 属性、焦点管理、语义标记、交互文案 i18n 需要逐一补齐
+5. **SEO**：canonical/alternate URL、结构化数据需要完善
 
 这些问题没有一个是"紧急"的，但逐步修复会让项目的可维护性上一个台阶。下一步我会按优先级逐个解决。

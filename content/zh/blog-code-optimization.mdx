@@ -1,13 +1,13 @@
 ---
-title: "博客代码优化实录：7 轮迭代，45+ 项改进"
+title: "博客代码优化实录：8 轮迭代，50+ 项改进"
 date: "2026-03-08"
-description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，7 轮迭代的完整实录。
+description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，8 轮迭代的完整实录。
 tags: ["代码审查", "性能优化", "Next.js"]
 ---
 
 ## 背景
 
-[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，7 轮迭代下来一共完成了 45+ 项改进。
+[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，8 轮迭代下来一共完成了 50+ 项改进。
 
 ---
 
@@ -261,14 +261,91 @@ RSS feed 的 `<description>` 从纯中文改为英文（`"Jimmy's personal blog 
 
 ---
 
+## 第八轮：架构优化与 i18n 补全
+
+这一轮聚焦三个方面：代码复用、国际化覆盖、SEO。
+
+### 提取 `useDarkMode` Hook
+
+`ThemedVideo.tsx` 和 `Comments.tsx` 各自创建了一个 MutationObserver 监听 `document.documentElement` 的 class 变化来追踪暗色模式状态，逻辑完全相同。提取为 `hooks/useDarkMode.ts`：
+
+```typescript
+export function useDarkMode(): boolean {
+  const [dark, setDark] = useState(false);
+  useEffect(() => {
+    const sync = () =>
+      setDark(document.documentElement.classList.contains("dark"));
+    sync();
+    const observer = new MutationObserver(sync);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    return () => observer.disconnect();
+  }, []);
+  return dark;
+}
+```
+
+两个组件各减少约 15 行样板代码。`ThemeToggle` 保留自己的逻辑，因为它还需要写入 localStorage 和应用 class。
+
+### UI 组件 i18n 补全
+
+四个客户端组件的交互文案之前是硬编码英文：
+
+- `ThemeToggle` — "Switch to light/dark mode"
+- `BackToTop` — "Back to top"
+- `CodeCopyButton` — "Copy" / "Copied!" / "Failed"
+- `LanguageSwitcher` — "Toggle language"
+
+新增 `a11y` 命名空间，统一管理这些无障碍和交互文案：
+
+```json
+{
+  "a11y": {
+    "lightMode": "切换到浅色模式",
+    "darkMode": "切换到深色模式",
+    "backToTop": "回到顶部",
+    "copyCode": "复制代码",
+    "copied": "已复制！",
+    "copyFailed": "复制失败",
+    "toggleLang": "切换语言"
+  }
+}
+```
+
+### SEO：canonical 和 alternate URL
+
+之前没有设置 `alternates` 元数据，搜索引擎可能把 `/zh/blog/xxx` 和 `/en/blog/xxx` 当作重复内容。在根布局和博客文章页面都添加了 canonical 和 alternate 链接：
+
+```typescript
+alternates: {
+  canonical: `/${locale}/blog/${slug}`,
+  languages: { zh: `/zh/blog/${slug}`, en: `/en/blog/${slug}` },
+},
+```
+
+### TableOfContents 优化
+
+MutationObserver 之前在每次 DOM 变化时都会重新初始化 IntersectionObserver（包括 CodeCopyButton 插入按钮时）。添加了 heading ID 缓存，只在标题实际变化时才重建：
+
+```typescript
+const key = items.map((h) => h.id).join(",");
+if (key === prevKeyRef.current) return;
+prevKeyRef.current = key;
+```
+
+---
+
 ## 总结
 
-7 轮迭代，45+ 项改进，涉及 20+ 个文件。主要收获：
+8 轮迭代，50+ 项改进，涉及 20+ 个文件。主要收获：
 
 - **安全性**：添加了响应头、禁用了 X-Powered-By、OG 参数校验
-- **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性
-- **性能**：MutationObserver 替代 setTimeout、Giscus postMessage、视频条件加载
+- **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性、UI 文案 i18n
+- **性能**：MutationObserver 替代 setTimeout、Giscus postMessage、视频条件加载、TOC 缓存优化
 - **一致性**：18 个 CSS 设计令牌、所有 UI 文案走 i18n、环境变量集中管理
-- **可维护性**：数据文件抽离、类型安全、错误日志、冗余代码清理
+- **可维护性**：useDarkMode Hook、数据文件抽离、类型安全、错误日志、冗余代码清理
+- **SEO**：canonical/alternate URL、结构化数据、RSS 规范化
 
 代码审查不只是找问题，更重要的是建立规范。当项目有了统一的设计令牌、i18n 覆盖和错误处理模式，后续开发就能自然地遵循这些约定。

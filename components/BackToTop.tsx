@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslations } from "next-intl";
 
 export default function BackToTop() {
   const [visible, setVisible] = useState(false);
+  const t = useTranslations("a11y");
 
   useEffect(() => {
     function onScroll() {
@@ -19,7 +21,7 @@ export default function BackToTop() {
     <button
       onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
       className="back-to-top"
-      aria-label="Back to top"
+      aria-label={t("backToTop")}
     >
       <svg
         width="18"

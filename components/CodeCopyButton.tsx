@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
+import { useTranslations } from "next-intl";
 
 export default function CodeCopyButton() {
+  const t = useTranslations("a11y");
+  const copyLabel = t("copyCode");
+  const copiedLabel = t("copied");
+  const failedLabel = t("copyFailed");
+
   useEffect(() => {
     function addButtons() {
       document.querySelectorAll("article pre").forEach((pre) => {
@@ -10,23 +16,23 @@ export default function CodeCopyButton() {
 
         const btn = document.createElement("button");
         btn.className = "copy-btn";
-        btn.setAttribute("aria-label", "Copy code");
-        btn.textContent = "Copy";
+        btn.setAttribute("aria-label", copyLabel);
+        btn.textContent = copyLabel;
 
         btn.addEventListener("click", async () => {
           const code = pre.querySelector("code");
           if (!code) return;
           try {
             await navigator.clipboard.writeText(code.textContent ?? "");
-            btn.textContent = "Copied!";
+            btn.textContent = copiedLabel;
             btn.classList.add("copied");
             setTimeout(() => {
-              btn.textContent = "Copy";
+              btn.textContent = copyLabel;
               btn.classList.remove("copied");
             }, 2000);
           } catch {
-            btn.textContent = "Failed";
-            setTimeout(() => { btn.textContent = "Copy"; }, 2000);
+            btn.textContent = failedLabel;
+            setTimeout(() => { btn.textContent = copyLabel; }, 2000);
           }
         });
 
@@ -46,7 +52,7 @@ export default function CodeCopyButton() {
     }
 
     return () => observer.disconnect();
-  }, []);
+  }, [copyLabel, copiedLabel, failedLabel]);
 
   return null;
 }

@@ -190,6 +190,33 @@ The RSS feed's `<description>` was in Chinese only, but the feed actually includ
 
 ---
 
+## Fourth Review: Architecture and i18n
+
+### Duplicate Dark Mode Observer Logic
+
+`ThemedVideo.tsx`, `Comments.tsx`, and `ThemeToggle.tsx` each create their own MutationObserver on `document.documentElement` class changes. The first two have identical logic — should be extracted to a shared `useDarkMode` hook.
+
+### UI Component Labels Hardcoded in English
+
+Four client components have hardcoded English aria-labels and button text, bypassing i18n:
+
+- `ThemeToggle` — "Switch to light/dark mode"
+- `BackToTop` — "Back to top"
+- `CodeCopyButton` — "Copy" / "Copied!" / "Failed" / "Copy code"
+- `LanguageSwitcher` — "Toggle language"
+
+Chinese users see English interaction prompts — inconsistent experience.
+
+### Missing Canonical and Alternate URLs
+
+Neither the layout nor blog post pages set `alternates` metadata. Search engines may treat `/zh/blog/xxx` and `/en/blog/xxx` as duplicate content, hurting SEO.
+
+### TableOfContents Unnecessary Rebuilds
+
+The MutationObserver re-initializes the IntersectionObserver on every DOM change, including when CodeCopyButton inserts buttons. Should cache the heading list and only rebuild when headings actually change.
+
+---
+
 ## Optimization Checklist
 
 | Priority | Issue | File |
@@ -221,16 +248,21 @@ The RSS feed's `<description>` was in Chinese only, but the feed actually includ
 | 🟡 Med | Giscus language switch broken | `Comments.tsx` |
 | 🟢 Low | Redundant CSS variable declarations (.dark duplicates 11) | `globals.css` |
 | 🟢 Low | RSS description language mismatch | `feed.xml/route.ts` |
+| 🟡 Med | Duplicate dark mode observer logic | `ThemedVideo.tsx`, `Comments.tsx` |
+| 🟡 Med | UI component labels hardcoded in English | `ThemeToggle.tsx` etc. |
+| 🟡 Med | Missing canonical/alternate URLs | `layout.tsx`, `blog/[slug]/page.tsx` |
+| 🟢 Low | TableOfContents unnecessary rebuilds | `TableOfContents.tsx` |
 
 ---
 
 ## Takeaway
 
-Overall, the project is well-structured. The Next.js App Router + next-intl combo is solid, and the dark mode and animation systems are nicely done. After three rounds of review, the main optimization opportunities fall into four buckets:
+Overall, the project is well-structured. The Next.js App Router + next-intl combo is solid, and the dark mode and animation systems are nicely done. After four rounds of review, the main optimization opportunities fall into five buckets:
 
 1. **Performance**: Video compression is the single biggest win
 2. **Robustness**: Error handling and environment variable validation need attention
 3. **Consistency**: The CSS variable system needs to be thorough — no raw values left behind
-4. **Accessibility**: aria attributes, focus management, and semantic markers need to be filled in one by one
+4. **Accessibility**: aria attributes, focus management, semantic markers, and UI label i18n need to be filled in one by one
+5. **SEO**: canonical/alternate URLs and structured data need completion
 
 None of these are urgent, but fixing them incrementally will make the project significantly more maintainable. Next step: tackle them by priority.

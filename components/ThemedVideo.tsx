@@ -1,25 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useDarkMode } from "@/hooks/useDarkMode";
 
 export default function ThemedVideo() {
-  const [dark, setDark] = useState(true);
-
-  useEffect(() => {
-    function sync() {
-      setDark(document.documentElement.classList.contains("dark"));
-    }
-
-    sync();
-
-    const observer = new MutationObserver(sync);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ["class"],
-    });
-
-    return () => observer.disconnect();
-  }, []);
+  const dark = useDarkMode();
 
   const baseClass = "fixed inset-0 w-full h-full object-cover -z-10";
 

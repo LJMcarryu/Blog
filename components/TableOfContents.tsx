@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface TocItem {
   id: string;
@@ -31,6 +31,7 @@ function getHeadings(): TocItem[] {
 export default function TableOfContents() {
   const [headings, setHeadings] = useState<TocItem[]>([]);
   const [activeId, setActiveId] = useState("");
+  const prevKeyRef = useRef("");
 
   useEffect(() => {
     let intersectionObserver: IntersectionObserver | null = null;
@@ -39,8 +40,14 @@ export default function TableOfContents() {
       const items = getHeadings();
       if (items.length < 2) return;
 
+      // Skip re-init if headings haven't changed
+      const key = items.map((h) => h.id).join(",");
+      if (key === prevKeyRef.current) return;
+      prevKeyRef.current = key;
+
       setHeadings(items);
 
+      intersectionObserver?.disconnect();
       intersectionObserver = new IntersectionObserver(
         (entries) => {
           for (const entry of entries) {
@@ -61,10 +68,7 @@ export default function TableOfContents() {
 
     const article = document.querySelector("article");
     const mutationObserver = article
-      ? new MutationObserver(() => {
-          intersectionObserver?.disconnect();
-          init();
-        })
+      ? new MutationObserver(() => init())
       : null;
     mutationObserver?.observe(article!, { childList: true, subtree: true });
 
