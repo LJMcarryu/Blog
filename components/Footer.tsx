@@ -7,7 +7,7 @@ export default function Footer() {
     <footer className="site-footer">
       <div className="site-footer-inner">
         <div className="site-footer-links">
-          {SOCIAL_LINKS.filter(({ href }) => href !== "#").map(({ label, href }) => (
+          {SOCIAL_LINKS.map(({ label, href }) => (
             <a
               key={label}
               href={href}

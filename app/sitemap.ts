@@ -20,6 +20,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const staticEntries = routing.locales.flatMap((locale) =>
     pages.map((page) => ({
       url: `${baseUrl}/${locale}${page}`,
+      changeFrequency: "weekly" as const,
+      priority: page === "" ? 1.0 : 0.8,
     }))
   );
 
@@ -27,6 +29,8 @@ export default function sitemap(): MetadataRoute.Sitemap {
     getPostsByLocale(locale).map((post) => ({
       url: `${baseUrl}/${locale}/blog/${post.slug}`,
       lastModified: post.date ? new Date(post.date) : undefined,
+      changeFrequency: "monthly" as const,
+      priority: 0.6,
     }))
   );
 

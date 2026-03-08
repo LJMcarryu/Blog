@@ -40,7 +40,7 @@ export default async function HomePage({
               <hr className="border-black/15 dark:border-white/20" />
               <p>{t("findMeOn")}</p>
               <div className="not-prose flex flex-wrap gap-x-5 gap-y-2 -mt-2">
-                {SOCIAL_LINKS.filter(({ href }) => href !== "#").map(({ label, href }) => (
+                {SOCIAL_LINKS.map(({ label, href }) => (
                   <a
                     key={label}
                     href={href}
