@@ -66,5 +66,14 @@
   "links": {
     "title": "链接收藏",
     "subtitle": "精选的网站、工具和资源"
+  },
+  "notFound": {
+    "title": "页面未找到",
+    "backHome": "返回首页"
+  },
+  "error": {
+    "title": "出错了",
+    "fallback": "渲染此页面时发生错误。",
+    "retry": "重试"
   }
 }

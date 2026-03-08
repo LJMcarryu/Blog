@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "next-intl";
+import { useTranslations } from "next-intl";
 
 export default function Error({
   error,
@@ -9,22 +9,18 @@ export default function Error({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  const locale = useLocale();
-  const isZh = locale === "zh";
+  const t = useTranslations("error");
 
   return (
     <div className="prose m-auto text-center py-20">
       <h2 className="slide-enter-1">
-        {isZh ? "出错了" : "Something went wrong"}
+        {t("title")}
       </h2>
       <p
         className="text-sm slide-enter-2"
         style={{ color: "var(--fg-light)" }}
       >
-        {error.message ||
-          (isZh
-            ? "渲染此页面时发生错误。"
-            : "An error occurred while rendering this page.")}
+        {error.message || t("fallback")}
       </p>
       <button
         onClick={reset}
@@ -34,7 +30,7 @@ export default function Error({
           borderColor: "rgba(125, 125, 125, 0.2)"
         }}
       >
-        {isZh ? "重试" : "Try again"}
+        {t("retry")}
       </button>
     </div>
   );

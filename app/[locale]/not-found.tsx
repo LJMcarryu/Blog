@@ -1,9 +1,9 @@
 import { Link } from "@/i18n/navigation";
-import { getLocale } from "next-intl/server";
+import { getLocale, getTranslations } from "next-intl/server";
 
 export default async function NotFound() {
   const locale = await getLocale();
-  const isZh = locale === "zh";
+  const t = await getTranslations({ locale, namespace: "notFound" });
 
   return (
     <div className="prose m-auto text-center py-20">
@@ -12,14 +12,14 @@ export default async function NotFound() {
         className="slide-enter-2"
         style={{ color: "var(--fg-light)" }}
       >
-        {isZh ? "页面未找到" : "Page not found"}
+        {t("title")}
       </p>
       <Link
         href="/"
         className="not-prose text-sm slide-enter-3 inline-block transition-opacity opacity-50 hover:opacity-100"
         style={{ color: "var(--fg)" }}
       >
-        ← {isZh ? "返回首页" : "Back to home"}
+        ← {t("backHome")}
       </Link>
     </div>
   );

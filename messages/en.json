@@ -66,5 +66,14 @@
   "links": {
     "title": "Links",
     "subtitle": "A curated collection of websites, tools, and resources"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "backHome": "Back to home"
+  },
+  "error": {
+    "title": "Something went wrong",
+    "fallback": "An error occurred while rendering this page.",
+    "retry": "Try again"
   }
 }

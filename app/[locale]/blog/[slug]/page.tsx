@@ -11,6 +11,7 @@ import Comments from "@/components/Comments";
 import TableOfContents from "@/components/TableOfContents";
 import CodeCopyButton from "@/components/CodeCopyButton";
 import { getSiteUrl } from "@/lib/env";
+import { routing } from "@/i18n/routing";
 
 export async function generateMetadata({
   params,
@@ -33,11 +34,13 @@ export async function generateMetadata({
   return {
     title: post.title,
     description,
+    authors: [{ name: "Jimmy" }],
     openGraph: {
       title: post.title,
       description,
       type: "article",
       publishedTime: post.date,
+      locale: locale === "zh" ? "zh_CN" : "en_US",
       images: [
         {
           url: `/og?title=${encodeURIComponent(post.title)}&locale=${locale}`,
@@ -51,10 +54,9 @@ export async function generateMetadata({
 }
 
 export async function generateStaticParams() {
-  const locales = ["zh", "en"];
   const params: { locale: string; slug: string }[] = [];
 
-  for (const locale of locales) {
+  for (const locale of routing.locales) {
     const posts = getPostsByLocale(locale);
     posts.forEach((post) => {
       params.push({ locale, slug: post.slug });

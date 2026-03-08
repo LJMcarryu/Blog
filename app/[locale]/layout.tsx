@@ -30,6 +30,14 @@ export const metadata: Metadata = {
     template: "%s | Jimmy's Blog",
   },
   description: "Personal blog by Jimmy — mobile development, tech, and more",
+  openGraph: {
+    type: "website",
+    siteName: "Jimmy's Blog",
+    images: [{ url: "/og?title=Jimmy%27s+Blog", width: 1200, height: 630 }],
+  },
+  twitter: {
+    card: "summary_large_image",
+  },
 };
 
 export function generateStaticParams() {
