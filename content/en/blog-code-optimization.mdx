@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 12 Rounds, 80+ Improvements"
+title: "Blog Code Optimization Log: 13 Rounds, 90+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 12 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 13 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 12 rounds of iteration, I completed 80+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 13 rounds of iteration, I completed 90+ improvements.
 
 ---
 
@@ -502,12 +502,54 @@ The focus trap selector only included `button`, `[href]`, and `[tabindex]`, miss
 
 ---
 
+## Round 13: Accessibility Hardening, Middleware Fix, and SEO Completion
+
+Another comprehensive deep review, covering accessibility, configuration, SEO, and code robustness.
+
+### Middleware Export Fix (Critical Bug)
+
+`proxy.ts` exported a function named `proxy`, but Next.js requires the middleware file to be named `middleware.ts` and export `default` or `middleware`. Renamed the file and fixed the export:
+
+```typescript
+// Before: export const proxy = createMiddleware(routing);
+// After:  export default createMiddleware(routing);
+```
+
+### RSS Feed Multilingual Support
+
+The RSS feed's `<language>` tag was hardcoded to `zh-CN`, but the feed contains posts in both languages. Added per-item `<language>` tags:
+
+```xml
+<language>zh-CN</language>  <!-- Chinese posts -->
+<language>en-US</language>  <!-- English posts -->
+```
+
+### CSS Accessibility Trifecta
+
+1. **`prefers-reduced-motion`**: Added a global media query that disables all animations and transitions for users who prefer reduced motion
+2. **`focus-visible` rings**: Added keyboard focus styles to 6 interactive elements — `.nav-link`, `.tag-pill`, `.pagination-link`, `.copy-btn`, `.back-to-top`, `.lightbox-close`
+3. **Print styles**: Hide navigation, back-to-top, comments, and other non-content elements; show URLs after links
+
+### Lightbox Focus Trap Hardening
+
+The original focus trap only checked `activeElement === first/last`. If focus escaped to an element outside the focusable list (e.g., shadow DOM or browser extension injections), the trap would fail. Now also checks whether `activeElement` is within the focusable list.
+
+### Blog List Page SEO
+
+`blog/page.tsx`'s `generateMetadata` only set `title`, missing `description` and `openGraph`. Added a `blog.description` i18n key and completed the metadata.
+
+### TableOfContents Non-null Assertion Fix
+
+Line 73 used `mutationObserver?.observe(article!, ...)` — a non-null assertion after optional chaining. If `article` is null, this crashes. Changed to an explicit null check.
+
+---
+
 ## Summary
 
-12 rounds, 80+ improvements, 20+ files touched. Key wins:
+13 rounds, 90+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
-- **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n
+- **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n, `prefers-reduced-motion`, `focus-visible` rings, print styles
 - **Performance**: MutationObserver over setTimeout, Giscus postMessage, conditional video loading, TOC caching
 - **Consistency**: 18 CSS design tokens, full i18n coverage, centralized env handling, bilingual data files
 - **Maintainability**: useDarkMode hook, data file extraction, type safety, error logging, redundant code cleanup

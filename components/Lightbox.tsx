@@ -67,12 +67,18 @@ export default function Lightbox() {
       const last = focusable[focusable.length - 1];
 
       if (e.shiftKey) {
-        if (document.activeElement === first) {
+        if (
+          document.activeElement === first ||
+          !Array.from(focusable).includes(document.activeElement as HTMLElement)
+        ) {
           e.preventDefault();
           last.focus();
         }
       } else {
-        if (document.activeElement === last) {
+        if (
+          document.activeElement === last ||
+          !Array.from(focusable).includes(document.activeElement as HTMLElement)
+        ) {
           e.preventDefault();
           first.focus();
         }

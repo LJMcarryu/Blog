@@ -16,6 +16,7 @@
   },
   "blog": {
     "title": "All Posts",
+    "description": "Jimmy's tech blog — mobile development, frontend, and learning notes",
     "backToList": "Back to List",
     "noResults": "No posts found",
     "searchPlaceholder": "Search posts...",

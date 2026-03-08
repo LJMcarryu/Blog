@@ -27,7 +27,8 @@ export async function GET() {
       <link>${baseUrl}/${post.locale}/blog/${post.slug}</link>
       <guid isPermaLink="true">${baseUrl}/${post.locale}/blog/${post.slug}</guid>
       <description><![CDATA[${escapeCdata(post.description || "")}]]></description>
-      <author>Jimmy</author>${
+      <author>Jimmy</author>
+      <language>${post.locale === "zh" ? "zh-CN" : "en-US"}</language>${
         post.date
           ? `\n      <pubDate>${new Date(post.date).toUTCString()}</pubDate>`
           : ""
@@ -42,7 +43,7 @@ export async function GET() {
     <title>Jimmy's Blog</title>
     <link>${baseUrl}</link>
     <description>Jimmy's personal blog</description>
-    <language>zh-CN</language>
+    <language>zh-CN</language><!-- channel default; per-item language set below -->
     <lastBuildDate>${latestDate.getTime() > 0 ? latestDate.toUTCString() : new Date().toUTCString()}</lastBuildDate>
     <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
 ${items}

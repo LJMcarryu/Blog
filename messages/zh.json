@@ -16,6 +16,7 @@
   },
   "blog": {
     "title": "所有文章",
+    "description": "Jimmy 的技术博客 — 移动开发、前端技术和学习笔记",
     "backToList": "返回列表",
     "noResults": "没有找到相关文章",
     "searchPlaceholder": "搜索文章...",

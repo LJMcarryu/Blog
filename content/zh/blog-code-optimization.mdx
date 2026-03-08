@@ -1,13 +1,13 @@
 ---
-title: "博客代码优化实录：12 轮迭代，80+ 项改进"
+title: "博客代码优化实录：13 轮迭代，90+ 项改进"
 date: "2026-03-08"
-description: "上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，12 轮迭代的完整实录。"
+description: "上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，13 轮迭代的完整实录。"
 tags: ["代码审查", "性能优化", "Next.js"]
 ---
 
 ## 背景
 
-[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，12 轮迭代下来一共完成了 80+ 项改进。
+[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，13 轮迭代下来一共完成了 90+ 项改进。
 
 ---
 
@@ -500,12 +500,54 @@ RSS feed 存在多个问题：
 
 ---
 
+## 第十三轮：无障碍强化、中间件修复与 SEO 补全
+
+这一轮是又一次全面深度审查，覆盖了无障碍、配置、SEO 和代码健壮性四个维度。
+
+### 中间件��出修复（关键 bug）
+
+`proxy.ts` 文件导出名为 `proxy`，但 Next.js 要求中间件文件命名为 `middleware.ts` 且导出 `default` 或 `middleware`。重命名文件并修正导出：
+
+```typescript
+// Before: export const proxy = createMiddleware(routing);
+// After:  export default createMiddleware(routing);
+```
+
+### RSS Feed 多语言支持
+
+RSS feed 的 `<language>` 标签硬编码为 `zh-CN`，但 feed 包含中英文两种语言的文章。为每篇文章添加独立的 `<language>` 标签：
+
+```xml
+<language>zh-CN</language>  <!-- 中文文章 -->
+<language>en-US</language>  <!-- 英文文章 -->
+```
+
+### CSS 无障碍三件套
+
+1. **`prefers-reduced-motion`**：添加全局媒体查询，对偏好减少动画的用户禁用所有动画和过渡效果
+2. **`focus-visible` 焦点环**：为 6 个交互元素添加键盘焦点样式——`.nav-link`、`.tag-pill`、`.pagination-link`、`.copy-btn`、`.back-to-top`、`.lightbox-close`
+3. **打印样式**：隐藏导航、返回顶部、评论区等非内容元素，链接显示 URL
+
+### Lightbox 焦点陷阱增强
+
+原来的焦点陷阱只检查 `activeElement === first/last`，如果焦点意外跳到 focusable 列表之外（如 shadow DOM 或浏览器扩展注入的元素），陷阱会失效。改为同时检查 `activeElement` 是否在列表内。
+
+### 博客列表页 SEO
+
+`blog/page.tsx` 的 `generateMetadata` 只设置了 `title`，缺少 `description` 和 `openGraph`。新增 `blog.description` i18n key，补全元数据。
+
+### TableOfContents 非空断言修复
+
+第 73 行 `mutationObserver?.observe(article!, ...)` 在可选链后使用非空断言——如果 `article` 为 null 会崩溃。改为显式 null 检查。
+
+---
+
 ## 总结
 
-12 轮迭代，80+ 项改进，涉及 20+ 个文件。主要收获：
+13 轮迭代，90+ 项改进，涉及 20+ 个文件。主要收获：
 
 - **安全性**：添加了响应头、禁用了 X-Powered-By、OG 参数校验
-- **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性、UI 文案 i18n
+- **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性、UI 文案 i18n、`prefers-reduced-motion`、`focus-visible` 焦点环、打印样式
 - **性能**：MutationObserver 替代 setTimeout、Giscus postMessage、视频条件加载、TOC 缓存优化
 - **一致性**：18 个 CSS 设计令牌、所有 UI 文案走 i18n、环境变量集中管理、数据文件双语化
 - **可维护性**：useDarkMode Hook、数据文件抽离、类型安全、错误日志、冗余代码清理

@@ -178,6 +178,11 @@ html:not(.no-sliding) .slide-enter-content > * {
   align-items: center;
   gap: 0.25rem;
 }
+.nav-link:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 .nav-link:hover,
 .nav-link.active { opacity: 1; }
 
@@ -361,6 +366,10 @@ html:not(.no-sliding) .slide-enter-content > * {
   border-color: var(--fg);
   color: var(--fg);
 }
+.tag-pill:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
 .tag-pill[data-active="true"] {
   background-color: var(--fg-deeper);
   color: var(--c-bg);
@@ -429,6 +438,11 @@ pre:hover .copy-btn { opacity: 1; }
   color: var(--fg);
   border-color: var(--fg);
 }
+.copy-btn:focus-visible {
+  opacity: 1;
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
 .copy-btn.copied {
   color: var(--success);
   border-color: var(--success);
@@ -479,6 +493,10 @@ pre:hover .copy-btn { opacity: 1; }
   border-color: var(--fg);
   color: var(--fg);
 }
+.back-to-top:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
+}
 
 /* ─── Lightbox overlay ─── */
 .lightbox-overlay {
@@ -509,6 +527,11 @@ pre:hover .copy-btn { opacity: 1; }
   z-index: 101;
 }
 .lightbox-close:hover { color: #fff; }
+.lightbox-close:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
 
 .lightbox-img {
   max-width: 90vw;
@@ -542,6 +565,10 @@ article .prose img {
 .pagination-link:hover {
   border-color: var(--fg);
   color: var(--fg-deep);
+}
+.pagination-link:focus-visible {
+  outline: 2px solid var(--fg);
+  outline-offset: 2px;
 }
 .pagination-link[data-active="true"] {
   background-color: var(--fg-deeper);
@@ -587,4 +614,30 @@ article .prose img {
   color: var(--fg-light);
   opacity: 0.6;
   margin: 0;
+}
+
+/* ─── Reduced motion ─── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Print styles ─── */
+@media print {
+  nav, .back-to-top, .lightbox-overlay, .copy-btn, .giscus, footer {
+    display: none !important;
+  }
+  html { overflow: visible; }
+  body { color: #000; background: #fff; }
+  .prose a { border-bottom: none; }
+  .prose a[href]::after { content: " (" attr(href) ")"; font-size: 0.8em; color: #666; }
+  .prose pre { border: 1px solid #ccc; }
 }

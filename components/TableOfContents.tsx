@@ -70,7 +70,9 @@ export default function TableOfContents() {
     const mutationObserver = article
       ? new MutationObserver(() => init())
       : null;
-    mutationObserver?.observe(article!, { childList: true, subtree: true });
+    if (article) {
+      mutationObserver?.observe(article, { childList: true, subtree: true });
+    }
 
     return () => {
       mutationObserver?.disconnect();
