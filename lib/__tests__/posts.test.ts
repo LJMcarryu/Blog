@@ -19,12 +19,12 @@ describe("getPostsByLocale", () => {
 
   it("parses frontmatter fields correctly", () => {
     const posts = getPostsByLocale("zh");
-    const hello = posts.find((p) => p.slug === "hello-world");
-    expect(hello).toBeDefined();
-    expect(hello!.title).toBe("你好，世界");
-    expect(hello!.date).toBe("2026-03-01");
-    expect(hello!.tags).toContain("随笔");
-    expect(hello!.description).toBeTruthy();
+    const post = posts.find((p) => p.slug === "building-my-blog");
+    expect(post).toBeDefined();
+    expect(post!.title).toBe("从零搭建个人博客：Next.js 16 + MDX 全记录");
+    expect(post!.date).toBe("2026-03-01");
+    expect(post!.tags).toContain("Next.js");
+    expect(post!.description).toBeTruthy();
   });
 
   it("returns posts with content", () => {
@@ -38,10 +38,10 @@ describe("getPostsByLocale", () => {
 
 describe("getPostBySlug", () => {
   it("returns a post for a valid slug", () => {
-    const post = getPostBySlug("hello-world", "zh");
+    const post = getPostBySlug("building-my-blog", "zh");
     expect(post).not.toBeNull();
-    expect(post!.slug).toBe("hello-world");
-    expect(post!.title).toBe("你好，世界");
+    expect(post!.slug).toBe("building-my-blog");
+    expect(post!.title).toBe("从零搭建个人博客：Next.js 16 + MDX 全记录");
   });
 
   it("returns null for non-existent slug", () => {
@@ -50,12 +50,13 @@ describe("getPostBySlug", () => {
   });
 
   it("returns null for non-existent locale", () => {
-    const post = getPostBySlug("hello-world", "nonexistent");
+    const post = getPostBySlug("building-my-blog", "nonexistent");
     expect(post).toBeNull();
   });
 
   it("returns tags as an array", () => {
-    const post = getPostBySlug("hello-world", "zh");
+    const post = getPostBySlug("building-my-blog", "zh");
+    expect(post).not.toBeNull();
     expect(Array.isArray(post!.tags)).toBe(true);
   });
 });

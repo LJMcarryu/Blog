@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { BOOKS, type BookStatus } from "@/data/books";
+import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata({
   params,
@@ -67,7 +68,7 @@ export default async function BooksPage({
                     </div>
                     {book.note && (
                       <p className="text-xs mt-2 italic" style={{ color: "var(--fg-light)" }}>
-                        {book.note[locale as "zh" | "en"]}
+                        {book.note[locale as Locale]}
                       </p>
                     )}
                   </div>

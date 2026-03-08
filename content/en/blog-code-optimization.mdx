@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 10 Rounds, 60+ Improvements"
+title: "Blog Code Optimization Log: 11 Rounds, 70+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 10 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 11 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 10 rounds of iteration, I completed 60+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 11 rounds of iteration, I completed 70+ improvements.
 
 ---
 
@@ -416,9 +416,43 @@ The RSS feed was missing the `lastBuildDate` element. Added it for RSS 2.0 compl
 
 ---
 
+## Round 11: Test Fix, Navigation Accessibility, and Type Safety
+
+This round uncovered two critical bugs — the test suites were broken — along with several accessibility and type safety gaps.
+
+### Reading Time Test Fix
+
+All assertions in `lib/__tests__/reading-time.test.ts` expected `getReadingTime()` to return formatted strings like `"1 min read"`, but the round 9 refactor changed the function to return a raw number. All 9 tests were failing. Fixed every assertion to compare against numbers.
+
+### Posts Test Fix
+
+`lib/__tests__/posts.test.ts` referenced a non-existent `hello-world` test fixture, causing 3 tests to fail. Updated to use the actual `building-my-blog` post with correct frontmatter assertions.
+
+### Navigation aria-current
+
+`Navigation.tsx`'s desktop and mobile nav links used a CSS `active` class but had no `aria-current="page"` attribute. Screen readers couldn't identify the current page. Added the attribute to both desktop and mobile link variants.
+
+### CodeCopyButton aria-label Sync
+
+The copy button set `aria-label` on creation but never updated it when the state changed to "Copied!" or "Failed". Screen reader users couldn't hear the status feedback. Now syncs `aria-label` on every state change.
+
+### ThemedVideo aria-hidden
+
+The home page background videos are purely decorative but lacked `aria-hidden="true"`, causing screen readers to potentially announce them. Added the attribute to both video elements.
+
+### "All" Tag Link Trailing ?
+
+The blog page's "All" tag filter linked to `?` when no search query was active, producing a trailing `?` in the URL. Fixed to use an empty string.
+
+### Locale Type Safety
+
+`projects/page.tsx` and `books/page.tsx` used hardcoded `locale as "zh" | "en"` type assertions. Exported a `Locale` type from `i18n/routing.ts` and switched to `locale as Locale` — now adding a new language only requires changing one file.
+
+---
+
 ## Summary
 
-10 rounds, 60+ improvements, 20+ files touched. Key wins:
+11 rounds, 70+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
 - **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n

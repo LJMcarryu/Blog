@@ -38,6 +38,7 @@ export default function Navigation() {
               key={href}
               href={href}
               className={`nav-link${isActive(href) ? " active" : ""}`}
+              aria-current={isActive(href) ? "page" : undefined}
             >
               {label}
             </Link>
@@ -93,6 +94,7 @@ export default function Navigation() {
               key={href}
               href={href}
               className={`nav-mobile-link${isActive(href) ? " active" : ""}`}
+              aria-current={isActive(href) ? "page" : undefined}
               onClick={() => setOpen(false)}
             >
               {label}

@@ -78,7 +78,7 @@ export default async function BlogPage({
       {allTags.length > 0 && (
         <div className="not-prose mt-4 flex flex-wrap gap-2 slide-enter-2">
           <a
-            href={q ? `?q=${encodeURIComponent(q)}` : "?"}
+            href={q ? `?q=${encodeURIComponent(q)}` : ""}
             className="tag-pill"
             data-active={!tag ? "true" : undefined}
             aria-current={!tag ? "true" : undefined}

@@ -14,6 +14,7 @@ export default function ThemedVideo() {
         preload={dark ? "auto" : "none"}
         className={baseClass}
         style={{ visibility: dark ? "visible" : "hidden" }}
+        aria-hidden="true"
       >
         <source src="/home_bg_video_dark.mp4" type="video/mp4" />
       </video>
@@ -22,6 +23,7 @@ export default function ThemedVideo() {
         preload={dark ? "none" : "auto"}
         className={baseClass}
         style={{ visibility: dark ? "hidden" : "visible" }}
+        aria-hidden="true"
       >
         <source src="/home_bg_video_light.mp4" type="video/mp4" />
       </video>

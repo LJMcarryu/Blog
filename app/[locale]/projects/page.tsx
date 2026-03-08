@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { PROJECTS } from "@/data/projects";
+import type { Locale } from "@/i18n/routing";
 
 export async function generateMetadata({
   params,
@@ -38,7 +39,7 @@ export default async function ProjectsPage({
           >
             <h2 className="text-lg font-semibold mb-2">{project.name}</h2>
             <p className="text-sm mb-3" style={{ color: "var(--fg-light)" }}>
-              {project.description[locale as "zh" | "en"]}
+              {project.description[locale as Locale]}
             </p>
             <div className="flex flex-wrap gap-1.5 mb-4">
               {project.tech.map((tech) => (

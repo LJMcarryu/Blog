@@ -25,14 +25,20 @@ export default function CodeCopyButton() {
           try {
             await navigator.clipboard.writeText(code.textContent ?? "");
             btn.textContent = copiedLabel;
+            btn.setAttribute("aria-label", copiedLabel);
             btn.classList.add("copied");
             setTimeout(() => {
               btn.textContent = copyLabel;
+              btn.setAttribute("aria-label", copyLabel);
               btn.classList.remove("copied");
             }, 2000);
           } catch {
             btn.textContent = failedLabel;
-            setTimeout(() => { btn.textContent = copyLabel; }, 2000);
+            btn.setAttribute("aria-label", failedLabel);
+            setTimeout(() => {
+              btn.textContent = copyLabel;
+              btn.setAttribute("aria-label", copyLabel);
+            }, 2000);
           }
         });
 
