@@ -27,7 +27,7 @@ export default function Error({
         className="mt-4 px-4 py-2 text-sm rounded-lg border transition-opacity opacity-60 hover:opacity-100 slide-enter-3"
         style={{
           color: "var(--fg)",
-          borderColor: "rgba(125, 125, 125, 0.2)"
+          borderColor: "var(--border)"
         }}
       >
         {t("retry")}

@@ -33,7 +33,7 @@ export default async function ProjectsPage({
             key={project.name}
             className="p-5 rounded-xl border transition-colors"
             style={{
-              borderColor: "rgba(125, 125, 125, 0.2)"
+              borderColor: "var(--border)"
             }}
           >
             <h2 className="text-lg font-semibold mb-2">{project.name}</h2>
@@ -47,7 +47,7 @@ export default async function ProjectsPage({
                   className="px-2 py-0.5 text-xs rounded-full"
                   style={{
                     color: "var(--fg-light)",
-                    backgroundColor: "rgba(125, 125, 125, 0.1)"
+                    backgroundColor: "var(--bg-subtle)"
                   }}
                 >
                   {tech}

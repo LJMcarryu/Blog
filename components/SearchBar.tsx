@@ -24,7 +24,7 @@ export default function SearchBar({ placeholder }: { placeholder: string }) {
         aria-label={placeholder}
         className="w-full px-4 py-2 pl-10 rounded-lg border focus:outline-none focus:ring-2 text-sm"
         style={{
-          borderColor: "rgba(125, 125, 125, 0.2)",
+          borderColor: "var(--border)",
           backgroundColor: "rgba(125, 125, 125, 0.05)",
           color: "var(--fg)",
         }}

@@ -52,7 +52,7 @@ export default async function BooksPage({
                   <div
                     key={book.title}
                     className="p-4 rounded-lg border"
-                    style={{ borderColor: "rgba(125, 125, 125, 0.2)" }}
+                    style={{ borderColor: "var(--border)" }}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>

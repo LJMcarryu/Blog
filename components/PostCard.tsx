@@ -29,7 +29,7 @@ export default function PostCard({ post }: { post: Post }) {
                 className="text-xs px-1.5 py-0.5 rounded"
                 style={{
                   color: "var(--fg-light)",
-                  backgroundColor: "rgba(125, 125, 125, 0.1)",
+                  backgroundColor: "var(--bg-subtle)",
                 }}
               >
                 {tag}

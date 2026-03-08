@@ -11,25 +11,29 @@
 
 /* ─── Design tokens ─── */
 :root {
-  --c-bg:     #ffffff;
-  --fg:       #333333;
-  --fg-deep:  #111111;
-  --fg-deeper:#000000;
-  --fg-light: #666666;
-  --code-bg:  #fafafa;
-  --star:     #facc15;
-  --success:  #22c55e;
+  --c-bg:       #ffffff;
+  --fg:         #333333;
+  --fg-deep:    #111111;
+  --fg-deeper:  #000000;
+  --fg-light:   #666666;
+  --code-bg:    #fafafa;
+  --star:       #facc15;
+  --success:    #22c55e;
+  --border:     rgba(125, 125, 125, 0.2);
+  --bg-subtle:  rgba(125, 125, 125, 0.1);
 }
 
 .dark {
-  --c-bg:     #000000;
-  --fg:       #e0e0e0;
-  --fg-deep:  #eeeeee;
-  --fg-deeper:#ffffff;
-  --fg-light: #a8a8a8;
-  --code-bg:  #161b22;
-  --star:     #facc15;
-  --success:  #22c55e;
+  --c-bg:       #000000;
+  --fg:         #e0e0e0;
+  --fg-deep:    #eeeeee;
+  --fg-deeper:  #ffffff;
+  --fg-light:   #a8a8a8;
+  --code-bg:    #161b22;
+  --star:       #facc15;
+  --success:    #22c55e;
+  --border:     rgba(125, 125, 125, 0.2);
+  --bg-subtle:  rgba(125, 125, 125, 0.1);
 }
 
 /* ─── Base ─── */
@@ -278,7 +282,7 @@ html:not(.no-sliding) .slide-enter-content > * {
 
 /* Code block line highlighting */
 .prose pre code [data-highlighted-line] {
-  background-color: rgba(125, 125, 125, 0.1);
+  background-color: var(--bg-subtle);
   margin: 0 -1.25rem;
   padding: 0 1.25rem;
   display: inline-block;
@@ -338,7 +342,7 @@ html:not(.no-sliding) .slide-enter-content > * {
 }
 
 .dark .prose :not(pre) > code {
-  background-color: rgba(125, 125, 125, 0.2) !important;
+  background-color: var(--border) !important;
   border-color: rgba(125, 125, 125, 0.25);
 }
 
@@ -348,7 +352,7 @@ html:not(.no-sliding) .slide-enter-content > * {
   padding: 0.2rem 0.6rem;
   font-size: 0.75rem;
   border-radius: 9999px;
-  border: 1px solid rgba(125, 125, 125, 0.2);
+  border: 1px solid var(--border);
   color: var(--fg-light);
   text-decoration: none;
   transition: all 0.2s ease;
@@ -367,14 +371,14 @@ html:not(.no-sliding) .slide-enter-content > * {
   font-size: 0.75rem;
   padding: 0.1rem 0.5rem;
   border-radius: 9999px;
-  background-color: rgba(125, 125, 125, 0.1);
+  background-color: var(--bg-subtle);
   color: var(--fg-light);
   text-decoration: none;
   transition: all 0.2s ease;
 }
 .tag-pill-sm:hover {
   color: var(--fg);
-  background-color: rgba(125, 125, 125, 0.2);
+  background-color: var(--border);
 }
 
 /* ─── Table of Contents ─── */
@@ -412,7 +416,7 @@ html:not(.no-sliding) .slide-enter-content > * {
   padding: 0.25rem 0.5rem;
   font-size: 0.7rem;
   border-radius: 0.25rem;
-  border: 1px solid rgba(125, 125, 125, 0.2);
+  border: 1px solid var(--border);
   background: var(--c-bg);
   color: var(--fg-light);
   cursor: pointer;
@@ -458,7 +462,7 @@ pre:hover .copy-btn { opacity: 1; }
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  border: 1px solid rgba(125, 125, 125, 0.2);
+  border: 1px solid var(--border);
   background: var(--c-bg);
   color: var(--fg-light);
   cursor: pointer;
@@ -529,7 +533,7 @@ article .prose img {
   height: 2rem;
   padding: 0 0.5rem;
   border-radius: 0.375rem;
-  border: 1px solid rgba(125, 125, 125, 0.2);
+  border: 1px solid var(--border);
   color: var(--fg);
   text-decoration: none;
   transition: all 0.2s ease;
@@ -551,7 +555,7 @@ article .prose img {
 
 /* ─── Site footer ─── */
 .site-footer {
-  border-top: 1px solid rgba(125, 125, 125, 0.1);
+  border-top: 1px solid var(--bg-subtle);
   padding: 2rem 1.5rem;
   margin-top: 4rem;
 }

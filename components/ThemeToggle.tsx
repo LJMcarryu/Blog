@@ -52,7 +52,7 @@ export default function ThemeToggle() {
 
     // Use View Transitions API for a smooth fade if available
     if ("startViewTransition" in document) {
-      (document as unknown as { startViewTransition: (cb: () => void) => void }).startViewTransition(apply);
+      document.startViewTransition(apply);
     } else {
       apply();
     }

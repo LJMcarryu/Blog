@@ -42,7 +42,7 @@ export default async function AboutPage({
               className="px-3 py-1 text-sm rounded-full border"
               style={{
                 color: "var(--fg-light)",
-                borderColor: "rgba(125, 125, 125, 0.2)"
+                borderColor: "var(--border)"
               }}
             >
               {skill}
