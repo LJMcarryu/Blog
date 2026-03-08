@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* ─── Personality font (Caveat) ─── */
+.font-caveat {
+  font-family: var(--font-caveat), 'Caveat', cursive;
+}
+
 /* ─── Class-based dark mode (antfu.me approach) ─── */
 @variant dark (&:where(.dark, .dark *));
 
@@ -118,7 +123,7 @@ html:not(.no-sliding) .slide-enter-content > * {
   position: absolute;
   top: 1.35rem;
   left: 1.5rem;
-  font-size: 1rem;
+  font-size: 1.25rem;
   font-weight: 600;
   letter-spacing: -0.02em;
   text-decoration: none;

@@ -24,7 +24,7 @@ export default function Navigation() {
   return (
     <header className="relative z-40">
       {/* Site logo — absolute top-left (antfu.me style) */}
-      <Link href="/" className="nav-logo" onClick={() => setOpen(false)}>
+      <Link href="/" className="nav-logo font-caveat" onClick={() => setOpen(false)}>
         Jimmy
       </Link>
 

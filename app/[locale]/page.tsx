@@ -22,7 +22,7 @@ export default async function HomePage({
       {/* All content on top of video */}
       <div className="relative z-10 max-w-2xl mx-auto px-6 py-20">
         <div className="prose dark:prose-invert m-auto">
-          <h1 className="mb-1 slide-enter-50">{t("name")}</h1>
+          <h1 className="mb-1 slide-enter-50 font-caveat">{t("name")}</h1>
 
           <div className="slide-enter-content">
             {/* Tagline */}
