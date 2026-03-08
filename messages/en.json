@@ -18,7 +18,10 @@
     "title": "All Posts",
     "backToList": "Back to List",
     "noResults": "No posts found",
-    "searchPlaceholder": "Search posts..."
+    "searchPlaceholder": "Search posts...",
+    "allTags": "All",
+    "prevPost": "Previous",
+    "nextPost": "Next"
   },
   "about": {
     "title": "About",

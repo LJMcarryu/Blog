@@ -16,6 +16,7 @@
   --fg-deep:  #111111;
   --fg-deeper:#000000;
   --fg-light: #666666;
+  --code-bg:  #fafafa;
 }
 
 .dark {
@@ -24,6 +25,7 @@
   --fg-deep:  #eeeeee;
   --fg-deeper:#ffffff;
   --fg-light: #a8a8a8;
+  --code-bg:  #161b22;
 }
 
 /* ─── Base ─── */
@@ -86,7 +88,8 @@ html:not(.no-sliding) .slide-enter-content > * {
   animation-delay: calc(var(--enter-initial) + var(--enter-stage) * var(--enter-step));
 }
 
-/* Auto-stagger children inside .slide-enter-content */
+/* Auto-stagger children inside .slide-enter-content
+   !important is needed to override the generic --enter-stage: 0 set on the parent selector */
 .slide-enter-content > *:nth-child(1)  { --enter-stage: 1  !important; }
 .slide-enter-content > *:nth-child(2)  { --enter-stage: 2  !important; }
 .slide-enter-content > *:nth-child(3)  { --enter-stage: 3  !important; }
@@ -220,11 +223,11 @@ html:not(.no-sliding) .slide-enter-content > * {
   overflow-x: auto;
   font-size: 0.85rem;
   line-height: 1.7;
-  background-color: #fafafa !important;
+  background-color: var(--code-bg) !important;
 }
 
 .dark .prose pre {
-  background-color: #161b22 !important;
+  background-color: var(--code-bg) !important;
 }
 
 /* Language label on code blocks */
@@ -247,7 +250,8 @@ html:not(.no-sliding) .slide-enter-content > * {
   user-select: none;
 }
 
-/* Dual-theme: apply correct Shiki CSS variable per mode */
+/* Dual-theme: apply correct Shiki CSS variable per mode
+   !important is needed to override Shiki's inline styles */
 .prose pre code span {
   color: var(--shiki-light) !important;
 }
@@ -255,16 +259,17 @@ html:not(.no-sliding) .slide-enter-content > * {
   color: var(--shiki-dark) !important;
 }
 
+/* Override typography plugin defaults for code inside pre */
 .prose pre code {
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
   font-size: inherit;
-  color: #0a0a0a;
+  color: var(--fg-deeper);
 }
 
 .dark .prose pre code {
-  color: #f0f0f0;
+  color: var(--fg);
 }
 
 /* Code block line highlighting */
@@ -311,7 +316,7 @@ html:not(.no-sliding) .slide-enter-content > * {
   color: var(--fg);
 }
 
-/* Inline code */
+/* Inline code — !important overrides typography plugin defaults */
 .prose :not(pre) > code {
   font-family: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
   background-color: rgba(125, 125, 125, 0.12) !important;

@@ -35,9 +35,17 @@ export default function CodeCopyButton() {
       });
     }
 
-    // Run after MDX renders
-    const timer = setTimeout(addButtons, 100);
-    return () => clearTimeout(timer);
+    // Run once immediately for any pre blocks already in the DOM
+    addButtons();
+
+    // Watch for new pre blocks added by MDX rendering
+    const observer = new MutationObserver(addButtons);
+    const article = document.querySelector("article");
+    if (article) {
+      observer.observe(article, { childList: true, subtree: true });
+    }
+
+    return () => observer.disconnect();
   }, []);
 
   return null;

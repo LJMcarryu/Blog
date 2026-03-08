@@ -10,6 +10,7 @@ import remarkGfm from "remark-gfm";
 import Comments from "@/components/Comments";
 import TableOfContents from "@/components/TableOfContents";
 import CodeCopyButton from "@/components/CodeCopyButton";
+import { getSiteUrl } from "@/lib/env";
 
 export async function generateMetadata({
   params,
@@ -85,7 +86,7 @@ export default async function PostPage({
   const prevPost = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
   const nextPost = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+  const siteUrl = getSiteUrl();
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -179,7 +180,7 @@ export default async function PostPage({
                   className="post-nav-link"
                 >
                   <span className="post-nav-label">
-                    ← {locale === "zh" ? "上一篇" : "Previous"}
+                    ← {t("prevPost")}
                   </span>
                   <span className="post-nav-title">{prevPost.title}</span>
                 </Link>
@@ -192,7 +193,7 @@ export default async function PostPage({
                   className="post-nav-link"
                 >
                   <span className="post-nav-label">
-                    {locale === "zh" ? "下一篇" : "Next"} →
+                    {t("nextPost")} →
                   </span>
                   <span className="post-nav-title">{nextPost.title}</span>
                 </Link>

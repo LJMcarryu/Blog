@@ -5,7 +5,7 @@ export const runtime = "edge";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
-  const title = searchParams.get("title") || "Jimmy's Blog";
+  const title = (searchParams.get("title") || "Jimmy's Blog").slice(0, 100);
   const locale = searchParams.get("locale") || "zh";
 
   const subtitle = locale === "zh" ? "Jimmy 的个人博客" : "Jimmy's Blog";

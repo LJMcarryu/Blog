@@ -1,18 +1,7 @@
 import type { Metadata } from "next";
 import { getTranslations } from "next-intl/server";
 import { Link } from "@/i18n/navigation";
-
-// ✏️ 在这里填写你的技术栈 / Edit your tech stack
-const SKILLS = [
-  "TypeScript",
-  "React",
-  "Next.js",
-  "Node.js",
-  "Tailwind CSS",
-  "Python",
-  "Git",
-  "Docker",
-];
+import { SKILLS } from "@/data/skills";
 
 export async function generateMetadata({
   params,

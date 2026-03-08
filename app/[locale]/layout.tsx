@@ -8,6 +8,7 @@ import Footer from "@/components/Footer";
 import BackToTop from "@/components/BackToTop";
 import Lightbox from "@/components/Lightbox";
 import Analytics from "@/components/Analytics";
+import { getSiteUrl } from "@/lib/env";
 import "../globals.css";
 
 const inter = Inter({
@@ -23,14 +24,12 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL || "https://example.com"
-  ),
+  metadataBase: new URL(getSiteUrl()),
   title: {
     default: "Jimmy's Blog",
     template: "%s | Jimmy's Blog",
   },
-  description: "个人博客 | Personal Blog",
+  description: "Personal blog by Jimmy — mobile development, tech, and more",
 };
 
 export function generateStaticParams() {
@@ -52,7 +51,7 @@ export default async function LocaleLayout({
 
   const messages = (await import(`@/messages/${locale}.json`)).default;
 
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+  const siteUrl = getSiteUrl();
   const webSiteJsonLd = {
     "@context": "https://schema.org",
     "@type": "WebSite",

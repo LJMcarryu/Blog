@@ -1,8 +1,9 @@
 import { routing } from "@/i18n/routing";
 import { getPostsByLocale } from "@/lib/posts";
+import { getSiteUrl } from "@/lib/env";
 
 export async function GET() {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+  const baseUrl = getSiteUrl();
 
   const allPosts = routing.locales.flatMap((locale) =>
     getPostsByLocale(locale).map((post) => ({ ...post, locale }))
@@ -29,7 +30,7 @@ export async function GET() {
     <title>Jimmy's Blog</title>
     <link>${baseUrl}</link>
     <description>个人博客 | Personal Blog</description>
-    <language>zh-en</language>
+    <language>zh</language>
     <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
 ${items}
   </channel>

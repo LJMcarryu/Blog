@@ -82,16 +82,16 @@ export default async function BlogPage({
             className="tag-pill"
             data-active={!tag ? "true" : undefined}
           >
-            {locale === "zh" ? "全部" : "All"}
+            {t("allTags")}
           </a>
-          {allTags.map((t) => (
+          {allTags.map((tagName) => (
             <a
-              key={t}
-              href={`?tag=${encodeURIComponent(t)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
+              key={tagName}
+              href={`?tag=${encodeURIComponent(tagName)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
               className="tag-pill"
-              data-active={tag === t ? "true" : undefined}
+              data-active={tag === tagName ? "true" : undefined}
             >
-              {t}
+              {tagName}
             </a>
           ))}
         </div>

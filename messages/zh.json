@@ -18,7 +18,10 @@
     "title": "所有文章",
     "backToList": "返回列表",
     "noResults": "没有找到相关文章",
-    "searchPlaceholder": "搜索文章..."
+    "searchPlaceholder": "搜索文章...",
+    "allTags": "全部",
+    "prevPost": "上一篇",
+    "nextPost": "下一篇"
   },
   "about": {
     "title": "关于我",

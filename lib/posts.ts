@@ -35,7 +35,8 @@ export function getPostsByLocale(locale: string): Post[] {
           tags: Array.isArray(data.tags) ? data.tags : [],
           content,
         };
-      } catch {
+      } catch (err) {
+        console.warn(`[posts] Failed to parse ${filename}:`, err);
         return {
           slug,
           title: slug,
@@ -70,7 +71,8 @@ export function getPostBySlug(slug: string, locale: string): Post | null {
       tags: Array.isArray(data.tags) ? data.tags : [],
       content,
     };
-  } catch {
+  } catch (err) {
+    console.warn(`[posts] Failed to read ${slug}.mdx (${locale}):`, err);
     return null;
   }
 }

@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
 import { routing } from "@/i18n/routing";
 import { getPostsByLocale } from "@/lib/posts";
+import { getSiteUrl } from "@/lib/env";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://example.com";
+  const baseUrl = getSiteUrl();
   const pages = [
     "",
     "/blog",
