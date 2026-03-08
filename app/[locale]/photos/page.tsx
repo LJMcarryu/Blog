@@ -61,7 +61,6 @@ export default async function PhotosPage({
                 height={600}
                 sizes="(max-width: 640px) 50vw, 33vw"
                 className="w-full rounded-lg object-cover"
-                style={{ width: "100%", height: "auto" }}
               />
             </div>
           ))}

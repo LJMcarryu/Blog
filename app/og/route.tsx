@@ -3,6 +3,9 @@ import type { NextRequest } from "next/server";
 
 export const runtime = "edge";
 
+const OG_BG = "#050505";
+const OG_FG = "#ffffff";
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const title = (searchParams.get("title") || "Jimmy's Blog").slice(0, 100);
@@ -20,7 +23,7 @@ export async function GET(request: NextRequest) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "#050505",
+          backgroundColor: OG_BG,
           padding: "60px 80px",
         }}
       >
@@ -38,7 +41,7 @@ export async function GET(request: NextRequest) {
             style={{
               fontSize: 52,
               fontWeight: 700,
-              color: "#ffffff",
+              color: OG_FG,
               lineHeight: 1.3,
               maxWidth: "900px",
               overflow: "hidden",

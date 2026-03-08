@@ -18,6 +18,7 @@
   --fg-light: #666666;
   --code-bg:  #fafafa;
   --star:     #facc15;
+  --success:  #22c55e;
 }
 
 .dark {
@@ -28,6 +29,7 @@
   --fg-light: #a8a8a8;
   --code-bg:  #161b22;
   --star:     #facc15;
+  --success:  #22c55e;
 }
 
 /* ─── Base ─── */
@@ -424,8 +426,8 @@ pre:hover .copy-btn { opacity: 1; }
   border-color: var(--fg);
 }
 .copy-btn.copied {
-  color: #22c55e;
-  border-color: #22c55e;
+  color: var(--success);
+  border-color: var(--success);
 }
 
 /* ─── Post prev/next navigation ─── */
