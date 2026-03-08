@@ -612,7 +612,7 @@ article .prose img {
 .site-footer p {
   font-size: 0.75rem;
   color: var(--fg-light);
-  opacity: 0.6;
+  opacity: 0.75;
   margin: 0;
 }
 

@@ -59,7 +59,7 @@ export default async function HomePage({
             {recentPosts.length > 0 && (
               <div>
                 <hr className="border-black/15 dark:border-white/20" />
-                <h3 className="mb-5">{t("latestPosts")}</h3>
+                <h2 className="mb-5">{t("latestPosts")}</h2>
                 <div className="not-prose flex flex-col gap-3">
                   {recentPosts.map((post) => (
                     <Link
