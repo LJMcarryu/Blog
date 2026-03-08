@@ -44,7 +44,7 @@ export default async function HomePage({
                   <a
                     key={label}
                     href={href}
-                    target={href.startsWith("mailto") ? "_self" : "_blank"}
+                    target={href.startsWith("mailto") ? undefined : "_blank"}
                     rel="noopener noreferrer"
                     className="text-sm text-black/50 dark:text-white/60 transition-opacity hover:opacity-100"
                   >

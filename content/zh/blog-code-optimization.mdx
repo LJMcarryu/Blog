@@ -1,13 +1,13 @@
 ---
-title: "博客代码优化实录：5 轮迭代，30+ 项改进"
+title: "博客代码优化实录：7 轮迭代，45+ 项改进"
 date: "2026-03-08"
-description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，5 轮迭代的完整实录。
+description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，7 轮迭代的完整实录。
 tags: ["代码审查", "性能优化", "Next.js"]
 ---
 
 ## 背景
 
-[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，5 轮迭代下来一共完成了 30+ 项改进。
+[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，7 轮迭代下来一共完成了 45+ 项改进。
 
 ---
 
@@ -151,20 +151,111 @@ const nextConfig: NextConfig = {
 
 ---
 
+## 第六轮：深层清理与可访问性
+
+第二轮审查后发现的问题，集中在 CSS 变量覆盖不彻底、可访问性遗漏和冗余代码三个方面。
+
+### CSS 变量体系补全
+
+`globals.css` 中仍有 15+ 处裸写的 `rgba(125, 125, 125, ...)` 值。新增 7 个设计令牌，彻底消除所有散落的 rgba 值：
+
+```css
+:root {
+  --border-light:   rgba(125, 125, 125, 0.15);
+  --border-strong:  rgba(125, 125, 125, 0.25);
+  --border-faint:   rgba(125, 125, 125, 0.3);
+  --scrollbar:      rgba(125, 125, 125, 0.35);
+  --scrollbar-hover: rgba(125, 125, 125, 0.6);
+  --code-label-bg:  rgba(125, 125, 125, 0.08);
+  --inline-code-bg: rgba(125, 125, 125, 0.12);
+}
+```
+
+替换范围覆盖：滚动条、代码块边框、语言标签背景、行内代码、引用块、目录侧线、移动端菜单边框，以及 JSX 中的 inline style（照片页空状态边框、文章导航分隔线）。
+
+### Giscus 初始化修复
+
+初始化 effect 的依赖从 `[locale, theme]` 改为 `[locale]`，并在初始化时直接读取 DOM 的实际主题状态：
+
+```typescript
+const isDark = document.documentElement.classList.contains("dark");
+const giscusTheme = isDark ? "dark" : "light";
+```
+
+这样 Giscus iframe 首次加载就能拿到正确的主题，不再闪烁。
+
+### 可访问性补齐
+
+- 汉堡菜单按钮添加 `aria-controls="mobile-menu"`，菜单添加对应 `id`
+- 标签筛选的激活项添加 `aria-current="true"`
+- Lightbox 改为传递原图的 `alt` 文本，而非写死的 `"Enlarged preview"`
+- 搜索框添加 `focus:ring-current`，确保焦点环可见
+
+### 冗余代码清理
+
+- 移除 `blog/[slug]/page.tsx` 中多余的 `dynamic = 'force-static'`
+- mailto 链接移除不必要的 `target="_self"`
+- RSS feed description 从混合语言改为纯中文
+
+---
+
+## 第七轮：遗漏修复与精简
+
+第三轮深度审查，发现了几个之前遗漏的问题。
+
+### SearchBar 遗漏的裸 rgba 值
+
+设计令牌迁移时漏掉了 `SearchBar.tsx` 中的 `rgba(125, 125, 125, 0.05)` 背景色。新增 `--search-bg` 令牌统一管理。
+
+### 分页链接多余的 `?`
+
+`blog/page.tsx` 中 `baseHref` 在没有筛选参数时返回 `"?"` 而非空字符串，导致分页链接出现多余的 `?`（如 `/blog?`）。修正为空字符串，`Pagination` 组件会自动处理 `?page=2` 的拼接。
+
+### Giscus 语言切换失效
+
+`Comments.tsx` 用 `initialized` ref 阻止重复初始化，但这也阻止了切换语言时重新创建 Giscus iframe。移除 `initialized` 守卫，改为在 locale 变化时清空容器并重新注入 script：
+
+```typescript
+useEffect(() => {
+  const container = ref.current;
+  if (!container) return;
+  container.innerHTML = "";
+  // ... 重新创建 script
+}, [locale]);
+```
+
+### CSS 变量去重
+
+`.dark` 块中有 11 个 CSS 变量和 `:root` 完全相同（所有 rgba 系列令牌和 `--star`、`--success`）。这些值在明暗模式下不变，重复声明只是噪音。清理后 `.dark` 只保留 6 个真正需要覆盖的颜色变量。
+
+### RSS 描述语言修正
+
+RSS feed 的 `<description>` 从纯中文改为英文（`"Jimmy's personal blog — mobile development, tech, and more"`），因为 feed 包含中英文两种语言的文章，用英文描述更通用。
+
+---
+
 ## 最终设计令牌一览
 
 ```css
 :root {
-  --c-bg        /* 页面背景 */
-  --fg          /* 正文颜色 */
-  --fg-deep     /* 标题颜色 */
-  --fg-deeper   /* 最深前景色 */
-  --fg-light    /* 辅助文字 */
-  --code-bg     /* 代码块背景 */
-  --star        /* 星级评分 */
-  --success     /* 成功状态 */
-  --border      /* 通用边框 */
-  --bg-subtle   /* 微妙背景 */
+  --c-bg            /* 页面背景 */
+  --fg              /* 正文颜色 */
+  --fg-deep         /* 标题颜色 */
+  --fg-deeper       /* 最深前景色 */
+  --fg-light        /* 辅助文字 */
+  --code-bg         /* 代码块背景 */
+  --star            /* 星级评分 */
+  --success         /* 成功状态 */
+  --border          /* 通用边框 */
+  --bg-subtle       /* 微妙背景 */
+  --border-light    /* 细边框（代码块、行内代码） */
+  --border-strong   /* 强边框（分隔线、引用块） */
+  --border-faint    /* 淡边框（引用块、链接下划线） */
+  --scrollbar       /* 滚动条 */
+  --scrollbar-hover /* 滚动条悬停 */
+  --code-label-bg   /* 代码语言标签背景 */
+  --inline-code-bg  /* 行内代码背景 */
+  --search-bg       /* 搜索框背景 */
 }
 ```
 
@@ -172,12 +263,12 @@ const nextConfig: NextConfig = {
 
 ## 总结
 
-5 轮迭代，30+ 项改进，涉及 20+ 个文件。主要收获：
+7 轮迭代，45+ 项改进，涉及 20+ 个文件。主要收获：
 
 - **安全性**：添加了响应头、禁用了 X-Powered-By、OG 参数校验
-- **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性
+- **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性
 - **性能**：MutationObserver 替代 setTimeout、Giscus postMessage、视频条件加载
-- **一致性**：10 个 CSS 设计令牌、所有 UI 文案走 i18n、环境变量集中管理
-- **可维护性**：数据文件抽离、类型安全、错误日志
+- **一致性**：18 个 CSS 设计令牌、所有 UI 文案走 i18n、环境变量集中管理
+- **可维护性**：数据文件抽离、类型安全、错误日志、冗余代码清理
 
 代码审查不只是找问题，更重要的是建立规范。当项目有了统一的设计令牌、i18n 覆盖和错误处理模式，后续开发就能自然地遵循这些约定。

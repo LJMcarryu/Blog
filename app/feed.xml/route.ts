@@ -29,7 +29,7 @@ export async function GET() {
   <channel>
     <title>Jimmy's Blog</title>
     <link>${baseUrl}</link>
-    <description>个人博客 | Personal Blog</description>
+    <description>Jimmy's personal blog — mobile development, tech, and more</description>
     <language>zh</language>
     <atom:link href="${baseUrl}/feed.xml" rel="self" type="application/rss+xml"/>
 ${items}

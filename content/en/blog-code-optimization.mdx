@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 5 Rounds, 30+ Improvements"
+title: "Blog Code Optimization Log: 7 Rounds, 45+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 5 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 7 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 5 rounds of iteration, I completed 30+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 7 rounds of iteration, I completed 45+ improvements.
 
 ---
 
@@ -151,20 +151,111 @@ Also fixed an unnecessary `as unknown as` double type cast in `ThemeToggle.tsx` 
 
 ---
 
+## Round 6: Deep Cleanup and Accessibility
+
+The second review uncovered issues in three areas: incomplete CSS variable coverage, accessibility gaps, and redundant code.
+
+### CSS Variable System Completion
+
+`globals.css` still had 15+ raw `rgba(125, 125, 125, ...)` values. Added 7 new design tokens to eliminate every last one:
+
+```css
+:root {
+  --border-light:    rgba(125, 125, 125, 0.15);
+  --border-strong:   rgba(125, 125, 125, 0.25);
+  --border-faint:    rgba(125, 125, 125, 0.3);
+  --scrollbar:       rgba(125, 125, 125, 0.35);
+  --scrollbar-hover: rgba(125, 125, 125, 0.6);
+  --code-label-bg:   rgba(125, 125, 125, 0.08);
+  --inline-code-bg:  rgba(125, 125, 125, 0.12);
+}
+```
+
+Replaced values across: scrollbar, code block borders, language label backgrounds, inline code, blockquotes, TOC sidebar, mobile menu border, and JSX inline styles (photos page empty state, post navigation divider).
+
+### Giscus Initialization Fix
+
+Changed the init effect dependency from `[locale, theme]` to `[locale]`, and read the actual DOM theme state at initialization time:
+
+```typescript
+const isDark = document.documentElement.classList.contains("dark");
+const giscusTheme = isDark ? "dark" : "light";
+```
+
+Now the Giscus iframe loads with the correct theme on first render — no more flash.
+
+### Accessibility Improvements
+
+- Hamburger button gets `aria-controls="mobile-menu"`, menu gets matching `id`
+- Active tag filter gets `aria-current="true"`
+- Lightbox now passes through the original image's `alt` text instead of hardcoded `"Enlarged preview"`
+- Search input gets `focus:ring-current` for visible focus ring
+
+### Redundant Code Cleanup
+
+- Removed redundant `dynamic = 'force-static'` from `blog/[slug]/page.tsx`
+- Removed unnecessary `target="_self"` from mailto links
+- RSS feed description changed from mixed-language to Chinese only
+
+---
+
+## Round 7: Missed Spots and Cleanup
+
+A third deep review caught several issues that slipped through earlier rounds.
+
+### SearchBar's Missed Raw rgba
+
+The design token migration missed `rgba(125, 125, 125, 0.05)` in `SearchBar.tsx`. Added a new `--search-bg` token to cover it.
+
+### Pagination Link Trailing `?`
+
+`blog/page.tsx` returned `"?"` as `baseHref` when no filter params were active, producing URLs like `/blog?`. Fixed to return an empty string — the `Pagination` component already handles `?page=2` concatenation correctly.
+
+### Giscus Language Switch Broken
+
+`Comments.tsx` used an `initialized` ref to prevent duplicate initialization, but this also blocked re-initialization when the locale changed. Removed the guard and switched to clearing the container on locale change:
+
+```typescript
+useEffect(() => {
+  const container = ref.current;
+  if (!container) return;
+  container.innerHTML = "";
+  // ... re-create script
+}, [locale]);
+```
+
+### CSS Variable Deduplication
+
+The `.dark` block contained 11 CSS variables identical to `:root` (all rgba-based tokens plus `--star` and `--success`). These values don't change between modes — the duplication was pure noise. After cleanup, `.dark` only contains the 6 color variables that actually differ.
+
+### RSS Description Language Fix
+
+Changed the RSS `<description>` from Chinese-only to English (`"Jimmy's personal blog — mobile development, tech, and more"`), since the feed includes posts in both languages.
+
+---
+
 ## Final Design Token Overview
 
 ```css
 :root {
-  --c-bg        /* Page background */
-  --fg          /* Body text */
-  --fg-deep     /* Heading color */
-  --fg-deeper   /* Deepest foreground */
-  --fg-light    /* Secondary text */
-  --code-bg     /* Code block background */
-  --star        /* Star rating */
-  --success     /* Success state */
-  --border      /* Common border */
-  --bg-subtle   /* Subtle background */
+  --c-bg            /* Page background */
+  --fg              /* Body text */
+  --fg-deep         /* Heading color */
+  --fg-deeper       /* Deepest foreground */
+  --fg-light        /* Secondary text */
+  --code-bg         /* Code block background */
+  --star            /* Star rating */
+  --success         /* Success state */
+  --border          /* Common border */
+  --bg-subtle       /* Subtle background */
+  --border-light    /* Fine border (code blocks, inline code) */
+  --border-strong   /* Strong border (dividers, blockquotes) */
+  --border-faint    /* Faint border (blockquotes, link underlines) */
+  --scrollbar       /* Scrollbar thumb */
+  --scrollbar-hover /* Scrollbar thumb hover */
+  --code-label-bg   /* Code language label background */
+  --inline-code-bg  /* Inline code background */
+  --search-bg       /* Search input background */
 }
 ```
 
@@ -172,12 +263,12 @@ Also fixed an unnecessary `as unknown as` double type cast in `ThemeToggle.tsx` 
 
 ## Summary
 
-5 rounds, 30+ improvements, 20+ files touched. Key wins:
+7 rounds, 45+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
-- **Accessibility**: Lightbox focus trap, scroll lock, aria attributes
+- **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility
 - **Performance**: MutationObserver over setTimeout, Giscus postMessage, conditional video loading
-- **Consistency**: 10 CSS design tokens, full i18n coverage, centralized env handling
-- **Maintainability**: Data file extraction, type safety, error logging
+- **Consistency**: 18 CSS design tokens, full i18n coverage, centralized env handling
+- **Maintainability**: Data file extraction, type safety, error logging, redundant code cleanup
 
 A code review isn't just about finding problems — it's about establishing conventions. Once a project has unified design tokens, i18n coverage, and error handling patterns, future development naturally follows those standards.

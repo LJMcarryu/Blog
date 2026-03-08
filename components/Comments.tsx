@@ -12,7 +12,6 @@ export default function Comments() {
   const ref = useRef<HTMLDivElement>(null);
   const locale = useLocale();
   const [theme, setTheme] = useState<"light" | "dark">("light");
-  const initialized = useRef(false);
 
   // Monitor theme changes
   useEffect(() => {
@@ -31,12 +30,16 @@ export default function Comments() {
     return () => observer.disconnect();
   }, []);
 
-  // Initialize Giscus once
+  // Initialize Giscus (re-create on locale change for language switch)
   useEffect(() => {
     const container = ref.current;
-    if (!container || initialized.current) return;
+    if (!container) return;
 
-    initialized.current = true;
+    // Clear previous instance on locale change
+    container.innerHTML = "";
+
+    const isDark = document.documentElement.classList.contains("dark");
+    const giscusTheme = isDark ? "dark" : "light";
 
     const script = document.createElement("script");
     script.src = "https://giscus.app/client.js";
@@ -49,13 +52,13 @@ export default function Comments() {
     script.setAttribute("data-reactions-enabled", "1");
     script.setAttribute("data-emit-metadata", "0");
     script.setAttribute("data-input-position", "bottom");
-    script.setAttribute("data-theme", theme);
+    script.setAttribute("data-theme", giscusTheme);
     script.setAttribute("data-lang", locale === "zh" ? "zh-CN" : "en");
     script.setAttribute("crossorigin", "anonymous");
     script.async = true;
 
     container.appendChild(script);
-  }, [locale, theme]);
+  }, [locale]);
 
   // Update theme via postMessage (avoids recreating the iframe)
   useEffect(() => {

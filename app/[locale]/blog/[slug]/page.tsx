@@ -67,7 +67,6 @@ export async function generateStaticParams() {
 }
 
 export const dynamicParams = false; // 404 for unknown slugs
-export const dynamic = 'force-static'; // Force static generation
 
 export default async function PostPage({
   params,
@@ -173,7 +172,7 @@ export default async function PostPage({
       {/* Prev / Next navigation */}
       {(prevPost || nextPost) && (
         <nav className="prose m-auto mt-12 not-prose" aria-label="Post navigation">
-          <hr className="mb-6" style={{ width: "50px", borderColor: "rgba(125, 125, 125, 0.25)" }} />
+          <hr className="mb-6" style={{ width: "50px", borderColor: "var(--border-strong)" }} />
           <div className="flex justify-between gap-4 text-sm">
             <div className="flex-1">
               {prevPost && (

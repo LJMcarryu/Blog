@@ -54,6 +54,7 @@ export default function Navigation() {
             className="nav-link nav-hamburger"
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
+            aria-controls="mobile-menu"
           >
             <svg
               width="18"
@@ -85,7 +86,7 @@ export default function Navigation() {
 
       {/* Mobile dropdown menu */}
       {open && (
-        <nav className="nav-mobile-menu" aria-label="Mobile navigation">
+        <nav id="mobile-menu" className="nav-mobile-menu" aria-label="Mobile navigation">
           {navLinks.map(({ href, label }) => (
             <Link
               key={href}

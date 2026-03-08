@@ -137,6 +137,59 @@ These should be in `messages/zh.json` and `messages/en.json`.
 
 ---
 
+## Second Review: Deeper Issues
+
+After completing the first five rounds of optimization, I did another deep review and found some subtler problems.
+
+### Incomplete CSS Variable Coverage
+
+Although `--border` and `--bg-subtle` design tokens were introduced earlier, `globals.css` still had 15+ raw `rgba(125, 125, 125, ...)` values scattered across scrollbar styles, code block borders, inline code, TOC, blockquotes, and more. Same semantic values, not using the variable system — changing one means hunting down a dozen places.
+
+### Giscus Initialization Theme Bug
+
+The initialization effect in `Comments.tsx` depended on `[locale, theme]`, but `theme` starts as `"light"` (React state default), not the actual page theme. In dark mode, Giscus would first render with a light theme, then flash to dark when the postMessage effect fires.
+
+### Accessibility Gaps
+
+- Hamburger menu button missing `aria-controls` — screen readers can't associate the button with the menu
+- Active tag filter only has visual styling (`data-active`), no `aria-current` semantic marker
+- Lightbox `alt` text hardcoded to `"Enlarged preview"`, losing the original image description
+- Search input's `focus:ring-2` has no color specified — focus ring invisible in some browsers
+
+### Redundant Code
+
+- `blog/[slug]/page.tsx` sets both `dynamicParams = false` and `dynamic = 'force-static'` — the latter is redundant
+- `Footer.tsx` and homepage set `target="_self"` for mailto links — that's the browser default
+- RSS feed description mixes languages: `"个人博客 | Personal Blog"` — not RFC-compliant
+
+---
+
+## Third Review: Missed Spots and Redundancy
+
+After the sixth round of optimization, another review uncovered several overlooked issues.
+
+### Design Token Gap
+
+`SearchBar.tsx` still had a raw `rgba(125, 125, 125, 0.05)` — the search input background was missed during the design token migration.
+
+### Pagination URL Anomaly
+
+`blog/page.tsx` returned `"?"` as `baseHref` when no filter params were active, producing URLs like `/blog?`. Functionally harmless, but the URL isn't clean.
+
+### Giscus Language Switch Broken
+
+`Comments.tsx` used an `initialized` ref to prevent duplicate initialization, but this also blocked re-initialization on locale change. After switching languages, the comment section's UI language wouldn't update.
+
+### Redundant CSS Variable Declarations
+
+The `.dark` block contained 11 CSS variables identical to `:root` (all rgba-based tokens, `--star`, `--success`). These values don't change between modes — the duplication only adds maintenance burden.
+
+### RSS Description Language Mismatch
+
+The RSS feed's `<description>` was in Chinese only, but the feed actually includes posts in both languages. The description should be more universal.
+
+---
+
 ## Optimization Checklist
 
 | Priority | Issue | File |
@@ -156,15 +209,28 @@ These should be in `messages/zh.json` and `messages/en.json`.
 | 🟢 Low | Redundant pagination logic | `blog/page.tsx` |
 | 🟢 Low | SKILLS data not extracted | `about/page.tsx` |
 | 🟢 Low | Fragile type assertion | `i18n/request.ts` |
+| 🟡 Med | Incomplete CSS variable coverage (15+ raw rgba) | `globals.css` etc. |
+| 🟡 Med | Giscus initialization theme bug | `Comments.tsx` |
+| 🟡 Med | Hamburger missing aria-controls | `Navigation.tsx` |
+| 🟢 Low | Tag filter missing aria-current | `blog/page.tsx` |
+| 🟢 Low | Lightbox alt text hardcoded | `Lightbox.tsx` |
+| 🟢 Low | Search focus ring has no color | `SearchBar.tsx` |
+| 🟢 Low | Redundant force-static / target="_self" | Multiple files |
+| 🟡 Med | SearchBar missed raw rgba value | `SearchBar.tsx` |
+| 🟡 Med | Pagination link trailing `?` | `blog/page.tsx` |
+| 🟡 Med | Giscus language switch broken | `Comments.tsx` |
+| 🟢 Low | Redundant CSS variable declarations (.dark duplicates 11) | `globals.css` |
+| 🟢 Low | RSS description language mismatch | `feed.xml/route.ts` |
 
 ---
 
 ## Takeaway
 
-Overall, the project is well-structured. The Next.js App Router + next-intl combo is solid, and the dark mode and animation systems are nicely done. The main optimization opportunities fall into three buckets:
+Overall, the project is well-structured. The Next.js App Router + next-intl combo is solid, and the dark mode and animation systems are nicely done. After three rounds of review, the main optimization opportunities fall into four buckets:
 
 1. **Performance**: Video compression is the single biggest win
 2. **Robustness**: Error handling and environment variable validation need attention
-3. **Consistency**: CSS variables, i18n translations, and data file organization should follow a unified pattern
+3. **Consistency**: The CSS variable system needs to be thorough — no raw values left behind
+4. **Accessibility**: aria attributes, focus management, and semantic markers need to be filled in one by one
 
 None of these are urgent, but fixing them incrementally will make the project significantly more maintainable. Next step: tackle them by priority.

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 export default function Lightbox() {
   const [src, setSrc] = useState<string | null>(null);
+  const [alt, setAlt] = useState("Image preview");
   const overlayRef = useRef<HTMLDivElement>(null);
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -19,6 +20,7 @@ export default function Lightbox() {
       if (!container) return;
 
       setSrc(img.src);
+      setAlt(img.alt || "Image preview");
     }
 
     document.addEventListener("click", onClick);
@@ -101,7 +103,7 @@ export default function Lightbox() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={src}
-        alt="Enlarged preview"
+        alt={alt}
         className="lightbox-img"
         onClick={(e) => e.stopPropagation()}
       />

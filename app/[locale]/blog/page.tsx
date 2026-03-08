@@ -65,7 +65,7 @@ export default async function BlogPage({
   const baseParams = new URLSearchParams();
   if (tag) baseParams.set("tag", tag);
   if (q) baseParams.set("q", q);
-  const baseHref = baseParams.toString() ? `?${baseParams.toString()}` : "?";
+  const baseHref = baseParams.toString() ? `?${baseParams.toString()}` : "";
 
   return (
     <div className="prose m-auto">
@@ -81,6 +81,7 @@ export default async function BlogPage({
             href={q ? `?q=${encodeURIComponent(q)}` : "?"}
             className="tag-pill"
             data-active={!tag ? "true" : undefined}
+            aria-current={!tag ? "true" : undefined}
           >
             {t("allTags")}
           </a>
@@ -90,6 +91,7 @@ export default async function BlogPage({
               href={`?tag=${encodeURIComponent(tagName)}${q ? `&q=${encodeURIComponent(q)}` : ""}`}
               className="tag-pill"
               data-active={tag === tagName ? "true" : undefined}
+              aria-current={tag === tagName ? "true" : undefined}
             >
               {tagName}
             </a>

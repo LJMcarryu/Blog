@@ -21,6 +21,14 @@
   --success:    #22c55e;
   --border:     rgba(125, 125, 125, 0.2);
   --bg-subtle:  rgba(125, 125, 125, 0.1);
+  --border-light: rgba(125, 125, 125, 0.15);
+  --border-strong: rgba(125, 125, 125, 0.25);
+  --border-faint: rgba(125, 125, 125, 0.3);
+  --scrollbar:  rgba(125, 125, 125, 0.35);
+  --scrollbar-hover: rgba(125, 125, 125, 0.6);
+  --code-label-bg: rgba(125, 125, 125, 0.08);
+  --inline-code-bg: rgba(125, 125, 125, 0.12);
+  --search-bg:    rgba(125, 125, 125, 0.05);
 }
 
 .dark {
@@ -30,10 +38,6 @@
   --fg-deeper:  #ffffff;
   --fg-light:   #a8a8a8;
   --code-bg:    #161b22;
-  --star:       #facc15;
-  --success:    #22c55e;
-  --border:     rgba(125, 125, 125, 0.2);
-  --bg-subtle:  rgba(125, 125, 125, 0.1);
 }
 
 /* ─── Base ─── */
@@ -60,10 +64,10 @@ body {
 ::-webkit-scrollbar { width: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: rgba(125, 125, 125, 0.35);
+  background: var(--scrollbar);
   border-radius: 3px;
 }
-::-webkit-scrollbar-thumb:hover { background: rgba(125, 125, 125, 0.6); }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
 /* ─── View Transitions (dark mode toggle) ─── */
 ::view-transition-old(root),
@@ -201,7 +205,7 @@ html:not(.no-sliding) .slide-enter-content > * {
     left: 0;
     right: 0;
     background-color: var(--c-bg);
-    border-bottom: 1px solid rgba(125, 125, 125, 0.15);
+    border-bottom: 1px solid var(--border-light);
     padding: 0.75rem 1.5rem 1rem;
     display: flex;
     flex-direction: column;
@@ -225,7 +229,7 @@ html:not(.no-sliding) .slide-enter-content > * {
 /* ─── Code blocks (rehype-pretty-code) ─── */
 .prose pre {
   position: relative;
-  border: 1px solid rgba(125, 125, 125, 0.15);
+  border: 1px solid var(--border-light);
   border-radius: 0.5rem;
   padding: 1rem 1.25rem;
   overflow-x: auto;
@@ -253,7 +257,7 @@ html:not(.no-sliding) .slide-enter-content > * {
   opacity: 0.6;
   border-bottom-right-radius: 0.375rem;
   border-top-left-radius: 0.375rem;
-  background: rgba(125, 125, 125, 0.08);
+  background: var(--code-label-bg);
   pointer-events: none;
   user-select: none;
 }
@@ -296,7 +300,7 @@ html:not(.no-sliding) .slide-enter-content > * {
   color: var(--fg-deeper);
   font-weight: inherit;
   text-decoration: none;
-  border-bottom: 1px solid rgba(125, 125, 125, 0.3);
+  border-bottom: 1px solid var(--border-faint);
   transition: border-color 0.3s ease-in-out;
 }
 .prose a:hover { border-bottom-color: var(--fg); }
@@ -312,14 +316,14 @@ html:not(.no-sliding) .slide-enter-content > * {
 /* Short decorative HR */
 .prose hr {
   width: 50px;
-  border-color: rgba(125, 125, 125, 0.25);
+  border-color: var(--border-strong);
   margin-top: 2rem;
   margin-bottom: 2rem;
 }
 
 /* Blockquote */
 .prose blockquote {
-  border-left-color: rgba(125, 125, 125, 0.3);
+  border-left-color: var(--border-faint);
   font-style: normal;
   color: var(--fg);
 }
@@ -327,13 +331,13 @@ html:not(.no-sliding) .slide-enter-content > * {
 /* Inline code — !important overrides typography plugin defaults */
 .prose :not(pre) > code {
   font-family: 'DM Mono', ui-monospace, 'SFMono-Regular', Menlo, Monaco, Consolas, monospace;
-  background-color: rgba(125, 125, 125, 0.12) !important;
+  background-color: var(--inline-code-bg) !important;
   color: var(--fg-deep) !important;
   border-radius: 0.25rem;
   padding: 0.15em 0.35em !important;
   font-size: 0.88em;
   font-weight: 500;
-  border: 1px solid rgba(125, 125, 125, 0.15);
+  border: 1px solid var(--border-light);
 }
 
 .prose :not(pre) > code::before,
@@ -343,7 +347,7 @@ html:not(.no-sliding) .slide-enter-content > * {
 
 .dark .prose :not(pre) > code {
   background-color: var(--border) !important;
-  border-color: rgba(125, 125, 125, 0.25);
+  border-color: var(--border-strong);
 }
 
 /* ─── Tag pills ─── */
@@ -383,7 +387,7 @@ html:not(.no-sliding) .slide-enter-content > * {
 
 /* ─── Table of Contents ─── */
 .toc {
-  border-left: 2px solid rgba(125, 125, 125, 0.15);
+  border-left: 2px solid var(--border-light);
   padding-left: 1rem;
   margin-bottom: 2rem;
 }

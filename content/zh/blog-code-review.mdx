@@ -139,6 +139,59 @@ catch {
 
 ---
 
+## 第二轮审查：深层问题
+
+完成前五轮优化后，我又做了一次深度审查，发现了一些更隐蔽的问题。
+
+### CSS 变量覆盖不彻底
+
+虽然之前引入了 `--border` 和 `--bg-subtle` 两个设计令牌，但 `globals.css` 中仍有大量裸写的 `rgba(125, 125, 125, ...)` 值散落在滚动条、代码块边框、行内代码、目录、引用块等样式中。这些值语义相同但没有走变量体系，改一个地方要改十几处。
+
+### Giscus 初始化主题错误
+
+`Comments.tsx` 的初始化 effect 依赖了 `[locale, theme]`，但 `theme` 的初始值是 `"light"`（React state 默认值），而不是页面实际的主题。这意味着暗色模式下首次加载 Giscus 时，iframe 会先以亮色主题渲染，然后 postMessage 再切换——用户会看到一次闪烁。
+
+### 可访问性遗漏
+
+- 汉堡菜单按钮缺少 `aria-controls` 属性，屏幕阅读器无法关联按钮和菜单
+- 标签筛选的激活状态只有视觉样式（`data-active`），没有 `aria-current` 语义标记
+- Lightbox 的 `alt` 文本写死为 `"Enlarged preview"`，丢失了原图的描述信息
+- 搜索框的 `focus:ring-2` 没有指定颜色，焦点环在某些浏览器下不可见
+
+### 冗余代码
+
+- `blog/[slug]/page.tsx` 同时设置了 `dynamicParams = false` 和 `dynamic = 'force-static'`，后者是多余的
+- `Footer.tsx` 和首页对 mailto 链接设置 `target="_self"`，这是浏览器默认行为
+- RSS feed 的 description 混用中英文 `"个人博客 | Personal Blog"`，不符合 RSS 规范
+
+---
+
+## 第三轮审查：遗漏与冗余
+
+第六轮优化后再次审查，发现了几个之前遗漏的问题。
+
+### 设计令牌遗漏
+
+`SearchBar.tsx` 中仍有一处 `rgba(125, 125, 125, 0.05)` 没有走变量体系——设计令牌迁移时漏掉了搜索框的背景色。
+
+### 分页链接 URL 异常
+
+`blog/page.tsx` 的 `baseHref` 在没有筛选参数时返回 `"?"` 而非空字符串，导致分页链接出现多余的问号（如 `/blog?`）。虽然功能不受影响，但 URL 不够干净。
+
+### Giscus 语言切换失效
+
+`Comments.tsx` 用 `initialized` ref 防止重复初始化，但这也阻止了切换语言时重新创建 Giscus iframe。用户切换中英文后，评论区的界面语言不会更新。
+
+### CSS 变量冗余声明
+
+`.dark` 块中有 11 个 CSS 变量和 `:root` 完全相同（所有 rgba 系列令牌、`--star`、`--success`）。这些值在明暗模式下不变，重复声明只增加维护负担。
+
+### RSS 描述语言不当
+
+RSS feed 的 `<description>` 使用纯中文，但 feed 实际包含中英文两种语言的文章，描述语言应该更通用。
+
+---
+
 ## 优化清单总览
 
 | 优先级 | 问题 | 文件 |
@@ -158,15 +211,28 @@ catch {
 | 🟢 低 | 分页逻辑冗余 | `blog/page.tsx` |
 | 🟢 低 | SKILLS 数据未抽离 | `about/page.tsx` |
 | 🟢 低 | 类型断言不健壮 | `i18n/request.ts` |
+| 🟡 中 | CSS 变量覆盖不彻底（15+ 处裸 rgba） | `globals.css` 等 |
+| 🟡 中 | Giscus 初始化主题错误 | `Comments.tsx` |
+| 🟡 中 | 汉堡菜单缺少 aria-controls | `Navigation.tsx` |
+| 🟢 低 | 标签筛选缺少 aria-current | `blog/page.tsx` |
+| 🟢 低 | Lightbox alt 文本写死 | `Lightbox.tsx` |
+| 🟢 低 | 搜索框焦点环无颜色 | `SearchBar.tsx` |
+| 🟢 低 | 冗余的 force-static / target="_self" | 多个文件 |
+| 🟡 中 | SearchBar 遗漏裸 rgba 值 | `SearchBar.tsx` |
+| 🟡 中 | 分页链接多余的 `?` | `blog/page.tsx` |
+| 🟡 中 | Giscus 语言切换失效 | `Comments.tsx` |
+| 🟢 低 | CSS 变量冗余声明（.dark 重复 11 个） | `globals.css` |
+| 🟢 低 | RSS 描述语言不当 | `feed.xml/route.ts` |
 
 ---
 
 ## 总结
 
-整体来看，项目架构清晰，Next.js App Router + next-intl 的组合用得比较规范，暗色模式和动画系统也做得不错。主要的优化空间集中在三个方面：
+整体来看，项目架构清晰，Next.js App Router + next-intl 的组合用得比较规范，暗色模式和动画系统也做得不错。经过三轮审查，主要的优化空间集中在四个方面：
 
 1. **性能**：视频资源压缩是最大的收益点
 2. **健壮性**：错误处理和环境变量校验需要补齐
-3. **一致性**：CSS 变量、i18n 翻译、数据文件的组织方式需要统一风格
+3. **一致性**：CSS 变量体系需要彻底贯穿，不能留死角
+4. **可访问性**：aria 属性、焦点管理、语义标记需要逐一补齐
 
 这些问题没有一个是"紧急"的，但逐步修复会让项目的可维护性上一个台阶。下一步我会按优先级逐个解决。
