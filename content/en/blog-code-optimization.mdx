@@ -1,13 +1,13 @@
 ---
-title: "Blog Code Optimization Log: 8 Rounds, 50+ Improvements"
+title: "Blog Code Optimization Log: 9 Rounds, 55+ Improvements"
 date: "2026-03-08"
-description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 8 iterative rounds."
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 9 iterative rounds."
 tags: ["Code Review", "Performance", "Next.js"]
 ---
 
 ## Context
 
-The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 8 rounds of iteration, I completed 50+ improvements.
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 9 rounds of iteration, I completed 55+ improvements.
 
 ---
 
@@ -337,14 +337,43 @@ prevKeyRef.current = key;
 
 ---
 
+## Round 9: i18n Blind Spot Cleanup
+
+This round focused on i18n blind spots — hardcoded strings hiding in utility functions and data files.
+
+### Reading Time i18n
+
+`lib/reading-time.ts` returned pre-formatted strings like `"X 分钟阅读"` / `"X min read"`, bypassing the translation system. Refactored to return just the minute count, with the caller formatting via `t("readingTime", { minutes })`:
+
+```typescript
+// Before: return locale === "zh" ? `${rounded} 分钟阅读` : `${rounded} min read`;
+// After:  return Math.max(1, Math.ceil(minutes));
+```
+
+Added i18n key: `blog.readingTime` → `"{minutes} min read"` / `"{minutes} 分钟阅读"`.
+
+### Bilingual Book Notes
+
+`data/books.ts` had Chinese-only book review notes — English users saw Chinese text. Changed `note` from `string` to `Record<"zh" | "en", string>`, matching the pattern used in `projects.ts`.
+
+### Stars Component aria-label
+
+The star rating component in `books/page.tsx` had a hardcoded English `aria-label` of `"X stars"`. Added `books.stars` i18n key and changed to `t("stars", { count })`.
+
+### Photo Alt Text Edge Case
+
+`photos/page.tsx`'s `altFromPath()` used `??` for the fallback, but `??` only catches `null`/`undefined`, not empty strings. In edge cases (e.g., a filename that's just an extension), it would return empty alt text. Changed to `||` to ensure the fallback triggers.
+
+---
+
 ## Summary
 
-8 rounds, 50+ improvements, 20+ files touched. Key wins:
+9 rounds, 55+ improvements, 20+ files touched. Key wins:
 
 - **Security**: Response headers, disabled X-Powered-By, OG parameter validation
 - **Accessibility**: Lightbox focus trap, scroll lock, aria attributes, focus ring visibility, UI label i18n
 - **Performance**: MutationObserver over setTimeout, Giscus postMessage, conditional video loading, TOC caching
-- **Consistency**: 18 CSS design tokens, full i18n coverage, centralized env handling
+- **Consistency**: 18 CSS design tokens, full i18n coverage, centralized env handling, bilingual data files
 - **Maintainability**: useDarkMode hook, data file extraction, type safety, error logging, redundant code cleanup
 - **SEO**: canonical/alternate URLs, structured data, RSS normalization
 

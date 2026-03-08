@@ -1,13 +1,13 @@
 ---
-title: "博客代码优化实录：8 轮迭代，50+ 项改进"
+title: "博客代码优化实录：9 轮迭代，55+ 项改进"
 date: "2026-03-08"
-description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，8 轮迭代的完整实录。
+description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从���全加固到设计令牌体系，9 轮迭代的完整实录。
 tags: ["代码审查", "性能优化", "Next.js"]
 ---
 
 ## 背景
 
-[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，8 轮迭代下来一共完成了 50+ 项改进。
+[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，9 轮迭代下来一共完成了 55+ 项改进。
 
 ---
 
@@ -337,14 +337,43 @@ prevKeyRef.current = key;
 
 ---
 
+## 第九轮：i18n 死角清理
+
+这一轮聚焦的是之前遗漏的 i18n 死角——那些藏在工具函数和数据文件里的硬编码文案。
+
+### 阅读时间 i18n
+
+`lib/reading-time.ts` 直接返回格式化后的字符串 `"X 分钟阅读"` / `"X min read"`，绕过了翻译系统。重构为只返回分钟数，由调用方通过 `t("readingTime", { minutes })` 格式化：
+
+```typescript
+// Before: return locale === "zh" ? `${rounded} 分钟阅读` : `${rounded} min read`;
+// After:  return Math.max(1, Math.ceil(minutes));
+```
+
+新增 i18n key：`blog.readingTime` → `"{minutes} 分钟阅读"` / `"{minutes} min read"`。
+
+### 书单笔记双语化
+
+`data/books.ts` 的书评笔记只有中文，英文用户看到的是中文笔记。将 `note` 字段从 `string` 改为 `Record<"zh" | "en", string>`，和 `projects.ts` 的 `description` 保持一致。
+
+### Stars 组件 aria-label
+
+`books/page.tsx` 的星级评分组件 `aria-label` 写死了英文 `"X stars"`。新增 `books.stars` i18n key，改为 `t("stars", { count })`。
+
+### 照片 alt 文本边界修复
+
+`photos/page.tsx` 的 `altFromPath()` 用 `??` 做 fallback，但 `??` 只捕获 `null`/`undefined`，不捕获空字符串。极端情况下（如文件名只有扩展名）会返回空 alt。改为 `||` 确保 fallback 生效。
+
+---
+
 ## 总结
 
-8 轮迭代，50+ 项改进，涉及 20+ 个文件。主要收获：
+9 轮迭代，55+ 项改进，涉及 20+ 个文件。主要收获：
 
 - **安全性**：添加了响应头、禁用了 X-Powered-By、OG 参数校验
 - **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性、焦点环可见性、UI 文案 i18n
 - **性能**：MutationObserver 替代 setTimeout、Giscus postMessage、视频条件加载、TOC 缓存优化
-- **一致性**：18 个 CSS 设计令牌、所有 UI 文案走 i18n、环境变量集中管理
+- **一致性**：18 个 CSS 设计令牌、所有 UI 文案走 i18n、环境变量集中管理、数据文件双语化
 - **可维护性**：useDarkMode Hook、数据文件抽离、类型安全、错误日志、冗余代码清理
 - **SEO**：canonical/alternate URL、结构化数据、RSS 规范化
 

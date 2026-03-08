@@ -217,6 +217,26 @@ The MutationObserver re-initializes the IntersectionObserver on every DOM change
 
 ---
 
+## Fifth Review: i18n Blind Spots
+
+### Reading Time Hardcoded
+
+`lib/reading-time.ts` returns pre-formatted strings like `"X 分钟阅读"` / `"X min read"`, bypassing the translation system. Utility functions shouldn't contain UI copy.
+
+### Book Notes Chinese-Only
+
+`data/books.ts` book review notes are plain Chinese strings — English users see Chinese content. Should use `Record<"zh" | "en", string>` like `projects.ts` does.
+
+### Stars Component aria-label Hardcoded
+
+The star rating `aria-label` in `books/page.tsx` is hardcoded as `"X stars"` — Chinese screen reader users hear English.
+
+### Photo Alt Text Fallback Broken
+
+`photos/page.tsx`'s `altFromPath()` uses `??` for the fallback, but `??` doesn't catch empty strings. If a filename is just an extension (e.g., `.jpg`), alt text would be empty.
+
+---
+
 ## Optimization Checklist
 
 | Priority | Issue | File |
@@ -252,12 +272,16 @@ The MutationObserver re-initializes the IntersectionObserver on every DOM change
 | 🟡 Med | UI component labels hardcoded in English | `ThemeToggle.tsx` etc. |
 | 🟡 Med | Missing canonical/alternate URLs | `layout.tsx`, `blog/[slug]/page.tsx` |
 | 🟢 Low | TableOfContents unnecessary rebuilds | `TableOfContents.tsx` |
+| 🟡 Med | Reading time hardcoded, bypasses i18n | `lib/reading-time.ts` |
+| 🟡 Med | Book notes Chinese-only | `data/books.ts` |
+| 🟢 Low | Stars aria-label hardcoded English | `books/page.tsx` |
+| 🟢 Low | Photo alt fallback uses `??` instead of `\|\|` | `photos/page.tsx` |
 
 ---
 
 ## Takeaway
 
-Overall, the project is well-structured. The Next.js App Router + next-intl combo is solid, and the dark mode and animation systems are nicely done. After four rounds of review, the main optimization opportunities fall into five buckets:
+Overall, the project is well-structured. The Next.js App Router + next-intl combo is solid, and the dark mode and animation systems are nicely done. After five rounds of review, the main optimization opportunities fall into five buckets:
 
 1. **Performance**: Video compression is the single biggest win
 2. **Robustness**: Error handling and environment variable validation need attention

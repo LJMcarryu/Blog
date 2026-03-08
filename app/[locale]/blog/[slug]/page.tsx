@@ -83,7 +83,8 @@ export default async function PostPage({
 
   if (!post) notFound();
 
-  const readingTime = getReadingTime(post.content, locale);
+  const readingMinutes = getReadingTime(post.content, locale);
+  const readingTime = t("readingTime", { minutes: readingMinutes });
 
   // Get prev/next posts
   const allPosts = getPostsByLocale(locale);

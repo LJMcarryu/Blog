@@ -23,7 +23,8 @@
     "prevPost": "上一篇",
     "nextPost": "下一篇",
     "prevPage": "← 上一页",
-    "nextPage": "下一页 →"
+    "nextPage": "下一页 →",
+    "readingTime": "{minutes} 分钟阅读"
   },
   "about": {
     "title": "关于我",
@@ -53,7 +54,8 @@
     "subtitle": "我读过、在读和想读的书",
     "reading": "在读",
     "read": "已读",
-    "want": "想读"
+    "want": "想读",
+    "stars": "{count} 星"
   },
   "now": {
     "title": "现在",

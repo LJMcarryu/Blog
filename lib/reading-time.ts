@@ -2,8 +2,10 @@
  * Calculate reading time for a post.
  * Chinese text: ~400 characters/min
  * English text: ~200 words/min
+ *
+ * Returns the estimated minutes (minimum 1).
  */
-export function getReadingTime(content: string, locale: string): string {
+export function getReadingTime(content: string, locale: string): number {
   // Strip MDX/markdown syntax
   const clean = content
     .replace(/^import\s.*$/gm, "")
@@ -28,7 +30,5 @@ export function getReadingTime(content: string, locale: string): string {
     minutes = words / 200;
   }
 
-  const rounded = Math.max(1, Math.ceil(minutes));
-
-  return locale === "zh" ? `${rounded} 分钟阅读` : `${rounded} min read`;
+  return Math.max(1, Math.ceil(minutes));
 }

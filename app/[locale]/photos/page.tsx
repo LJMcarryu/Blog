@@ -16,7 +16,7 @@ function getPhotos(): string[] {
 }
 
 function altFromPath(src: string): string {
-  const name = src.split("/").pop()?.replace(/\.[^.]+$/, "") ?? "photo";
+  const name = src.split("/").pop()?.replace(/\.[^.]+$/, "") || "photo";
   return name.replace(/[-_]/g, " ");
 }
 

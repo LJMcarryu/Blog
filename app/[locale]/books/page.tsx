@@ -12,9 +12,9 @@ export async function generateMetadata({
   return { title: t("title") };
 }
 
-function Stars({ count }: { count: number }) {
+function Stars({ count, label }: { count: number; label: string }) {
   return (
-    <span className="text-xs" style={{ color: "var(--star)" }} aria-label={`${count} stars`}>
+    <span className="text-xs" style={{ color: "var(--star)" }} aria-label={label}>
       {"★".repeat(count)}
       {"☆".repeat(5 - count)}
     </span>
@@ -62,12 +62,12 @@ export default async function BooksPage({
                         </p>
                       </div>
                       {book.rating !== undefined && (
-                        <Stars count={book.rating} />
+                        <Stars count={book.rating} label={t("stars", { count: book.rating })} />
                       )}
                     </div>
                     {book.note && (
                       <p className="text-xs mt-2 italic" style={{ color: "var(--fg-light)" }}>
-                        {book.note}
+                        {book.note[locale as "zh" | "en"]}
                       </p>
                     )}
                   </div>

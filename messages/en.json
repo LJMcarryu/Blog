@@ -23,7 +23,8 @@
     "prevPost": "Previous",
     "nextPost": "Next",
     "prevPage": "← Previous",
-    "nextPage": "Next →"
+    "nextPage": "Next →",
+    "readingTime": "{minutes} min read"
   },
   "about": {
     "title": "About",
@@ -53,7 +54,8 @@
     "subtitle": "Books I've read, am reading, or want to read",
     "reading": "Reading",
     "read": "Read",
-    "want": "Want to Read"
+    "want": "Want to Read",
+    "stars": "{count} stars"
   },
   "now": {
     "title": "Now",
