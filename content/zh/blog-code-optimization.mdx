@@ -1,0 +1,183 @@
+---
+title: "博客代码优化实录：5 轮迭代，30+ 项改进"
+date: "2026-03-08"
+description: 上一篇文章梳理了博客的所有优化点，这篇记录实际的修复过程——从安全加固到设计令牌体系，5 轮迭代的完整实录。
+tags: ["代码审查", "性能优化", "Next.js"]
+---
+
+## 背景
+
+[上一篇文章](/zh/blog/blog-code-review)做了一次全面的代码审查，列出了 15 个优化点。这篇文章记录实际的修复过程——最终远不止 15 项，5 轮迭代下来一共完成了 30+ 项改进。
+
+---
+
+## 第一轮：高优先级修复
+
+### 环境变量集中管理
+
+之前 `robots.ts`、`sitemap.ts`、`feed.xml/route.ts`、`layout.tsx`、`blog/[slug]/page.tsx` 五个文件各自写了一遍 `process.env.NEXT_PUBLIC_SITE_URL || "https://example.com"`。
+
+新建 `lib/env.ts`，抽取 `getSiteUrl()` 函数，统一处理 fallback 并在缺失时输出 `console.warn`：
+
+```typescript
+export function getSiteUrl(): string {
+  const url = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!url) {
+    console.warn("[env] NEXT_PUBLIC_SITE_URL is not set — falling back to", FALLBACK_URL);
+    return FALLBACK_URL;
+  }
+  return url;
+}
+```
+
+### Lightbox 无障碍访问
+
+原来的 Lightbox 只是一个 `div` 模拟的弹窗，键盘用户可以 Tab 跳出去。修复后：
+
+- 添加 `aria-modal="true"`
+- 打开时自动聚焦关闭按钮
+- 锁定 `body` 滚动
+- 实现焦点陷阱（Tab 循环在 lightbox 内部）
+
+### CSS 清理
+
+- 代码块背景色 `#fafafa` / `#161b22` → `var(--code-bg)`
+- 代码文字色 `#0a0a0a` / `#f0f0f0` → `var(--fg-deeper)` / `var(--fg)`
+- 给所有必要的 `!important` 加上注释说明原因
+
+### 其他修复
+
+- OG 图片 title 截断到 100 字符
+- MDX 解析错误加 `console.warn` 日志
+- 硬编码的"全部"/"上一篇"/"下一篇"移入 i18n messages
+- RSS `language` 从 `"zh-en"` 修正为 `"zh"`
+- 布局 metadata description 改为 SEO 友好的英文
+- `CodeCopyButton` 的 `setTimeout` 替换为 `MutationObserver`
+- `ThemedVideo` 改为双 video 元素 + CSS visibility 切换
+- SKILLS 数据从 about 页面抽离到 `data/skills.ts`
+- i18n 类型断言改用 `(typeof routing.locales)[number]`
+
+---
+
+## 第二轮：组件优化
+
+### TableOfContents 同步修复
+
+和 CodeCopyButton 一样，把 150ms 的 `setTimeout` 替换为 `MutationObserver`，确保 MDX 渲染完成后再初始化目录。
+
+### 分页组件 i18n
+
+`Pagination.tsx` 里的"上一页"/"下一页"也是硬编码的。改为通过 props 传入翻译后的标签，移除了 `locale` prop。
+
+### Giscus 评论主题切换优化
+
+之前每次切换主题都会销毁并重建整个 Giscus iframe。改用 Giscus 的 `postMessage` API 原地更新主题：
+
+```typescript
+iframe.contentWindow?.postMessage(
+  { giscus: { setConfig: { theme } } },
+  "https://giscus.app"
+);
+```
+
+### 小修复
+
+- 星级评分的 `#facc15` → `var(--star)` CSS 变量
+- ThemedVideo 只对可见的视频设置 `autoPlay` 和 `preload="auto"`
+
+---
+
+## 第三轮：安全与 SEO
+
+### 安全响应头
+
+`next.config.ts` 从空配置升级为：
+
+```typescript
+const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{
+      source: "/(.*)",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      ],
+    }];
+  },
+};
+```
+
+### SEO 元数据补全
+
+- 根布局添加 Twitter Card meta 和默认 OG 图片
+- 博客文章 OG 添加 `locale` 和 `authors` 字段
+
+### i18n 覆盖扩展
+
+- `not-found.tsx` 和 `error.tsx` 的硬编码文案移入 messages
+- 移除 social-links 中的 Twitter `"#"` 占位链接
+- `generateStaticParams` 改用 `routing.locales` 替代硬编码数组
+
+---
+
+## 第四轮：设计令牌完善
+
+- 复制按钮成功色 `#22c55e` → `var(--success)`
+- OG 图片和 favicon 的硬编码颜色抽取为命名常量
+- 修复 rgba 值的空格格式不一致
+- 移除 photos 页面 Image 组件上多余的 inline style
+
+---
+
+## 第五轮：设计令牌体系化
+
+这是最大的一次 CSS 重构。项目中大量使用 `rgba(125, 125, 125, 0.2)` 和 `rgba(125, 125, 125, 0.1)` 作为边框和背景色，散落在 CSS 和 JSX inline style 中。
+
+新增两个设计令牌：
+
+```css
+:root {
+  --border:     rgba(125, 125, 125, 0.2);
+  --bg-subtle:  rgba(125, 125, 125, 0.1);
+}
+```
+
+替换了 9 处 CSS 选择器和 7 处 JSX inline style，统一走变量体系。
+
+同时修复了 `ThemeToggle.tsx` 中不必要的 `as unknown as` 双重类型断言——项目的 TypeScript DOM lib 已经支持 `startViewTransition`。
+
+---
+
+## 最终设计令牌一览
+
+```css
+:root {
+  --c-bg        /* 页面背景 */
+  --fg          /* 正文颜色 */
+  --fg-deep     /* 标题颜色 */
+  --fg-deeper   /* 最深前景色 */
+  --fg-light    /* 辅助文字 */
+  --code-bg     /* 代码块背景 */
+  --star        /* 星级评分 */
+  --success     /* 成功状态 */
+  --border      /* 通用边框 */
+  --bg-subtle   /* 微妙背景 */
+}
+```
+
+---
+
+## 总结
+
+5 轮迭代，30+ 项改进，涉及 20+ 个文件。主要收获：
+
+- **安全性**：添加了响应头、禁用了 X-Powered-By、OG 参数校验
+- **无障碍**：Lightbox 焦点陷阱、滚动锁定、aria 属性
+- **性能**：MutationObserver 替代 setTimeout、Giscus postMessage、视频条件加载
+- **一致性**：10 个 CSS 设计令牌、所有 UI 文案走 i18n、环境变量集中管理
+- **可维护性**：数据文件抽离、类型安全、错误日志
+
+代码审查不只是找问题，更重要的是建立规范。当项目有了统一的设计令牌、i18n 覆盖和错误处理模式，后续开发就能自然地遵循这些约定。

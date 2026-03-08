@@ -1,0 +1,183 @@
+---
+title: "Blog Code Optimization Log: 5 Rounds, 30+ Improvements"
+date: "2026-03-08"
+description: "The previous post identified every optimization opportunity. This one documents the actual fixes — from security hardening to a design token system, across 5 iterative rounds."
+tags: ["Code Review", "Performance", "Next.js"]
+---
+
+## Context
+
+The [previous post](/en/blog/blog-code-review) was a full code audit that identified 15 optimization points. This post documents the actual fixes — which ended up being far more than 15. Across 5 rounds of iteration, I completed 30+ improvements.
+
+---
+
+## Round 1: High-Priority Fixes
+
+### Centralized Environment Variables
+
+Five files each had their own copy of `process.env.NEXT_PUBLIC_SITE_URL || "https://example.com"` — `robots.ts`, `sitemap.ts`, `feed.xml/route.ts`, `layout.tsx`, and `blog/[slug]/page.tsx`.
+
+Created `lib/env.ts` with a `getSiteUrl()` function that handles the fallback and warns when the env var is missing:
+
+```typescript
+export function getSiteUrl(): string {
+  const url = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!url) {
+    console.warn("[env] NEXT_PUBLIC_SITE_URL is not set — falling back to", FALLBACK_URL);
+    return FALLBACK_URL;
+  }
+  return url;
+}
+```
+
+### Lightbox Accessibility
+
+The original Lightbox was a `div` pretending to be a modal — keyboard users could Tab right out of it. After the fix:
+
+- Added `aria-modal="true"`
+- Auto-focus the close button on open
+- Lock body scroll
+- Implemented a focus trap (Tab cycles within the lightbox)
+
+### CSS Cleanup
+
+- Code block backgrounds `#fafafa` / `#161b22` → `var(--code-bg)`
+- Code text colors `#0a0a0a` / `#f0f0f0` → `var(--fg-deeper)` / `var(--fg)`
+- Added comments explaining why each `!important` is necessary
+
+### Other Fixes
+
+- OG image title truncated to 100 characters
+- MDX parse errors now log with `console.warn`
+- Hardcoded "All" / "Previous" / "Next" labels moved to i18n messages
+- RSS `language` corrected from `"zh-en"` to `"zh"`
+- Layout metadata description changed to SEO-friendly English
+- `CodeCopyButton` replaced `setTimeout` with `MutationObserver`
+- `ThemedVideo` switched to dual video elements with CSS visibility toggle
+- SKILLS data extracted from about page to `data/skills.ts`
+- i18n type assertion now uses `(typeof routing.locales)[number]`
+
+---
+
+## Round 2: Component Optimization
+
+### TableOfContents Timing Fix
+
+Same pattern as CodeCopyButton — replaced the 150ms `setTimeout` with a `MutationObserver` to reliably detect when MDX content finishes rendering.
+
+### Pagination i18n
+
+The "Previous" / "Next" labels in `Pagination.tsx` were also hardcoded. Changed to accept translated labels via props, removing the `locale` prop entirely.
+
+### Giscus Theme Switch Optimization
+
+Previously, every theme toggle destroyed and recreated the entire Giscus iframe. Now uses the Giscus `postMessage` API to update the theme in-place:
+
+```typescript
+iframe.contentWindow?.postMessage(
+  { giscus: { setConfig: { theme } } },
+  "https://giscus.app"
+);
+```
+
+### Minor Fixes
+
+- Star rating color `#facc15` → `var(--star)` CSS variable
+- ThemedVideo only sets `autoPlay` and `preload="auto"` on the visible video
+
+---
+
+## Round 3: Security and SEO
+
+### Security Headers
+
+`next.config.ts` went from empty to properly configured:
+
+```typescript
+const nextConfig: NextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{
+      source: "/(.*)",
+      headers: [
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      ],
+    }];
+  },
+};
+```
+
+### SEO Metadata
+
+- Added Twitter Card meta and default OG image to root layout
+- Added `locale` and `authors` to blog post OG metadata
+
+### i18n Coverage Expansion
+
+- `not-found.tsx` and `error.tsx` hardcoded strings moved to messages
+- Removed Twitter `"#"` placeholder from social-links
+- `generateStaticParams` now uses `routing.locales` instead of hardcoded array
+
+---
+
+## Round 4: Design Token Refinement
+
+- Copy button success color `#22c55e` → `var(--success)`
+- OG image and favicon hardcoded colors extracted to named constants
+- Fixed inconsistent rgba value spacing
+- Removed redundant inline style on photos page Image component
+
+---
+
+## Round 5: Design Token System
+
+The biggest CSS refactor. The project used `rgba(125, 125, 125, 0.2)` and `rgba(125, 125, 125, 0.1)` extensively for borders and backgrounds, scattered across CSS and JSX inline styles.
+
+Added two new design tokens:
+
+```css
+:root {
+  --border:     rgba(125, 125, 125, 0.2);
+  --bg-subtle:  rgba(125, 125, 125, 0.1);
+}
+```
+
+Replaced 9 CSS selectors and 7 JSX inline styles to use the variables consistently.
+
+Also fixed an unnecessary `as unknown as` double type cast in `ThemeToggle.tsx` — the project's TypeScript DOM lib already supports `startViewTransition`.
+
+---
+
+## Final Design Token Overview
+
+```css
+:root {
+  --c-bg        /* Page background */
+  --fg          /* Body text */
+  --fg-deep     /* Heading color */
+  --fg-deeper   /* Deepest foreground */
+  --fg-light    /* Secondary text */
+  --code-bg     /* Code block background */
+  --star        /* Star rating */
+  --success     /* Success state */
+  --border      /* Common border */
+  --bg-subtle   /* Subtle background */
+}
+```
+
+---
+
+## Summary
+
+5 rounds, 30+ improvements, 20+ files touched. Key wins:
+
+- **Security**: Response headers, disabled X-Powered-By, OG parameter validation
+- **Accessibility**: Lightbox focus trap, scroll lock, aria attributes
+- **Performance**: MutationObserver over setTimeout, Giscus postMessage, conditional video loading
+- **Consistency**: 10 CSS design tokens, full i18n coverage, centralized env handling
+- **Maintainability**: Data file extraction, type safety, error logging
+
+A code review isn't just about finding problems — it's about establishing conventions. Once a project has unified design tokens, i18n coverage, and error handling patterns, future development naturally follows those standards.
