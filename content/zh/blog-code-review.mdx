@@ -1,0 +1,172 @@
+---
+title: "博客代码全面审查：我发现了这些可以优化的地方"
+date: "2026-03-08"
+description: 对个人博客项目进行了一次深度代码审查，从性能、安全、可访问性、SEO、代码质量、国际化六个维度梳理出所有值得优化的点。
+tags: ["代码审查", "性能优化", "Next.js"]
+---
+
+## 为什么要做代码审查？
+
+博客上线后跑了一段时间，功能基本稳定。但"能跑"和"跑得好"是两回事——趁着还没积累太多技术债，我决定对整个项目做一次全面审查，把隐患和优化空间都摸清楚。
+
+审查维度覆盖六个方面：**性能、安全、可访问性、SEO、代码质量、国际化**。
+
+---
+
+## 性能问题
+
+### 视频背景资源过大
+
+首页的背景视频是最大的性能瓶颈：
+
+- `home_bg_video_dark.mp4` — 20.7 MB
+- `home_bg_video_light.mp4` — 10.8 MB
+
+总计超过 31 MB，移动端加载体验很差。优化方向：
+
+1. 用 FFmpeg 压缩并转为 WebM/VP9 格式，体积可减少 60-70%
+2. 给 `<video>` 添加 `poster` 属性，首帧用静态图代替
+3. 考虑移动端直接用静态图替代视频
+
+### 组件中的定时器隐患
+
+`CodeCopyButton.tsx` 用 `setTimeout(100ms)` 等待 DOM 渲染完成后再插入复制按钮。这在慢设备上可能失效，更稳健的做法是用 `MutationObserver` 监听 DOM 变化。
+
+`TableOfContents.tsx` 同样有 150ms 的延迟初始化，可能导致 CLS（累积布局偏移）。
+
+### 主题切换时视频重载
+
+`ThemedVideo.tsx` 在主题切换时调用 `.load()` 重新加载视频源，会导致画面闪烁。更好的方案是同时渲染两个 `<video>`，用 CSS `display` 控制显隐。
+
+---
+
+## 安全问题
+
+### OG 图片参数未校验
+
+`app/og/route.tsx` 从 URL ���数中读取 `title` 直接渲染到 `ImageResponse`，没有做长度限制或内容过滤。虽然 OG 图片生成环境相对安全，但作为外部输入的入口，建议加上基本校验。
+
+### MDX 解析错误被静默吞掉
+
+`lib/posts.ts` 的 catch 块直接返回空对象，不打日志也不抛错：
+
+```typescript
+// 当前写法 — 出错时完全静默
+catch {
+  return { slug, title: "", date: "", description: "", tags: [], content: "" };
+}
+```
+
+建议至少加一行 `console.warn`，否则 MDX 文件写错了根本发现不了。
+
+---
+
+## 可访问性问题
+
+### Lightbox 缺少焦点管理
+
+`Lightbox.tsx` 用 `div` 模拟了一个模态弹窗，但没有实现焦点陷阱（focus trap）。键盘用户按 Tab 可以跳出弹窗，操作到背后的页面元素。
+
+推荐方案：改用原生 `<dialog>` 元素，或者引入 `focus-trap-react` 库。
+
+### 复制按钮的 aria-label 不一致
+
+`CodeCopyButton.tsx` 的按钮文本是 "Copy"，但 `aria-label` 是 "Copy code"——屏幕阅读器和视觉呈现不一致，建议统一。
+
+---
+
+## SEO 问题
+
+### 元数据描述不区分语言
+
+`layout.tsx` 的 metadata description 写的是 `"个人博客 | Personal Blog"`，中英文混在一起。搜索引擎会根据页面语言判断描述是否匹配，建议改为根据 locale 动态设置。
+
+### RSS 语言标签无效
+
+`feed.xml/route.ts` 中 RSS 的 `language` 字段设为 `"zh-en"`，这不是合法的 RFC 5646 语言标签。应该为每个语言生成独立的 feed，或者使用 `"zh"` 作为主语言。
+
+### Sitemap 缺少更新频率
+
+`sitemap.ts` 生成的站点地图没有 `changeFrequency` 和 `priority` 字段。虽然 Google 声称不太依赖这些字段，但其他搜索引擎（如 Bing）仍然参考。
+
+### robots.ts 的 fallback 风险
+
+`robots.ts` 和 `sitemap.ts` 都用 `https://example.com` 作为 `NEXT_PUBLIC_SITE_URL` 的默认值。如果部署时忘记设置环境变量，站点地图和 robots.txt 会指向错误的域名，直接影响 SEO 收录。
+
+---
+
+## 代码质量
+
+### CSS 中 `!important` 泛滥
+
+`globals.css` 中有大量 `!important`：
+
+- 20 个 `nth-child` 动画规则（第 90-109 行）
+- 代码块背景色（第 223、227 行）
+- Shiki 主题色（第 252-256 行）
+- 行内代码样式（第 317-324 行）
+
+`!important` 越多，后续维护越难。建议通过调整选择器层级或使用 CSS Layers 来解决优先级问题。
+
+### 硬编码颜色值
+
+代码块内的文字颜色直接写死了 `#0a0a0a` 和 `#f0f0f0`，没有走 CSS 变量体系。和其他地方用 `var(--fg)` 的风格不统一。
+
+### 分页逻辑冗余
+
+`blog/page.tsx` 中 `Math.max(1, Math.ceil(...))` 是多余的——`Math.ceil()` 对正数本身就返回 ≥ 1 的值。
+
+### About 页面数据硬编码
+
+`about/page.tsx` 的 SKILLS 数组直接写在组件里，而项目、书籍等数据都抽到了 `data/` 目录。建议保持一致，移到 `data/skills.ts`。
+
+---
+
+## 国际化问题
+
+### 部分文案未走翻译系统
+
+以下位置使用了硬编码的中英文字符串，没有通过 `next-intl` 的翻译函数：
+
+- `blog/[slug]/page.tsx` 第 182 行 — 上一篇/下一篇标签
+- `blog/page.tsx` 第 85 行 — "全部" / "All" 标签筛选
+
+这些应该统一放到 `messages/zh.json` 和 `messages/en.json` 中。
+
+### 类型断言不够健壮
+
+`i18n/request.ts` 中用 `as "zh" | "en"` 做类型断言，如果将来新增语言（比如日语），这里会悄悄出 bug。建议从 `routing.locales` 推导类型。
+
+---
+
+## 优化清单总览
+
+| 优先级 | 问题 | 文件 |
+|--------|------|------|
+| 🔴 高 | 视频文件过大（31.5 MB） | `public/` |
+| 🔴 高 | robots/sitemap fallback 到 example.com | `robots.ts`, `sitemap.ts` |
+| 🔴 高 | Lightbox 无焦点管理 | `Lightbox.tsx` |
+| 🟡 中 | CSS `!important` 过多 | `globals.css` |
+| 🟡 中 | 硬编码颜色未走变量 | `globals.css` |
+| 🟡 中 | OG 图片参数未校验 | `app/og/route.tsx` |
+| 🟡 中 | MDX 解析错误被静默 | `lib/posts.ts` |
+| 🟡 中 | 部分文案未走 i18n | `blog/page.tsx` 等 |
+| 🟡 中 | RSS 语言标签无效 | `feed.xml/route.ts` |
+| 🟡 中 | metadata 描述不区分语言 | `layout.tsx` |
+| 🟢 低 | 定时器替换为 MutationObserver | `CodeCopyButton.tsx` |
+| 🟢 低 | 主题切换视频闪烁 | `ThemedVideo.tsx` |
+| 🟢 低 | 分页逻辑冗余 | `blog/page.tsx` |
+| 🟢 低 | SKILLS 数据未抽离 | `about/page.tsx` |
+| 🟢 低 | 类型断言不健壮 | `i18n/request.ts` |
+
+---
+
+## 总结
+
+整体来看，项目架构清晰，Next.js App Router + next-intl 的组合用得比较规范，暗色模式和动画系统也做得不错。主要的优化空间集中在三个方面：
+
+1. **性能**：视频资源压缩是最大的收益点
+2. **健壮性**：错误处理和环境变量校验需要补齐
+3. **一致性**：CSS 变量、i18n 翻译、数据文件的组织方式需要统一风格
+
+这些问题没有一个是"紧急"的，但逐步修复会让项目的可维护性上一个台阶。下一步我会按优先级逐个解决。

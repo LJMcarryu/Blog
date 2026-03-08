@@ -1,0 +1,170 @@
+---
+title: "Full Code Review of My Blog: Every Optimization I Found"
+date: "2026-03-08"
+description: A deep code audit of my personal blog project, covering performance, security, accessibility, SEO, code quality, and i18n — with a prioritized list of improvements.
+tags: ["Code Review", "Performance", "Next.js"]
+---
+
+## Why Do a Code Review?
+
+The blog has been running for a while and everything works. But "it works" and "it works well" are two different things. Before technical debt piles up, I decided to do a thorough audit across six dimensions: **performance, security, accessibility, SEO, code quality, and i18n**.
+
+---
+
+## Performance Issues
+
+### Oversized Video Background
+
+The homepage background videos are the biggest bottleneck:
+
+- `home_bg_video_dark.mp4` — 20.7 MB
+- `home_bg_video_light.mp4` — 10.8 MB
+
+Over 31 MB total. Brutal on mobile. The fix:
+
+1. Compress and convert to WebM/VP9 with FFmpeg — 60-70% size reduction
+2. Add a `poster` attribute to `<video>` so the first frame loads as a static image
+3. Consider replacing video with a static image on mobile
+
+### Fragile Timers in Components
+
+`CodeCopyButton.tsx` uses `setTimeout(100ms)` to wait for DOM rendering before inserting copy buttons. This can fail on slower devices. A `MutationObserver` would be more reliable.
+
+`TableOfContents.tsx` has a similar 150ms initialization delay that could cause CLS (Cumulative Layout Shift).
+
+### Video Reload on Theme Switch
+
+`ThemedVideo.tsx` calls `.load()` when the theme changes, causing a visible flash. A better approach: render both `<video>` elements and toggle visibility with CSS `display`.
+
+---
+
+## Security Issues
+
+### Unsanitized OG Image Parameters
+
+`app/og/route.tsx` reads `title` from URL params and renders it directly into `ImageResponse` without length limits or content validation. While the OG image generation environment is relatively safe, it's still an external input entry point worth sanitizing.
+
+### Silent MDX Parsing Failures
+
+`lib/posts.ts` swallows errors in its catch block — no logging, no re-throw:
+
+```typescript
+// Current approach — completely silent on error
+catch {
+  return { slug, title: "", date: "", description: "", tags: [], content: "" };
+}
+```
+
+At minimum, add a `console.warn`. Otherwise, a broken MDX file is invisible.
+
+---
+
+## Accessibility Issues
+
+### Lightbox Missing Focus Management
+
+`Lightbox.tsx` simulates a modal with a `div` but doesn't implement a focus trap. Keyboard users can Tab out of the lightbox and interact with background elements.
+
+Recommended fix: use the native `<dialog>` element, or add `focus-trap-react`.
+
+### Inconsistent Copy Button aria-label
+
+`CodeCopyButton.tsx` shows "Copy" as button text but has `aria-label="Copy code"` — screen readers and visual presentation don't match. Pick one and stick with it.
+
+---
+
+## SEO Issues
+
+### Metadata Description Not Locale-Aware
+
+`layout.tsx` sets the metadata description to `"个人博客 | Personal Blog"` — mixing both languages. Search engines match description language to page language, so this should be set dynamically per locale.
+
+### Invalid RSS Language Tag
+
+`feed.xml/route.ts` sets the RSS `language` field to `"zh-en"`, which is not a valid RFC 5646 language tag. Either generate separate feeds per language, or use `"zh"` as the primary.
+
+### Sitemap Missing Change Frequency
+
+`sitemap.ts` doesn't include `changeFrequency` or `priority` fields. While Google claims to mostly ignore these, other search engines (like Bing) still reference them.
+
+### Dangerous robots.ts Fallback
+
+Both `robots.ts` and `sitemap.ts` fall back to `https://example.com` when `NEXT_PUBLIC_SITE_URL` is not set. If you forget to configure this in production, your sitemap and robots.txt will point to the wrong domain — an SEO disaster.
+
+---
+
+## Code Quality
+
+### `!important` Overuse in CSS
+
+`globals.css` is littered with `!important`:
+
+- 20 `nth-child` animation rules (lines 90-109)
+- Code block backgrounds (lines 223, 227)
+- Shiki theme colors (lines 252-256)
+- Inline code styles (lines 317-324)
+
+The more `!important` you have, the harder maintenance gets. Consider restructuring selector specificity or using CSS Layers.
+
+### Hardcoded Color Values
+
+Code block text colors are hardcoded as `#0a0a0a` and `#f0f0f0` instead of using CSS variables. Inconsistent with the `var(--fg)` pattern used everywhere else.
+
+### Redundant Pagination Logic
+
+`blog/page.tsx` uses `Math.max(1, Math.ceil(...))` — redundant since `Math.ceil()` already returns ≥ 1 for positive numbers.
+
+### Hardcoded Data in About Page
+
+`about/page.tsx` has a SKILLS array defined inline, while projects and books are properly extracted to `data/`. Move it to `data/skills.ts` for consistency.
+
+---
+
+## i18n Issues
+
+### Hardcoded Strings Bypassing Translation
+
+Several places use hardcoded Chinese/English strings instead of `next-intl` translations:
+
+- `blog/[slug]/page.tsx` line 182 — prev/next post labels
+- `blog/page.tsx` line 85 — "全部" / "All" tag filter
+
+These should be in `messages/zh.json` and `messages/en.json`.
+
+### Fragile Type Assertion
+
+`i18n/request.ts` uses `as "zh" | "en"` for type assertion. If a new locale is added (say Japanese), this silently breaks. Derive the type from `routing.locales` instead.
+
+---
+
+## Optimization Checklist
+
+| Priority | Issue | File |
+|----------|-------|------|
+| 🔴 High | Video files too large (31.5 MB) | `public/` |
+| 🔴 High | robots/sitemap fallback to example.com | `robots.ts`, `sitemap.ts` |
+| 🔴 High | Lightbox has no focus management | `Lightbox.tsx` |
+| 🟡 Med | Excessive `!important` in CSS | `globals.css` |
+| 🟡 Med | Hardcoded colors not using variables | `globals.css` |
+| 🟡 Med | OG image params unsanitized | `app/og/route.tsx` |
+| 🟡 Med | MDX parse errors silenced | `lib/posts.ts` |
+| 🟡 Med | Some strings bypass i18n | `blog/page.tsx` etc. |
+| 🟡 Med | Invalid RSS language tag | `feed.xml/route.ts` |
+| 🟡 Med | Metadata description not locale-aware | `layout.tsx` |
+| 🟢 Low | Replace timers with MutationObserver | `CodeCopyButton.tsx` |
+| 🟢 Low | Theme switch video flash | `ThemedVideo.tsx` |
+| 🟢 Low | Redundant pagination logic | `blog/page.tsx` |
+| 🟢 Low | SKILLS data not extracted | `about/page.tsx` |
+| 🟢 Low | Fragile type assertion | `i18n/request.ts` |
+
+---
+
+## Takeaway
+
+Overall, the project is well-structured. The Next.js App Router + next-intl combo is solid, and the dark mode and animation systems are nicely done. The main optimization opportunities fall into three buckets:
+
+1. **Performance**: Video compression is the single biggest win
+2. **Robustness**: Error handling and environment variable validation need attention
+3. **Consistency**: CSS variables, i18n translations, and data file organization should follow a unified pattern
+
+None of these are urgent, but fixing them incrementally will make the project significantly more maintainable. Next step: tackle them by priority.
