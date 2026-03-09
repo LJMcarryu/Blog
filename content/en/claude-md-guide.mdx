@@ -1,0 +1,443 @@
+---
+title: "The Complete Guide to CLAUDE.md: Make AI Truly Understand Your Project"
+date: "2026-03-09"
+description: A deep dive into CLAUDE.md — what it is, how the configuration hierarchy works, writing tips, and two complete real-world examples for a Next.js blog and a Flutter app.
+tags: ["Claude Code", "AI", "Developer Tools", "Tutorial"]
+---
+
+## Introduction
+
+In my [previous advanced guide](/en/blog/claude-code-advanced-guide), I briefly mentioned CLAUDE.md as Claude Code's "first efficiency lever." But many readers still weren't sure how to actually write one — what to include, how much detail, how to organize it.
+
+This post is dedicated to covering CLAUDE.md thoroughly.
+
+---
+
+## What is CLAUDE.md
+
+In one sentence: **CLAUDE.md is a project instruction manual you write for Claude Code.**
+
+Every time Claude Code starts, it automatically reads CLAUDE.md and injects it into the system prompt. This means you don't need to repeat "I'm using Next.js 16" or "commit messages in English" every conversation — write it once, it works forever.
+
+Think of it as:
+- An onboarding document for AI
+- Your project's "constitution"
+- An executable coding standard
+
+**How it differs from README:** README is for humans, CLAUDE.md is for AI. README can be beautifully detailed; CLAUDE.md should be precise and actionable.
+
+---
+
+## Configuration Hierarchy
+
+CLAUDE.md has three levels, and Claude Code loads and merges all of them:
+
+```
+~/.claude/CLAUDE.md              → Global (applies to all projects)
+project-root/CLAUDE.md           → Project-level (committed to Git, shared with team)
+subdirectory/CLAUDE.md           → Directory-level (module-specific rules)
+```
+
+### Global CLAUDE.md
+
+For personal preferences that apply across all projects:
+
+```markdown
+## General Preferences
+- Respond in English
+- Git commit messages: type: description format
+- Prefer TypeScript
+- Code comments in English
+- Don't auto-commit, wait for my confirmation
+```
+
+Path: `~/.claude/CLAUDE.md`
+
+### Project-level CLAUDE.md
+
+For your project's tech stack, architecture, and conventions. This is the most important level — commit it to Git for team sharing:
+
+```markdown
+# My Blog Project
+
+## Tech Stack
+- Next.js 16 (App Router) + TypeScript
+- Tailwind CSS v4
+- next-intl (zh/en bilingual)
+
+## Common Commands
+- npm run dev — Start dev server
+- npm run build — Production build
+- npm test — Run tests
+```
+
+Path: `CLAUDE.md` in project root
+
+### Directory-level CLAUDE.md
+
+Especially useful in monorepos or large projects. For example, component-specific conventions:
+
+```markdown
+# components/
+
+## Component Conventions
+- One component per file, PascalCase naming
+- Must export Props type
+- Client components must have 'use client' directive
+- Prefer server components
+```
+
+Path: `components/CLAUDE.md`
+
+### Priority
+
+When configurations conflict, **more specific levels take priority**:
+
+```
+Directory-level > Project-level > Global
+```
+
+---
+
+## What to Write (and What Not to)
+
+### What to Include
+
+Core principle: **Only write what Claude cannot infer from the code itself.**
+
+| Include | Why |
+|---------|-----|
+| Tech stack and versions | Claude may not accurately detect your versions |
+| Build/test/deploy commands | Every project is different |
+| Code style conventions | Only rules that differ from defaults |
+| Architectural decisions and boundaries | "Don't modify middleware.ts" |
+| Domain-specific terminology | Business concepts |
+| File structure notes | Especially non-standard directory layouts |
+| Prohibited actions | Clear red lines |
+
+### What NOT to Include
+
+| Don't Include | Why |
+|---------------|-----|
+| Info Claude can read from code | Wastes tokens |
+| Copy of README content | Redundant |
+| Detailed API documentation | Too long, dilutes key points |
+| Obvious rules | "Use meaningful variable names" — goes without saying |
+
+---
+
+## Writing Tips
+
+### Be Specific and Actionable
+
+Bad:
+```markdown
+Write good code, pay attention to quality
+```
+
+Good:
+```markdown
+- Functions must not exceed 30 lines
+- Component Props must have TypeScript interfaces
+- All API calls must have error handling
+```
+
+### Use Imperative Mood
+
+CLAUDE.md is instructions, not descriptions. Use "do X" not "we usually do X":
+
+```markdown
+# ✗ Bad
+Our project typically uses ESM module format
+
+# ✓ Good
+Use ESM modules. Do not use CommonJS.
+```
+
+### Clear Sections
+
+Use Markdown headings to organize, with the most important info first:
+
+```markdown
+## Tech Stack        ← Seen first
+## Common Commands   ← Frequently used
+## Code Standards    ← Daily constraints
+## Architecture      ← Reference when needed
+## Prohibited        ← Red lines
+```
+
+### Keep It Concise
+
+CLAUDE.md consumes context window space. Too long and it dilutes important information. Rule of thumb: **keep it under 100-200 lines.**
+
+If you need more, split into subdirectory CLAUDE.md files — Claude only loads them when working in that directory.
+
+### Iterate Continuously
+
+CLAUDE.md isn't write-once-and-forget. Treat it like code:
+
+- Claude keeps making the same mistake? Add a rule
+- A rule never takes effect? Remove it
+- Tech stack upgraded? Update accordingly
+- Review CLAUDE.md changes in code review too
+
+---
+
+## CLAUDE.md vs settings.json
+
+These two files serve completely different purposes:
+
+| | CLAUDE.md | .claude/settings.json |
+|---|-----------|----------------------|
+| Format | Markdown | JSON |
+| Purpose | Project instructions and context | Tool configuration and permissions |
+| Content | Tech stack, conventions, architecture | Hooks, MCP, permission modes |
+| Sharing | Committed to Git, team-shared | Usually gitignored |
+| Analogy | Employee handbook | System settings |
+
+Simply put: **CLAUDE.md tells Claude "what to do," settings.json tells Claude "how to do it."**
+
+---
+
+## Example 1: Next.js Blog Project
+
+Here's the CLAUDE.md I actually use for this blog (condensed version):
+
+```markdown
+# Personal Blog
+
+## Tech Stack
+- Next.js 16 (App Router) + TypeScript strict mode
+- Tailwind CSS v4 (no tailwind.config.js, uses CSS @import "tailwindcss")
+- next-intl for i18n, supports zh/en, default zh
+- MDX content rendered via next-mdx-remote/rsc
+- rehype-pretty-code for syntax highlighting (dual theme: github-light / github-dark-dimmed)
+
+## Common Commands
+- npm run dev — Start dev server (don't run this for me)
+- npm run build — Production build
+- npm test — Run vitest tests
+- npx eslint . — Lint check
+
+## Project Structure
+- app/[locale]/ — Locale-based routing
+- content/zh/*.mdx, content/en/*.mdx — Blog content (bilingual)
+- components/ — React components
+- lib/posts.ts — Blog post loading logic
+- i18n/routing.ts — i18n routing config, exports Locale type
+- messages/zh.json, en.json — UI translation strings
+
+## Code Standards
+- Components: PascalCase. Utilities: camelCase
+- Prefer Server Components, only add 'use client' when interaction is needed
+- Locale params must use Locale type (from i18n/routing.ts), not string
+- CSS variables defined in globals.css, never hardcode color values
+- Dark mode is class-based (.dark), switched via CSS variables
+
+## Internationalization
+- All user-visible text must use next-intl's useTranslations
+- Translation keys maintained in both messages/zh.json and messages/en.json
+- When adding new UI text, update both language files
+
+## Git Commits
+- Commit messages in English, format: type: description
+- Types: feat, fix, refactor, chore, docs, test, style
+- Don't auto-push, wait for my confirmation
+
+## Prohibited
+- Don't modify middleware.ts (next-intl middleware config)
+- Don't use useState/useEffect in Server Components
+- Don't introduce new CSS frameworks or UI libraries
+- Don't delete or modify existing CSS variables
+```
+
+### Why It's Written This Way
+
+1. **Tech stack includes version numbers** — Tailwind CSS v4 configures completely differently from v3; without the version, Claude might use the wrong approach
+2. **Tailwind v4 specifics called out** — No tailwind.config.js, uses CSS @import — this is unique to v4
+3. **Locale type constraint** — Without this rule, Claude defaults to `string` type, losing type safety
+4. **Prohibitions are specific** — Not "be careful not to break things," but exactly which files are off-limits
+
+---
+
+## Example 2: Flutter Project
+
+Suppose you're building a Flutter e-commerce app. Here's how the CLAUDE.md could look:
+
+```markdown
+# ShopEasy — Flutter E-commerce App
+
+## Tech Stack
+- Flutter 3.27 + Dart 3.6
+- State management: Riverpod 2.x (don't use Provider or Bloc)
+- Routing: go_router 14.x (declarative routing)
+- Networking: dio 5.x + retrofit
+- Local storage: shared_preferences (lightweight) + drift (database)
+- i18n: flutter_localizations + intl
+
+## Common Commands
+- flutter run — Run the app (don't execute this for me)
+- flutter test — Run unit tests
+- flutter analyze — Static analysis
+- dart run build_runner build --delete-conflicting-outputs — Code generation
+- flutter gen-l10n — Generate i18n files
+
+## Project Structure (Feature-First)
+- lib/
+  - core/ — Shared utilities, theme, constants, network layer
+    - theme/ — AppTheme, color and font definitions
+    - network/ — Dio config, interceptors, API base class
+    - constants/ — API endpoints, storage keys
+  - features/ — Organized by feature module
+    - auth/ — Login and registration
+      - data/ — Repository implementations, data sources, DTOs
+      - domain/ — Entities, Repository interfaces
+      - presentation/ — Pages, Widgets, Controllers
+    - home/ — Home screen
+    - cart/ — Shopping cart
+    - product/ — Product details
+    - profile/ — User profile
+  - shared/ — Cross-module shared Widgets and utilities
+  - app.dart — MaterialApp.router entry point
+  - main.dart — Initialization and bootstrap
+
+## Architecture Rules
+- Strictly follow Clean Architecture: data → domain → presentation
+- Domain layer must not depend on any external packages (pure Dart only)
+- Repository pattern: domain defines interfaces, data layer implements
+- State management exclusively via Riverpod:
+  - Page state: AsyncNotifierProvider
+  - Simple state: StateProvider
+  - Dependency injection: Provider
+- All API returns wrapped in Result<T> type (lib/core/network/result.dart)
+
+## Code Standards
+- File names: snake_case. Class names: PascalCase
+- Widget granularity: build methods over 80 lines must be split into sub-Widgets
+- Private methods prefixed with _
+- All public APIs must have dartdoc comments
+- Use const constructors to optimize Widget rebuilds
+- Never call APIs directly in Widgets — always go through Repository
+
+## Testing
+- Unit tests cover all Repositories and Notifiers
+- Widget tests cover key interaction flows
+- Mocking: use mocktail (not mockito)
+- Test files mirror source files, placed in test/ directory
+
+## Prohibited
+- Don't use setState (use Riverpod exclusively)
+- Don't import data layer directly in presentation layer
+- Don't hardcode colors — use Theme.of(context)
+- Don't use print for debugging — use logger package
+- Don't modify core/network/dio_client.dart interceptor chain
+```
+
+### Why It's Written This Way
+
+1. **State management explicitly chosen** — Flutter has too many state management options; without this, Claude might use setState or Provider
+2. **Feature-First structure detailed** — This isn't Flutter's default structure; Claude needs to know where files go
+3. **Clean Architecture boundaries** — "Domain layer must not depend on external packages" — Claude easily violates this without explicit instruction
+4. **Specific package names and versions** — "mocktail not mockito" — these details determine whether generated code actually runs
+5. **Widget split rule quantified** — "Over 80 lines must split" is far more useful than "keep Widgets simple"
+
+---
+
+## Advanced Tips
+
+### Use /init to Auto-Generate
+
+If you don't want to start from scratch, Claude Code offers the `/init` command:
+
+```bash
+claude /init
+```
+
+Claude will analyze your project structure, package.json, config files, etc., and generate a CLAUDE.md draft. Edit from there — much more efficient than starting blank.
+
+### Team Collaboration
+
+Commit your project-level CLAUDE.md to Git:
+
+```bash
+git add CLAUDE.md
+git commit -m "chore: add CLAUDE.md for AI-assisted development"
+```
+
+This way everyone on the team loads the same conventions when using Claude Code, ensuring consistent AI-generated code style.
+
+Review CLAUDE.md changes in code review too — it's as important as your ESLint config.
+
+### Monorepo Strategy
+
+In monorepos, leverage directory-level CLAUDE.md files:
+
+```
+monorepo/
+  CLAUDE.md                    ← Root: shared conventions, Git rules
+  packages/
+    frontend/
+      CLAUDE.md                ← Frontend: React conventions, component rules
+    backend/
+      CLAUDE.md                ← Backend: API conventions, database rules
+    shared/
+      CLAUDE.md                ← Shared: type definitions, utility conventions
+```
+
+When Claude works in a subdirectory, it loads both the root and that subdirectory's CLAUDE.md.
+
+### Pair with settings.json
+
+CLAUDE.md handles "what to do," settings.json handles "how to do it." They work best together:
+
+```
+CLAUDE.md          → Format with Prettier after saving
+settings.json      → Configure PostToolUse Hook to auto-run Prettier
+```
+
+```
+CLAUDE.md          → Must pass ESLint before committing
+settings.json      → Configure PreToolUse Hook to block non-compliant commits
+```
+
+---
+
+## FAQ
+
+**Q: What happens if CLAUDE.md is too long?**
+A: It consumes context window space, squeezing out room for actual conversation. Keep it under 200 lines; split detailed content into subdirectories.
+
+**Q: How does CLAUDE.md relate to Cursor Rules / Copilot Instructions?**
+A: Same concept — project-level instructions for AI. But different formats and loading mechanisms; they're not interchangeable. If you use multiple AI tools, you may need to maintain similar files for each.
+
+**Q: I wrote CLAUDE.md but Claude doesn't seem to follow it?**
+A: A few possible reasons:
+1. Rules too vague — "write good code" is less effective than "functions under 30 lines"
+2. Contradicting rules — check for conflicting instructions
+3. Context too long — CLAUDE.md got compressed; put critical rules at the top
+4. Conversation overrides — explicit instructions in chat take priority over CLAUDE.md
+
+**Q: Should I add CLAUDE.md to .gitignore?**
+A: It depends. Project-level ones should be committed (team sharing). For personal preferences or sensitive paths, use `~/.claude/CLAUDE.md` as your global config instead.
+
+---
+
+## Conclusion
+
+CLAUDE.md is essentially **a work manual for AI**. Write it well, and your collaboration with Claude Code improves dramatically.
+
+Three principles to remember:
+1. **Only include what Claude can't infer from code**
+2. **Be specific, actionable, and constrained**
+3. **Iterate continuously — treat it like code**
+
+Spending 30 minutes on a good CLAUDE.md saves you time in every future conversation. Probably the highest-ROI 30 minutes you'll spend.
+
+---
+
+## Further Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-advanced-guide) — My Claude Code advanced tips roundup
+- [Claude Code Docs — Memory](https://docs.anthropic.com/en/docs/claude-code/memory) — Official CLAUDE.md documentation
+- [How to Write the Perfect CLAUDE.md](https://paul-schick.com/posts/how-to-write-claude-md/) — A detailed writing guide
+- [CLAUDE.md Best Practices](https://lazy.dev/claude-md-best-practices) — Community-curated best practices
