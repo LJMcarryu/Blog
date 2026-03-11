@@ -73,7 +73,7 @@ export default async function LocaleLayout({
   };
 
   return (
-    <html lang={locale} className={`${inter.variable} ${caveat.variable}`} suppressHydrationWarning>
+    <html lang={locale} className={`dark ${inter.variable} ${caveat.variable}`} suppressHydrationWarning>
       <head>
         <script
           type="application/ld+json"
@@ -85,7 +85,7 @@ export default async function LocaleLayout({
         {/* Inline script: apply .dark class before first paint to prevent flash */}
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var d=localStorage.getItem('blog-color-scheme')||'dark';var sys=window.matchMedia('(prefers-color-scheme:dark)').matches;if(d==='dark'||(d==='auto'&&sys))document.documentElement.classList.add('dark')}catch(e){if(window.matchMedia('(prefers-color-scheme:dark)').matches)document.documentElement.classList.add('dark')}})()`,
+            __html: `(function(){try{var d=localStorage.getItem('blog-color-scheme');if(d==='light')document.documentElement.classList.remove('dark')}catch(e){}})()`,
           }}
         />
       </head>
