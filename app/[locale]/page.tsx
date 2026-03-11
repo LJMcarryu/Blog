@@ -12,7 +12,9 @@ export default async function HomePage({
 }) {
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "home" });
-  const recentPosts = getPostsByLocale(locale as Locale).slice(0, 5);
+  const featuredPosts = getPostsByLocale(locale as Locale).filter(
+    (post) => post.tags?.includes("AI")
+  );
 
   return (
     <div className="relative min-h-screen w-screen -ml-[calc((100vw-100%)/2)] overflow-hidden">
@@ -55,13 +57,13 @@ export default async function HomePage({
               </div>
             </div>
 
-            {/* Recent posts */}
-            {recentPosts.length > 0 && (
+            {/* Featured posts */}
+            {featuredPosts.length > 0 && (
               <div>
                 <hr className="border-black/15 dark:border-white/20" />
                 <h2 className="mb-5">{t("latestPosts")}</h2>
                 <div className="not-prose flex flex-col gap-3">
-                  {recentPosts.map((post) => (
+                  {featuredPosts.map((post) => (
                     <Link
                       key={post.slug}
                       href={`/blog/${post.slug}`}
