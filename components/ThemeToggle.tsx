@@ -11,11 +11,7 @@ export default function ThemeToggle() {
     function applyTheme() {
       try {
         const saved = localStorage.getItem("blog-color-scheme");
-        const prefersDark = window.matchMedia(
-          "(prefers-color-scheme:dark)"
-        ).matches;
-        const shouldBeDark =
-          saved === "dark" || (saved !== "light" && prefersDark);
+        const shouldBeDark = saved !== "light";
         const isDark = document.documentElement.classList.contains("dark");
         if (shouldBeDark !== isDark) {
           document.documentElement.classList.toggle("dark", shouldBeDark);
