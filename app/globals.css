@@ -44,9 +44,9 @@
 html {
   background-color: var(--c-bg);
   overflow-y: scroll;
-  color-scheme: light;
+  color-scheme: dark;
 }
-html.dark { color-scheme: dark; }
+html:not(.dark) { color-scheme: light; }
 
 body {
   color: var(--fg);
