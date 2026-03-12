@@ -1,0 +1,895 @@
+---
+title: "Claude Code 测试工作流完全指南：从 TDD 到 CI/CD 的 AI 测试之道"
+date: "2026-03-20"
+description: 系统讲解 Claude Code 的测试工作流能力，涵盖 TDD 驱动开发、Mock 策略、Coverage 分析、失败测试调试、集成测试与 E2E、CLAUDE.md 测试规范、CI/CD 集成，附带完整 TDD 实战流程。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+在这个系列里，测试相关的内容其实一直在出现——[进阶指南](/zh/blog/claude-code-advanced-guide)里提过 vitest 基础，[Slash Commands 指南](/zh/blog/claude-code-skills-guide)里写了 `/test` 命令模板，[Git 指南](/zh/blog/claude-code-git-guide)里把测试作为 PR 流程的一环。但从来没有一篇文章系统地讲过：**怎么用 Claude Code 建立一套完整的测试工作流**。
+
+TDD 怎么跑？Mock 什么时候该用？Coverage 报告怎么分析？失败的测试怎么调试？这些问题散落在各处，今天把它们收拢到一起。
+
+## 一、为什么测试工作流很重要
+
+### 手动写测试 vs Claude Code 写测试
+
+| 维度 | 手动写测试 | Claude Code 写测试 |
+|------|-----------|-------------------|
+| 速度 | 一个函数 10-30 分钟 | 一个函数 1-2 分钟 |
+| 覆盖面 | 容易遗漏边界情况 | 系统性枚举边界 |
+| 一致性 | 风格因人而异 | 遵循 CLAUDE.md 规范 |
+| Mock 质量 | 经验依赖 | 自动识别外部依赖 |
+| 维护成本 | 改代码后手动改测试 | "更新这个函数的测试" |
+| 学习曲线 | 需要熟悉测试框架 | 自然语言描述即可 |
+
+### 测试金字塔
+
+```
+        /  E2E  \          ← 少量，验证关键用户流程
+       /----------\
+      / 集成测试   \       ← 适量，验证模块间协作
+     /--------------\
+    /   单元测试     \     ← 大量，验证单个函数/组件
+   /------------------\
+```
+
+Claude Code 在每一层都能帮你：
+- **单元测试**：最擅长，给一个函数就能生成完整测试
+- **集成测试**：需要你描述模块间的交互关系
+- **E2E 测试**：需要你描述用户操作流程，Claude Code 生成 Playwright 脚本
+
+## 二、TDD 驱动开发
+
+### Red-Green-Refactor 循环
+
+TDD 的核心是三步循环：
+
+```
+Red（写失败的测试）→ Green（写最少的代码让测试通过）→ Refactor（重构，保持测试通过）
+```
+
+在 Claude Code 里，这个循环变成了对话：
+
+```bash
+# Step 1: Red — 让 Claude Code 先写测试
+> 我要实现一个 parseMarkdown 函数，把 markdown 字符串转成 HTML。
+> 先不要写实现，只写测试。包含这些场景：
+> - 标题（h1-h3）
+> - 粗体和斜体
+> - 代码块
+> - 空字符串输入
+> - 纯文本（无 markdown 语法）
+
+# Step 2: Green — 让 Claude Code 写实现
+> 现在写 parseMarkdown 的实现，让所有测试通过。用最简单的方式。
+
+# Step 3: Refactor — 让 Claude Code 重构
+> 测试都通过了。现在重构 parseMarkdown：
+> - 把正则提取为常量
+> - 每种语法的解析拆成独立函数
+> - 跑测试确认没有破坏
+```
+
+### 完整 TDD 会话示例
+
+以实现一个 `parseMarkdown` 工具函数为例：
+
+**Step 1：Red — 写测试**
+
+```typescript
+// lib/__tests__/parse-markdown.test.ts
+import { describe, it, expect } from 'vitest'
+import { parseMarkdown } from '../parse-markdown'
+
+describe('parseMarkdown', () => {
+  describe('标题', () => {
+    it('应该解析 h1', () => {
+      expect(parseMarkdown('# Hello')).toBe('<h1>Hello</h1>')
+    })
+
+    it('应该解析 h2', () => {
+      expect(parseMarkdown('## World')).toBe('<h2>World</h2>')
+    })
+
+    it('应该解析 h3', () => {
+      expect(parseMarkdown('### Test')).toBe('<h3>Test</h3>')
+    })
+  })
+
+  describe('行内样式', () => {
+    it('应该解析粗体', () => {
+      expect(parseMarkdown('**bold**')).toBe('<p><strong>bold</strong></p>')
+    })
+
+    it('应该解析斜体', () => {
+      expect(parseMarkdown('*italic*')).toBe('<p><em>italic</em></p>')
+    })
+  })
+
+  describe('代码块', () => {
+    it('应该解析行内代码', () => {
+      expect(parseMarkdown('`code`')).toBe('<p><code>code</code></p>')
+    })
+  })
+
+  describe('边界情况', () => {
+    it('空字符串返回空字符串', () => {
+      expect(parseMarkdown('')).toBe('')
+    })
+
+    it('纯文本包裹在 p 标签中', () => {
+      expect(parseMarkdown('hello world')).toBe('<p>hello world</p>')
+    })
+  })
+})
+```
+
+此时运行测试，全部失败（Red）。
+
+**Step 2：Green — 写实现**
+
+```typescript
+// lib/parse-markdown.ts
+export function parseMarkdown(input: string): string {
+  if (!input) return ''
+
+  const lines = input.split('\n')
+  const result: string[] = []
+
+  for (const line of lines) {
+    // 标题
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      result.push(`<h${level}>${headingMatch[2]}</h${level}>`)
+      continue
+    }
+
+    // 行内样式
+    let processed = line
+    processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    processed = processed.replace(/\*(.+?)\*/g, '<em>$1</em>')
+    processed = processed.replace(/`(.+?)`/g, '<code>$1</code>')
+
+    if (processed) {
+      result.push(`<p>${processed}</p>`)
+    }
+  }
+
+  return result.join('\n')
+}
+```
+
+运行测试，全部通过（Green）。
+
+**Step 3：Refactor — 重构**
+
+```bash
+> 重构 parseMarkdown：把正则提取为常量，每种语法拆成独立函数。跑测试确认。
+```
+
+### TDD Prompt 模板
+
+把这个流程固化成 Slash Command：
+
+```markdown
+<!-- .claude/commands/tdd.md -->
+用 TDD 方式实现 $ARGUMENTS：
+
+1. 先写测试文件（只写测试，不写实现）
+2. 确认测试全部失败
+3. 写最小实现让测试通过
+4. 重构代码，保持测试通过
+5. 检查是否有遗漏的边界情况，补充测试
+
+测试框架：vitest
+测试文件放在同目录的 __tests__ 下
+每步完成后告诉我当前状态（Red/Green/Refactor）
+```
+
+使用：`/tdd "一个计算阅读时间的函数 estimateReadingTime"`
+
+## 三、让 Claude Code 写测试
+
+### 为现有代码补测试
+
+在[自定义 Slash Commands 指南](/zh/blog/claude-code-skills-guide)里，我们已经写过 `/test` 命令模板。这里不重复那个模板，而是讲几个进阶技巧。
+
+**技巧 1：先让 Claude Code 分析再写测试**
+
+```bash
+# 不好 — 直接让它写
+> 给 src/lib/posts.ts 写测试
+
+# 好 — 先分析
+> 阅读 src/lib/posts.ts，列出所有公开函数和它们的：
+> 1. 参数类型和返回类型
+> 2. 外部依赖（文件系统、网络、数据库）
+> 3. 可能的边界情况
+> 然后再写测试
+```
+
+**技巧 2：按模块批量生成**
+
+```bash
+> 给 src/lib/ 下所有工具函数写测试。按文件逐个处理：
+> 1. 先列出 src/lib/ 下所有 .ts 文件
+> 2. 跳过已有测试的文件（检查 __tests__ 目录）
+> 3. 逐个生成测试
+> 4. 每个文件生成后跑一次测试确认通过
+```
+
+**技巧 3：测试质量评估**
+
+"能跑通"不等于"测试写得好"。让 Claude Code 自我审查：
+
+```bash
+> 审查 src/lib/__tests__/posts.test.ts 的测试质量：
+> 1. 是否只测试了 happy path？
+> 2. 有没有测试错误处理路径？
+> 3. 有没有测试边界值（空数组、null、超长字符串）？
+> 4. 断言是否足够具体（不只是 toBeTruthy）？
+> 5. 测试之间是否有隐式依赖（共享状态）？
+> 列出问题并修复
+```
+
+### 测试质量检查清单
+
+| 检查项 | 好的测试 | 差的测试 |
+|--------|---------|---------|
+| 断言 | `toBe('expected')` | `toBeTruthy()` |
+| 命名 | "空数组时返回 0" | "test case 1" |
+| 独立性 | 每个测试独立运行 | 依赖前一个测试的状态 |
+| 边界 | 测试空值、极值、异常 | 只测试正常输入 |
+| Mock | 只 mock 外部依赖 | mock 被测函数内部逻辑 |
+| 可读性 | Arrange-Act-Assert 结构 | 逻辑混在一起 |
+
+## 四、Mock 策略
+
+### 什么时候该 Mock
+
+| 场景 | 该 Mock | 不该 Mock |
+|------|---------|----------|
+| 外部 API 调用 | ✅ 网络不稳定，速度慢 | |
+| 文件系统读写 | ✅ 避免真实文件操作 | |
+| 数据库查询 | ✅ 避免依赖数据库状态 | |
+| 当前时间 | ✅ 确保测试可重复 | |
+| 随机数 | ✅ 确保测试可预测 | |
+| 纯工具函数 | | ❌ 直接调用更可靠 |
+| 被测模块内部函数 | | ❌ 测试实现细节 |
+| 简单数据转换 | | ❌ 没有副作用 |
+
+### 常见 Mock 场景实战
+
+**场景 1：Mock API 调用**
+
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { fetchUserProfile } from '../api'
+
+// Mock 整个 fetch
+vi.stubGlobal('fetch', vi.fn())
+
+describe('fetchUserProfile', () => {
+  it('成功获取用户信息', async () => {
+    const mockUser = { id: 1, name: 'Alice' }
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(mockUser), { status: 200 })
+    )
+
+    const result = await fetchUserProfile(1)
+    expect(result).toEqual(mockUser)
+    expect(fetch).toHaveBeenCalledWith('/api/users/1')
+  })
+
+  it('处理 404 错误', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(null, { status: 404 })
+    )
+
+    await expect(fetchUserProfile(999)).rejects.toThrow('User not found')
+  })
+})
+```
+
+**场景 2：Mock 文件系统**
+
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import fs from 'fs'
+import { getPostSlugs } from '../posts'
+
+vi.mock('fs', () => ({
+  default: {
+    readdirSync: vi.fn(),
+    readFileSync: vi.fn(),
+  },
+}))
+
+describe('getPostSlugs', () => {
+  it('返回所有 mdx 文件的 slug', () => {
+    vi.mocked(fs.readdirSync).mockReturnValue(
+      ['hello.mdx', 'world.mdx', 'readme.txt'] as any
+    )
+
+    const slugs = getPostSlugs('content/zh')
+    expect(slugs).toEqual(['hello', 'world'])
+  })
+
+  it('目录为空时返回空数组', () => {
+    vi.mocked(fs.readdirSync).mockReturnValue([] as any)
+
+    const slugs = getPostSlugs('content/zh')
+    expect(slugs).toEqual([])
+  })
+})
+```
+
+**场景 3：Mock 时间**
+
+```typescript
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { isNewPost } from '../utils'
+
+describe('isNewPost', () => {
+  beforeEach(() => {
+    // 固定当前时间为 2026-03-20
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-20'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('7 天内的文章标记为新', () => {
+    expect(isNewPost('2026-03-15')).toBe(true)
+  })
+
+  it('超过 7 天的文章不标记', () => {
+    expect(isNewPost('2026-03-01')).toBe(false)
+  })
+})
+```
+
+**场景 4：Mock 随机数**
+
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { getRandomPost } from '../posts'
+
+describe('getRandomPost', () => {
+  it('根据随机数返回对应文章', () => {
+    const posts = [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }]
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+
+    const result = getRandomPost(posts)
+    // Math.floor(0.5 * 3) = 1，返回第二篇
+    expect(result.slug).toBe('b')
+
+    vi.restoreAllMocks()
+  })
+})
+```
+
+### 让 Claude Code 决定 Mock 策略
+
+```bash
+> 阅读 src/services/notification.ts，分析它的依赖关系，
+> 告诉我写测试时哪些需要 mock、哪些不需要，以及为什么。
+> 然后按你的分析写测试。
+```
+
+## 五、Coverage 分析
+
+### 配置 Coverage 工具
+
+在 `vitest.config.ts` 中配置：
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: 'v8', // 或 'istanbul'
+      reporter: ['text', 'html', 'json-summary'],
+      include: ['src/lib/**', 'src/utils/**'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.d.ts',
+        'src/**/types.ts',
+      ],
+      thresholds: {
+        statements: 80,
+        branches: 75,
+        functions: 80,
+        lines: 80,
+      },
+    },
+  },
+})
+```
+
+运行：
+
+```bash
+npx vitest run --coverage
+```
+
+### 让 Claude Code 分析 Coverage 报告
+
+```bash
+> 跑 npx vitest run --coverage，分析 coverage 报告：
+> 1. 哪些文件覆盖率低于 80%？
+> 2. 具体是哪些分支/函数没有被覆盖？
+> 3. 按优先级排序，先补最关键的
+> 4. 生成补充测试
+```
+
+### Coverage 目标的合理设定
+
+| 代码类型 | 建议覆盖率 | 原因 |
+|---------|-----------|------|
+| 核心业务逻辑 | 90%+ | 出错影响大 |
+| 工具函数 | 85%+ | 被广泛复用 |
+| API 路由处理 | 80%+ | 涉及数据流转 |
+| UI 组件 | 70%+ | 视觉测试更有效 |
+| 配置/常量 | 不需要 | 没有逻辑 |
+| 类型定义 | 不需要 | TypeScript 已保证 |
+
+> **注意**：100% 覆盖率不是目标。追求 100% 会导致大量低价值测试，维护成本远超收益。关注关键路径的覆盖率比追求数字更重要。
+
+## 六、调试失败测试
+
+### 常见失败模式
+
+| 失败模式 | 典型报错 | 根因 | 修复方向 |
+|---------|---------|------|---------|
+| 异步未等待 | `received undefined` | 忘记 `await` | 检查 async/await 链 |
+| Mock 泄漏 | 测试单独通过，一起跑失败 | mock 没清理 | `afterEach` 里 `vi.restoreAllMocks()` |
+| 快照过期 | `Snapshot mismatch` | 代码改了但快照没更新 | `vitest -u` 更新快照 |
+| 环境差异 | CI 通过本地失败 | 时区/路径/环境变量 | 用 `vi.useFakeTimers()` 固定环境 |
+| 导入错误 | `Cannot find module` | 路径别名未配置 | 检查 `vitest.config.ts` 的 `resolve.alias` |
+| 类型不匹配 | `toEqual` 失败 | Date 对象 vs 字符串 | 统一类型后再比较 |
+
+### 让 Claude Code 诊断失败
+
+```bash
+> 跑 npx vitest run，有 3 个测试失败了。
+> 分析失败原因，按以下步骤排查：
+> 1. 先看报错信息，判断是哪种失败模式
+> 2. 检查测试代码是否有问题（mock 没清理、异步没等待）
+> 3. 检查被测代码是否有 bug
+> 4. 修复问题，重新跑测试确认
+```
+
+### 实战排错流程
+
+```bash
+# 场景：测试单独跑通过，一起跑失败
+> tests/lib/posts.test.ts 单独跑通过，但跑全部测试时失败。
+> 这通常是 mock 泄漏问题。帮我排查：
+> 1. 检查所有测试文件的 beforeEach/afterEach
+> 2. 找出哪个测试文件的 mock 影响了 posts.test.ts
+> 3. 添加正确的清理逻辑
+```
+
+```bash
+# 场景：CI 通过但本地失败
+> 这个测试在 GitHub Actions 上通过但本地失败。
+> 可能的原因：
+> - 时区差异（CI 是 UTC）
+> - 文件路径分隔符（CI 是 Linux）
+> - 环境变量缺失
+> 帮我找出具体原因并修复
+```
+
+## 七、集成测试与 E2E 测试
+
+### 集成测试策略
+
+单元测试验证单个函数，集成测试验证模块间的协作。
+
+**API 路由测试示例**：
+
+```typescript
+// app/api/posts/__tests__/route.test.ts
+import { describe, it, expect } from 'vitest'
+import { GET } from '../route'
+import { NextRequest } from 'next/server'
+
+describe('GET /api/posts', () => {
+  it('返回文章列表', async () => {
+    const request = new NextRequest('http://localhost/api/posts?locale=zh')
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(Array.isArray(data.posts)).toBe(true)
+    expect(data.posts[0]).toHaveProperty('title')
+    expect(data.posts[0]).toHaveProperty('slug')
+  })
+
+  it('无效 locale 返回 400', async () => {
+    const request = new NextRequest('http://localhost/api/posts?locale=fr')
+    const response = await GET(request)
+
+    expect(response.status).toBe(400)
+  })
+})
+```
+
+### E2E 测试简介（Playwright）
+
+```bash
+> 用 Playwright 写一个 E2E 测试：
+> 1. 打开博客首页
+> 2. 点击第一篇文章
+> 3. 验证文章标题显示正确
+> 4. 验证目录导航存在
+> 5. 滚动到底部，验证评论区加载
+```
+
+Claude Code 生成的 Playwright 测试：
+
+```typescript
+// e2e/blog-flow.spec.ts
+import { test, expect } from '@playwright/test'
+
+test('博客文章阅读流程', async ({ page }) => {
+  // 1. 打开博客首页
+  await page.goto('/zh/blog')
+  await expect(page).toHaveTitle(/博客/)
+
+  // 2. 点击第一篇文章
+  const firstPost = page.locator('article a').first()
+  const postTitle = await firstPost.textContent()
+  await firstPost.click()
+
+  // 3. 验证文章标题
+  await expect(page.locator('h1')).toHaveText(postTitle!)
+
+  // 4. 验证目录导航
+  await expect(page.locator('nav[aria-label="目录"]')).toBeVisible()
+
+  // 5. 滚动到底部，验证评论区
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await expect(page.locator('.giscus')).toBeVisible({ timeout: 10000 })
+})
+```
+
+### 单元 vs 集成 vs E2E 选择指南
+
+| 你想验证的 | 选择 | 示例 |
+|-----------|------|------|
+| 一个函数的输入输出 | 单元测试 | `parseMarkdown('# Hi')` → `<h1>Hi</h1>` |
+| 两个模块的协作 | 集成测试 | API 路由 + 数据层 |
+| 用户操作流程 | E2E 测试 | 打开页面 → 搜索 → 点击结果 |
+| 数据转换逻辑 | 单元测试 | 日期格式化、字符串处理 |
+| 中间件行为 | 集成测试 | 认证中间件 + 路由 |
+| 跨页面导航 | E2E 测试 | 首页 → 文章 → 返回 |
+
+## 八、CLAUDE.md 测试规范
+
+把测试规范写进 CLAUDE.md，让 Claude Code 每次写测试都遵循统一标准。
+
+```markdown
+# 测试规范
+
+## 框架与工具
+- 测试框架：vitest
+- 断言：vitest 内置 expect
+- Mock：vi.mock() / vi.spyOn()
+- Coverage：v8 provider
+
+## 文件组织
+- 测试文件放在被测文件同目录的 __tests__/ 下
+- 命名：[原文件名].test.ts
+- 例：src/lib/posts.ts → src/lib/__tests__/posts.test.ts
+
+## 命名规范
+- describe 用模块/函数名
+- it 用中文描述行为："应该返回空数组"
+- 不要用 "test case 1" 这种无意义命名
+
+## 结构
+- 每个测试遵循 Arrange-Act-Assert 模式
+- 相关测试用 describe 分组
+- 边界情况单独一个 describe 块
+
+## Mock 规则
+- 只 mock 外部依赖（网络、文件系统、数据库、时间）
+- 不要 mock 被测模块的内部函数
+- 每个测试后清理 mock：afterEach(() => vi.restoreAllMocks())
+- 优先用 vi.spyOn() 而不是完全替换模块
+
+## 覆盖率要求
+- 核心业务逻辑：>= 90%
+- 工具函数：>= 85%
+- API 路由：>= 80%
+- 不要求 100%，不要写无意义的凑覆盖率测试
+
+## 禁止事项
+- 不要测试实现细节（私有函数、内部状态）
+- 不要写依赖执行顺序的测试
+- 不要在测试中硬编码环境相关的值（路径、时区）
+- 不要用 snapshot 测试逻辑（snapshot 只用于 UI 结构）
+```
+
+> 关于 CLAUDE.md 的更多配置技巧，参考 [CLAUDE.md 完全指南](/zh/blog/claude-md-guide)。
+
+## 九、CI/CD 测试集成
+
+### GitHub Actions 测试工作流
+
+```yaml
+# .github/workflows/test.yml
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage
+
+      - name: Check coverage thresholds
+        run: npx vitest run --coverage --coverage.thresholds.100=false
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+```
+
+### Coverage 门禁
+
+在 `vitest.config.ts` 中设置阈值后，CI 会在覆盖率不达标时自动失败：
+
+```typescript
+// vitest.config.ts 中的 thresholds 配置
+thresholds: {
+  statements: 80,
+  branches: 75,
+  functions: 80,
+  lines: 80,
+}
+```
+
+如果某次 PR 让覆盖率降到阈值以下，CI 会报错，PR 无法合并。
+
+### 测试报告自动评论 PR
+
+配合 GitHub Actions，可以让测试结果自动评论到 PR 上：
+
+```yaml
+# .github/workflows/test.yml 追加
+      - name: Test Report
+        if: github.event_name == 'pull_request'
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: 'test-results/junit.xml'
+          reporter: jest-junit
+
+      - name: Coverage Comment
+        if: github.event_name == 'pull_request'
+        uses: MishaKav/jest-coverage-comment@main
+        with:
+          coverage-summary-path: coverage/coverage-summary.json
+          title: '测试覆盖率报告'
+```
+
+需要在 vitest 配置中添加 junit reporter：
+
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    reporters: ['default', 'junit'],
+    outputFile: {
+      junit: 'test-results/junit.xml',
+    },
+    // ... coverage 配置
+  },
+})
+```
+
+> 关于 CI/CD 与 Claude Code 的更多集成方式，参考 [Git 工作流指南](/zh/blog/claude-code-git-guide)的 CI/CD 章节。
+
+## 十、完整实战：TDD 开发"阅读时间估算"功能
+
+以 Next.js 博客添加"阅读时间估算"功能为例，走完 TDD 全流程。
+
+### Step 1：Red — 写测试
+
+```bash
+> 我要给博客添加一个 estimateReadingTime 函数。
+> 规则：
+> - 中文按 300 字/分钟计算
+> - 英文按 200 词/分钟计算
+> - 代码块不计入阅读时间
+> - 返回格式："X 分钟"
+> - 最少 1 分钟
+>
+> 先写测试，不要写实现。
+```
+
+Claude Code 生成的测试：
+
+```typescript
+// lib/__tests__/reading-time.test.ts
+import { describe, it, expect } from 'vitest'
+import { estimateReadingTime } from '../reading-time'
+
+describe('estimateReadingTime', () => {
+  describe('中文内容', () => {
+    it('300 个中文字符应该是 1 分钟', () => {
+      const content = '测'.repeat(300)
+      expect(estimateReadingTime(content, 'zh')).toBe('1 分钟')
+    })
+
+    it('900 个中文字符应该是 3 分钟', () => {
+      const content = '测'.repeat(900)
+      expect(estimateReadingTime(content, 'zh')).toBe('3 分钟')
+    })
+  })
+
+  describe('英文内容', () => {
+    it('200 个英文单词应该是 1 分钟', () => {
+      const content = Array(200).fill('word').join(' ')
+      expect(estimateReadingTime(content, 'en')).toBe('1 min')
+    })
+
+    it('600 个英文单词应该是 3 分钟', () => {
+      const content = Array(600).fill('word').join(' ')
+      expect(estimateReadingTime(content, 'en')).toBe('3 min')
+    })
+  })
+
+  describe('代码块过滤', () => {
+    it('代码块内容不计入阅读时间', () => {
+      const content = '测'.repeat(300) + '\n```js\nconsole.log("hello")\n```\n'
+      expect(estimateReadingTime(content, 'zh')).toBe('1 分钟')
+    })
+  })
+
+  describe('边界情况', () => {
+    it('空内容返回最少 1 分钟', () => {
+      expect(estimateReadingTime('', 'zh')).toBe('1 分钟')
+    })
+
+    it('极短内容返回最少 1 分钟', () => {
+      expect(estimateReadingTime('你好', 'zh')).toBe('1 分钟')
+    })
+  })
+})
+```
+
+运行测试：全部失败 ✅（Red 阶段完成）
+
+### Step 2：Green — 写实现
+
+```bash
+> 测试写好了，现在写 estimateReadingTime 的实现，让所有测试通过。
+```
+
+```typescript
+// lib/reading-time.ts
+import type { Locale } from '@/i18n/routing'
+
+const READING_SPEED = {
+  zh: 300, // 字/分钟
+  en: 200, // 词/分钟
+}
+
+export function estimateReadingTime(content: string, locale: Locale): string {
+  // 移除代码块
+  const cleaned = content.replace(/```[\s\S]*?```/g, '')
+
+  let count: number
+  if (locale === 'zh') {
+    // 中文：计算字符数（排除空白和标点）
+    count = cleaned.replace(/[\s\p{P}]/gu, '').length
+  } else {
+    // 英文：计算单词数
+    count = cleaned.split(/\s+/).filter(Boolean).length
+  }
+
+  const minutes = Math.max(1, Math.round(count / READING_SPEED[locale]))
+  return locale === 'zh' ? `${minutes} 分钟` : `${minutes} min`
+}
+```
+
+运行测试：全部通过 ✅（Green 阶段完成）
+
+### Step 3：Refactor — 重构
+
+```bash
+> 测试都通过了。审查一下代码质量，看看有没有可以改进的地方。
+> 改完之后跑测试确认没有破坏。
+```
+
+### Step 4：Coverage — 检查覆盖率
+
+```bash
+> 跑 coverage，看看 reading-time.ts 的覆盖率。
+> 如果有未覆盖的分支，补充测试。
+```
+
+### Step 5：集成到博客
+
+```bash
+> 把 estimateReadingTime 集成到博客文章页面：
+> 1. 在 blog/[slug]/page.tsx 中调用
+> 2. 显示在文章标题下方，日期旁边
+> 3. 用 i18n 处理"分钟"/"min"的显示
+```
+
+### Step 6：CI — 确保 CI 通过
+
+```bash
+> 检查 GitHub Actions 配置，确保新增的测试会在 CI 中运行。
+> 如果 coverage 阈值需要调整，告诉我。
+```
+
+### 完整流程回顾
+
+```
+写测试（Red）→ 写实现（Green）→ 重构（Refactor）
+    ↓                                    ↓
+检查 Coverage → 补充边界测试 → 集成到项目 → CI 验证
+```
+
+整个过程，Claude Code 是你的测试搭档：你定义需求和规则，它负责生成测试代码、实现代码、分析覆盖率、调试失败。你始终掌控方向，它加速执行。
+
+## 总结
+
+| 章节 | 核心要点 |
+|------|---------|
+| 测试金字塔 | 单元测试为主，集成适量，E2E 少量 |
+| TDD | Red-Green-Refactor，先写测试再写实现 |
+| 写测试技巧 | 先分析再写，批量生成，自我审查质量 |
+| Mock 策略 | 只 mock 外部依赖，不 mock 内部逻辑 |
+| Coverage | 关注关键路径，不追求 100% |
+| 调试 | 按失败模式分类排查 |
+| 集成/E2E | 按验证目标选择测试类型 |
+| CLAUDE.md | 把测试规范固化为项目配置 |
+| CI/CD | 自动化测试 + coverage 门禁 |
+| 实战 | TDD 全流程：测试 → 实现 → 重构 → coverage → CI |
+
+测试不是开发完成后的"附加任务"，而是开发过程的一部分。Claude Code 让这个过程从"痛苦的义务"变成"自然的节奏"。
+
+## 推荐阅读
+
+- [Claude Code 进阶指南](/zh/blog/claude-code-advanced-guide) — 从零开始的完整入门
+- [CLAUDE.md 完全指南](/zh/blog/claude-md-guide) — 把测试规范写进项目记忆
+- [Claude Code Hooks 指南](/zh/blog/claude-code-hooks-guide) — 用 Hooks 自动化测试流程
+- [上下文管理指南](/zh/blog/claude-code-context-guide) — 管好上下文，让测试生成更精准
+- [多 Agent 并行指南](/zh/blog/claude-code-multi-agent-guide) — 多 Agent 并行跑测试
+- [自定义 Slash Commands 指南](/zh/blog/claude-code-skills-guide) — /test 命令模板详解
+- [MCP Server 深度指南](/zh/blog/claude-code-mcp-guide) — 用 MCP 扩展测试能力
+- [高效 Prompt 指南](/zh/blog/claude-code-prompt-guide) — 写好测试相关的 Prompt
+- [settings.json 指南](/zh/blog/claude-code-settings-guide) — 配置测试相关的权限
+- [Git 工作流指南](/zh/blog/claude-code-git-guide) — 测试作为 PR 流程的一环
