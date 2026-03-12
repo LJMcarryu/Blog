@@ -1,0 +1,816 @@
+---
+title: "The Complete Claude Code Git Workflow Guide: AI-Powered Version Control"
+date: "2026-03-19"
+description: A deep dive into Claude Code's Git workflow capabilities, covering smart commits, PR creation, worktree isolation, code review, conflict resolution, Hooks safety, and CI/CD integration with a complete hands-on walkthrough.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+Throughout this series, we've covered everything from [CLAUDE.md](/en/blog/claude-md-guide) to [Hooks](/en/blog/claude-code-hooks-guide), from [MCP](/en/blog/claude-code-mcp-guide) to [Prompt techniques](/en/blog/claude-code-prompt-guide). But there's one topic that runs through every development workflow that we haven't dedicated a full article to — **Git workflows**.
+
+Claude Code is Git-native to its core. It reads `git status` on startup, understands your branch structure, analyzes `git diff`, and can even generate commit messages that match your project's style based on `git log`. Yet most people only use `/commit` and miss out on its full capabilities.
+
+This guide covers Claude Code's Git abilities end-to-end — from daily commits to PR creation, from worktree isolation to code review, from conflict resolution to CI/CD integration, wrapped up with a complete hands-on walkthrough.
+
+---
+
+## 1. Why Git Workflows Matter
+
+### 1.1 Claude Code Is a Git-Native Agent
+
+Claude Code isn't a chatbot that "happens to run git commands." Its entire operating model is built around Git:
+
+- **On startup**, it automatically runs `git status` to understand the current branch and uncommitted changes
+- **During conversation**, it continuously tracks Git state and knows which files have been modified
+- **On commit**, it analyzes `git diff` and `git log` to generate commit messages matching your project's style
+- **Safety mechanisms** include built-in confirmation prompts for dangerous Git operations (force push, reset --hard, etc.)
+
+The better you leverage Git workflows, the better Claude Code understands your project state and the more precise its assistance becomes.
+
+### 1.2 Manual Git vs Claude Code Git
+
+| Operation | Manual Git | Claude Code |
+|-----------|-----------|-------------|
+| View changes | `git diff` then read manually | Automatically analyzes diff and summarizes changes |
+| Write commit message | Manual, inconsistent style | Analyzes diff + log, auto-matches project style |
+| Create PR | Manually write title and description | Analyzes all commits, generates structured PR description |
+| Code review | File-by-file manual review | Automatically analyzes changes, flags potential issues |
+| Resolve conflicts | Manually edit conflict markers | Understands both sides' intent, smart merge |
+| Branch management | Manual create, switch, cleanup | Suggests branch operations based on task context |
+
+---
+
+## 2. Core Git Operations
+
+### 2.1 /commit: Smart Commits
+
+`/commit` is Claude Code's most-used Git skill. It's not a simple `git commit` wrapper — it's a complete commit workflow:
+
+```
+> /commit
+```
+
+Claude Code automatically:
+
+1. Runs `git status` to see all changes
+2. Runs `git diff` to analyze specific modifications
+3. Runs `git log` to check recent commit message style
+4. Generates a commit message matching your project's conventions
+5. Stages relevant files (prefers `git add` on specific files over `git add .`)
+6. Executes the commit
+
+Key details:
+
+- Claude Code **won't auto-push** — you need to explicitly request a push after committing
+- If a pre-commit hook fails, Claude Code fixes the issue and **creates a new commit** rather than using `--amend`
+- Sensitive files (`.env`, `credentials.json`) are automatically skipped with a warning
+
+### 2.2 Common Git Prompt Reference
+
+| What you want to do | Example prompt |
+|---------------------|---------------|
+| Commit all changes | `/commit` or `commit the current changes` |
+| Commit specific files | `only commit changes under src/components/` |
+| View change summary | `summarize the current git diff` |
+| Create feature branch | `create a feature/add-search branch` |
+| View commit history | `what changed in the last 10 commits` |
+| Compare branches | `what's different between this branch and main` |
+| Undo last commit | `undo the last commit but keep the file changes` |
+| Stash current work | `stash the current changes` |
+
+### 2.3 PR Creation Flow
+
+Creating Pull Requests is one of Claude Code's strengths. It analyzes all commits across the entire branch, not just the latest one:
+
+```
+> create a PR to main
+```
+
+Claude Code's PR creation process:
+
+1. Checks current branch status and remote sync state
+2. Runs `git diff main...HEAD` to analyze all changes
+3. Reviews all commit history
+4. Generates a concise PR title (under 70 characters)
+5. Generates a structured PR description (changes, motivation, testing)
+6. Uses `gh pr create` to create the PR
+
+```bash
+# Claude Code executes commands similar to:
+git status
+git diff --staged
+git diff
+git log main..HEAD --oneline
+git diff main...HEAD
+gh pr create --title "Add search functionality" --body "..."
+```
+
+### 2.4 Diff Analysis
+
+Having Claude Code analyze diffs is a powerful code review tool:
+
+```
+> analyze the current diff for potential issues
+
+> are there any security concerns in git diff main...HEAD
+
+> will these changes affect performance
+```
+
+Claude Code analyzes from multiple angles: security, performance, code style, potential bugs, and edge cases.
+
+---
+
+## 3. Worktree Isolation
+
+### 3.1 What Is Git Worktree
+
+Git worktree lets you check out multiple branches into different directories simultaneously within the same repository. This means you can work on multiple tasks without switching branches:
+
+```bash
+# Traditional approach: switching branches disrupts current work
+git stash
+git checkout feature-b
+# do some work...
+git checkout feature-a
+git stash pop
+
+# Worktree approach: each branch has its own working directory
+git worktree add ../feature-b feature-b
+# Both branches exist simultaneously, no interference
+```
+
+### 3.2 Built-in Worktree Support
+
+Claude Code natively supports worktree operations — no manual git commands needed:
+
+```
+> start a worktree for the bug fix
+
+> start a worktree for the login fix
+```
+
+Claude Code will:
+
+1. Create a new worktree under `.claude/worktrees/`
+2. Create a new branch based on the current HEAD
+3. Switch the working directory to the new worktree
+4. When done, let you choose to keep or remove the worktree
+
+```
+> exit the worktree, keep the changes
+# Preserves the worktree and branch for later
+
+> exit the worktree, remove it
+# Cleans up the worktree and branch (warns if there are uncommitted changes)
+```
+
+### 3.3 Multi-Agent + Worktree Combo
+
+This is one of Claude Code's most powerful work modes. As covered in the [Multi-Agent Parallelism Guide](/en/blog/claude-code-multi-agent-guide), the Agent tool supports an `isolation: "worktree"` parameter:
+
+```
+> do two things in parallel:
+> 1. refactor the auth module in a worktree
+> 2. add unit tests in a worktree
+```
+
+Claude Code launches two sub-agents, each working in an isolated worktree with no interference. You can review and merge each independently.
+
+Key advantages:
+
+- **Zero conflicts**: each agent works in an isolated filesystem
+- **Parallel speedup**: multiple tasks run simultaneously
+- **Safe rollback**: unhappy with the result? Just delete the worktree — main branch untouched
+
+Things to note:
+
+- Each worktree has its own `node_modules` — you may need `npm install` on first use
+- Worktrees are session-scoped — Claude Code prompts you to handle them on exit
+- Creating worktrees in large repos may take a moment
+
+---
+
+## 4. Code Review Workflow
+
+### 4.1 Reviewing Your Own Changes
+
+Having Claude Code review your code before committing is a great habit:
+
+```
+> review my current changes, focus on security and performance
+
+> review my staged changes, focus on edge cases
+```
+
+Claude Code will:
+
+1. Read `git diff` (or `git diff --staged`)
+2. Analyze changes file by file
+3. Flag potential issues: security vulnerabilities, performance bottlenecks, logic errors, edge cases
+4. Suggest improvements
+
+### 4.2 Reviewing Pull Requests
+
+Claude Code can review GitHub PRs directly:
+
+```
+> review PR #42
+
+> review https://github.com/user/repo/pull/42
+```
+
+It uses the `gh` CLI to fetch PR information, analyzes all changed files, and provides structured review feedback.
+
+### 4.3 Custom /review Command
+
+In the [Custom Slash Commands Guide](/en/blog/claude-code-skills-guide), we covered how to create custom commands. Here's a practical code review command:
+
+```markdown
+<!-- .claude/commands/review.md -->
+Review all changes on the current branch relative to $ARGUMENTS (default: main).
+
+Review criteria:
+1. Security: injection, XSS, sensitive data exposure
+2. Performance: N+1 queries, unnecessary re-renders, memory leaks
+3. Correctness: edge cases, error handling, type safety
+4. Style: consistency with existing project code style
+
+Output format:
+- 🔴 Must fix (security/correctness issues)
+- 🟡 Should fix (performance/maintainability)
+- 🟢 Optional (style/best practices)
+
+Start by running git diff $ARGUMENTS...HEAD to get the full changeset.
+```
+
+Usage:
+
+```
+> /review main
+> /review develop
+```
+
+### 4.4 Review Reference Table
+
+| Review scenario | Prompt |
+|----------------|--------|
+| Pre-commit self-review | `review staged changes` |
+| Review entire branch | `review all changes on this branch vs main` |
+| Review specific file | `review changes in src/auth.ts` |
+| Review a PR | `review PR #42` |
+| Security-focused review | `review the current diff from a security perspective` |
+| Performance-focused review | `any performance issues in these changes` |
+
+---
+
+## 5. Conflict Resolution
+
+### 5.1 How Claude Code Handles Conflicts
+
+When you hit conflicts during `git merge` or `git rebase`, Claude Code can understand conflict markers and perform smart merges:
+
+```
+> I got conflicts while rebasing onto main, help me resolve them
+```
+
+Claude Code's resolution process:
+
+1. Reads conflicted files, understanding `<<<<<<<`, `=======`, `>>>>>>>` markers
+2. Analyzes both sides' modification intent (semantic understanding, not just text diffing)
+3. Generates merged code
+4. Marks conflicts as resolved
+
+### 5.2 Practical Example
+
+Say you modified a function on your `feature` branch while `main` also modified the same function:
+
+```typescript
+// Conflicted file: src/utils.ts
+<<<<<<< HEAD
+export function formatDate(date: Date): string {
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+=======
+export function formatDate(date: Date, locale: string = 'en'): string {
+  return new Intl.DateTimeFormat(locale).format(date)
+}
+>>>>>>> main
+```
+
+```
+> resolve this conflict, keep both features: support the locale parameter while keeping the Chinese default format
+```
+
+Claude Code generates:
+
+```typescript
+export function formatDate(date: Date, locale: string = 'zh-CN'): string {
+  return date.toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+```
+
+### 5.3 Rebase vs Merge
+
+| Dimension | Rebase | Merge |
+|-----------|--------|-------|
+| History | Linear, clean | Preserves branch topology |
+| Conflict handling | Resolve per-commit, may repeat | Resolve all conflicts at once |
+| Best for | Syncing personal branch with main | Merging feature branch into main |
+| Claude Code support | ✅ Step-by-step guidance | ✅ Analyzes all conflicts at once |
+| Risk | Rewrites history — don't use on pushed commits | Creates merge commit |
+
+Note: Claude Code won't run `git rebase -i` (interactive rebase) since it requires interactive input. If you need to squash commits, ask Claude Code to use an alternative approach:
+
+```
+> squash the last 3 commits into one
+# Claude Code uses git reset --soft and re-commits
+```
+
+---
+
+## 6. Git Conventions in CLAUDE.md
+
+In the [CLAUDE.md Guide](/en/blog/claude-md-guide), we covered how to manage project conventions with CLAUDE.md. Git-related conventions are among the most important.
+
+### 6.1 Commit Message Format
+
+```markdown
+<!-- CLAUDE.md -->
+## Git Conventions
+
+### Commit Messages
+- Format: `<type>(<scope>): <description>`
+- type: feat, fix, refactor, docs, test, chore, perf, ci
+- scope: optional, indicates affected area (auth, ui, api, etc.)
+- description: imperative mood, lowercase, no period
+- Example: `feat(auth): add OAuth2 login flow`
+```
+
+Once Claude Code reads these conventions, `/commit` will automatically follow the format.
+
+### 6.2 Branch Naming
+
+```markdown
+### Branch Naming
+- Feature branches: feature/<description>
+- Fix branches: fix/<description>
+- Refactor branches: refactor/<description>
+- Use kebab-case: feature/add-user-search
+- No direct commits to main/develop
+```
+
+### 6.3 PR Rules
+
+```markdown
+### Pull Requests
+- Title follows commit message format
+- Description must include: changes, motivation, testing approach
+- Single PR should not exceed 500 lines of changes
+- Must pass CI checks before merging
+```
+
+### 6.4 Safety Rules
+
+```markdown
+### Git Safety
+- No force push to main or develop
+- Never commit .env, key files, or credentials
+- Never use --no-verify to skip hooks
+- Confirm branch deletion only after merge is verified
+```
+
+These rules in CLAUDE.md are strictly followed. If you say "force push to main," Claude Code will refuse and explain why.
+
+---
+
+## 7. Hooks and Git Integration
+
+In the [Hooks Guide](/en/blog/claude-code-hooks-guide), we covered Claude Code's Hook system in detail. Here we focus on Git-specific Hook usage.
+
+### 7.1 PreToolUse: Intercepting Dangerous Git Operations
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE \"git\\s+(push\\s+--force|reset\\s+--hard|clean\\s+-fd)\"; then echo \"BLOCK: Dangerous Git operation intercepted\"; exit 1; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 7.2 PostToolUse: Post-Commit Automation
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -q \"git commit\"; then echo \"Commit successful, running lint...\"; npm run lint; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 7.3 Dangerous Operations Reference
+
+| Operation | Risk Level | Claude Code Default | Recommended Hook Strategy |
+|-----------|-----------|-------------------|--------------------------|
+| `git push --force` | 🔴 High | Asks for confirmation | PreToolUse block |
+| `git reset --hard` | 🔴 High | Asks for confirmation | PreToolUse block |
+| `git clean -fd` | 🔴 High | Asks for confirmation | PreToolUse block |
+| `git branch -D` | 🟡 Medium | Asks for confirmation | Allow but log |
+| `git checkout .` | 🟡 Medium | Asks for confirmation | PreToolUse warn |
+| `git stash drop` | 🟡 Medium | Executes directly | Consider adding confirmation |
+| `git push` | 🟢 Low | Asks for confirmation | Allow |
+| `git commit` | 🟢 Low | Executes directly | PostToolUse trigger lint |
+
+### 7.4 Git Hooks (Not Claude Hooks) Integration
+
+Claude Code also respects your project's Git hooks (`.git/hooks/` or husky):
+
+```bash
+# If your project uses husky
+# .husky/pre-commit
+npm run lint-staged
+
+# .husky/commit-msg
+npx commitlint --edit $1
+```
+
+When Claude Code runs `/commit`:
+
+1. If pre-commit hook fails → Claude Code fixes the issue and **creates a new commit**
+2. If commit-msg hook fails → Claude Code adjusts the message format and re-commits
+3. Claude Code **never** uses `--no-verify` to skip hooks
+
+---
+
+## 8. CI/CD Integration
+
+Claude Code isn't just for local use — it can be integrated into CI/CD pipelines for automated code review and quality assurance.
+
+### 8.1 GitHub Actions: Automated PR Review
+
+```yaml
+# .github/workflows/claude-review.yml
+name: Claude Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Review PR
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "Review all changes in this PR, focusing on security and performance.
+          Run git diff origin/main...HEAD to get the changes.
+          Output the review in GitHub PR comment format." \
+          --output-format text > review.md
+
+      - name: Post Review Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('review.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: review
+            });
+```
+
+### 8.2 Commit Message Validation
+
+```yaml
+# .github/workflows/commit-lint.yml
+name: Commit Message Lint
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Commit Messages
+        run: |
+          # Verify all PR commit messages follow conventional commits
+          git log origin/main..HEAD --pretty=format:"%s" | while read msg; do
+            if ! echo "$msg" | grep -qE "^(feat|fix|refactor|docs|test|chore|perf|ci)(\(.+\))?: .+"; then
+              echo "❌ Non-compliant: $msg"
+              exit 1
+            fi
+          done
+          echo "✅ All commit messages are compliant"
+```
+
+### 8.3 Automated Changelog Generation
+
+```
+> generate a CHANGELOG based on all commits from v1.0.0 to HEAD
+
+> organize the last month's commits into Keep a Changelog format
+```
+
+Claude Code analyzes commit history, groups by type (Features, Bug Fixes, Refactoring, etc.), and generates a structured changelog.
+
+You can also automate this in your release workflow:
+
+```yaml
+# In a release workflow
+- name: Generate Changelog
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  run: |
+    claude -p "Generate a changelog based on git log ${{ github.event.release.tag_name }}..HEAD,
+    following Keep a Changelog format." --output-format text > CHANGELOG_NEW.md
+```
+
+---
+
+## 9. Complete Walkthrough: Branch to Merged PR
+
+Let's walk through a real scenario: adding a "Related Posts" feature to a Next.js blog, covering the full Git workflow.
+
+### Step 1: Create a Feature Branch
+
+```
+> create a feature/related-posts branch
+```
+
+```bash
+# Claude Code executes:
+git checkout -b feature/related-posts
+```
+
+### Step 2: Implement the Feature
+
+```
+> add a "Related Posts" component at the bottom of blog posts, recommending up to 3 articles based on shared tags
+```
+
+Claude Code will:
+- Read the existing `blog/[slug]/page.tsx` to understand page structure
+- Read `lib/posts.ts` to understand data fetching
+- Create `components/RelatedPosts.tsx`
+- Modify the page file to integrate the component
+
+### Step 3: Mid-Work Self-Review
+
+```
+> review my current changes
+```
+
+Claude Code analyzes `git diff` and might flag:
+- "RelatedPosts component doesn't handle the case where fewer than 3 posts share tags"
+- "Consider adding `aria-label` for accessibility"
+
+### Step 4: Fix Issues and Commit
+
+```
+> fix these issues, then commit
+```
+
+After fixing, Claude Code runs `/commit` and generates:
+
+```
+feat(blog): add related posts component based on shared tags
+```
+
+### Step 5: Add Tests
+
+```
+> add unit tests for the RelatedPosts component
+```
+
+```
+> /commit
+```
+
+```
+test(blog): add unit tests for RelatedPosts component
+```
+
+### Step 6: Sync with Main
+
+```
+> rebase the latest changes from main
+```
+
+```bash
+# Claude Code executes:
+git fetch origin
+git rebase origin/main
+# If conflicts arise, Claude Code guides you through resolution
+```
+
+### Step 7: Create the PR
+
+```
+> create a PR to main
+```
+
+Claude Code analyzes all commits and generates:
+
+```markdown
+## Add Related Posts Feature
+
+### Changes
+- New `RelatedPosts` component that recommends up to 3 articles based on shared tags
+- Integrated into blog post page layout
+- Added unit tests with full coverage
+
+### Motivation
+Improve content discovery by showing readers related articles at the end of each post.
+
+### Testing
+- Unit tests added and passing
+- Manually verified with posts sharing 0, 1, 2, and 3+ tags
+```
+
+### Step 8: Address Review Feedback
+
+```
+> the PR review says to add a loading state, make the change and update the PR
+```
+
+```bash
+# Claude Code modifies code, commits, and pushes
+git add components/RelatedPosts.tsx
+git commit -m "feat(blog): add loading state to RelatedPosts"
+git push
+```
+
+Throughout this entire flow, you describe intent in natural language while Claude Code handles all the Git mechanics.
+
+---
+
+## 10. FAQ
+
+### Q1: What if Claude Code makes a bad commit?
+
+```
+> undo the last commit but keep the file changes
+```
+
+Claude Code runs `git reset --soft HEAD~1`, undoing the commit while keeping all changes staged. If you've already pushed, Claude Code warns that a force push is needed and asks for confirmation.
+
+### Q2: How do I get Claude Code to follow my commit message format?
+
+Two approaches:
+
+1. **CLAUDE.md**: Define the format — Claude Code reads it every session
+2. **Project history**: Claude Code analyzes `git log` to auto-match style
+
+Best practice: combine both — CLAUDE.md defines the rules, `git log` provides examples.
+
+### Q3: Can Claude Code do interactive rebase?
+
+Not directly — `git rebase -i` requires an interactive editor. But Claude Code can achieve the same result through alternative approaches:
+
+```
+> squash the last 5 commits into 2: first 3 as "refactor auth module", last 2 as "add tests"
+```
+
+Claude Code uses `git reset --soft` + re-commit to accomplish this.
+
+### Q4: How do I auto-approve Git operations?
+
+Configure permissions in [settings.json](/en/blog/claude-code-settings-guide):
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)"
+    ]
+  }
+}
+```
+
+Routine Git operations run automatically, dangerous ones are blocked, everything else requires confirmation.
+
+### Q5: How do I handle node_modules in worktrees?
+
+Each worktree is an independent working directory that needs its own dependency installation:
+
+```
+> run npm install in the worktree
+```
+
+If your project uses pnpm or yarn, worktrees can share the cache, making installation fast. For large projects, note this in CLAUDE.md:
+
+```markdown
+## Worktree Notes
+- Run pnpm install after creating a new worktree
+- Don't modify pnpm-lock.yaml in worktrees
+```
+
+### Q6: How good is Claude Code at resolving conflicts?
+
+For most common conflicts (different regions of the same file, import statement conflicts, config file conflicts), Claude Code handles them well. Its advantage is understanding code semantics rather than just doing text merges.
+
+For complex logical conflicts (two branches making different architectural changes to the same function), the recommended approach is:
+
+1. Have Claude Code analyze the conflict and explain both sides' intent
+2. You decide which approach to keep
+3. Have Claude Code execute the merge
+
+### Q7: Will Claude Code accidentally push code?
+
+No. Claude Code's safety mechanisms:
+
+- `git push` requires user confirmation by default
+- `git push --force` triggers an additional warning
+- Force push to `main`/`master` is refused
+- You can add extra pre-push checks via Hooks
+
+To completely disable pushing, add to settings.json:
+
+```json
+{
+  "permissions": {
+    "deny": ["Bash(git push*)"]
+  }
+}
+```
+
+---
+
+## Summary
+
+Claude Code's Git workflow capabilities go far beyond `/commit`. From daily commits to PR creation, from worktree isolation to code review, from conflict resolution to CI/CD integration, it covers every aspect of a developer's Git workflow.
+
+Key takeaways:
+
+1. **Let Claude Code know your Git conventions** — put them in CLAUDE.md
+2. **Leverage worktrees** — parallel development, zero conflicts, safe rollback
+3. **Build safety guardrails** — Hooks intercept dangerous operations, settings.json controls permissions
+4. **Automate reviews** — self-review before commits, integrate Claude Code review in CI/CD
+
+Combine these practices and your Git workflow becomes both efficient and safe.
+
+---
+
+## Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-advanced-guide) — Complete getting-started guide
+- [CLAUDE.md Guide](/en/blog/claude-md-guide) — Encode Git conventions into project memory
+- [Claude Code Hooks Guide](/en/blog/claude-code-hooks-guide) — Intercept dangerous Git operations with Hooks
+- [Context Management Guide](/en/blog/claude-code-context-guide) — Better context for more precise Git operations
+- [Multi-Agent Parallelism Guide](/en/blog/claude-code-multi-agent-guide) — Worktree + multi-agent parallel development
+- [Custom Slash Commands Guide](/en/blog/claude-code-skills-guide) — Create custom /review commands
+- [MCP Server Guide](/en/blog/claude-code-mcp-guide) — Extend Git integration with MCP
+- [Prompt Techniques Guide](/en/blog/claude-code-prompt-guide) — Write better Git-related prompts
+- [settings.json Guide](/en/blog/claude-code-settings-guide) — Configure permissions for Git operations
