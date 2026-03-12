@@ -1,0 +1,872 @@
+---
+title: "Claude Code 高效 Prompt 完全指南：让 AI 精准理解你的意图"
+date: "2026-03-17"
+description: 深入解析 Claude Code 的 Prompt 编写技巧，涵盖六大核心原则、实用模板库、上下文喂养技巧、进阶策略，附带 Flutter 开发完整实战示例。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+在[进阶指南](/zh/blog/claude-code-advanced-guide)的第七节里，我用大约 55 行介绍了四个基本的 Prompt 技巧：任务拆解、给约束条件、管道输入、迭代式开发。
+
+但用了几个月后，我越来越确信一件事：**Prompt 质量是决定 Claude Code 输出质量的最大单一变量。** 同样的任务，一个模糊的 prompt 和一个精心设计的 prompt，产出的代码质量可以差出一个量级。
+
+这篇文章把 Prompt 技巧讲透——从底层逻辑到实战模板，再到一个完整的 Flutter 开发实战。
+
+---
+
+## 一、Prompt 的底层逻辑
+
+### 1.1 Claude Code 不是普通聊天机器人
+
+在用 Claude Code 之前，你可能用过 ChatGPT 或者 Claude 的网页版。那些场景下，prompt 写得随意一点问题不大——反正就是对话。
+
+但 Claude Code 不一样。它是一个 **Agent**，拥有工具调用能力：
+
+- 它能读写你的文件系统
+- 它能执行 shell 命令
+- 它能搜索代码库
+- 它能调用 MCP 工具
+
+这意味着一个模糊的 prompt 不只是"回答不准确"，而是可能导致：
+
+- 改错文件
+- 引入不必要的依赖
+- 破坏现有功能
+- 浪费大量 token 在错误的方向上
+
+### 1.2 好 Prompt 的经济学
+
+Claude Code 按 token 计费。一个好的 prompt 能：
+
+| 维度 | 差的 Prompt | 好的 Prompt |
+|------|-----------|-----------|
+| 迭代次数 | 3-5 轮才到位 | 1-2 轮搞定 |
+| Token 消耗 | 大量浪费在试错 | 精准命中 |
+| 代码质量 | 需要手动修改 | 基本可用 |
+| 上下文占用 | 快速填满窗口 | 留出空间 |
+
+简单算一笔账：如果每次迭代消耗 5000 token，差的 prompt 需要 5 轮（25000 token），好的 prompt 只需要 1 轮（5000 token）。**5 倍的差距。**
+
+### 1.3 Prompt 的三层结构
+
+一个高效的 Claude Code prompt 通常包含三层：
+
+```
+[目标] 你要做什么
+[约束] 怎么做、不能做什么
+[验收] 怎么判断做对了
+```
+
+后面的所有技巧，本质上都是在优化这三层。
+
+---
+
+## 二、六大核心原则
+
+### 2.1 具体胜于模糊
+
+这是最基本也最重要的原则。
+
+差的 prompt：
+```
+帮我写一个登录页面
+```
+
+好的 prompt：
+```
+在 lib/features/auth/presentation/pages/ 下创建 login_page.dart：
+- 使用 Riverpod 做状态管理
+- 邮箱 + 密码登录
+- 表单验证：邮箱格式、密码至少 8 位
+- 登录按钮在请求中显示 loading 状态
+- 参考 register_page.dart 的布局风格
+```
+
+差距在哪？好的 prompt 告诉了 Claude：
+
+1. **在哪里**创建文件（路径）
+2. **用什么**技术（Riverpod）
+3. **做什么**功能（邮箱 + 密码）
+4. **什么标准**（验证规则）
+5. **什么风格**（参考现有文件）
+
+### 2.2 约束驱动质量
+
+没有约束的 prompt 就像没有需求文档的项目——Claude 会按自己的理解来，结果往往不是你想要的。
+
+常用约束类型：
+
+| 约束类型 | 示例 |
+|---------|------|
+| 依赖约束 | "不引入新的第三方包" |
+| API 约束 | "保持现有公开 API 不变" |
+| 风格约束 | "遵循项目现有的命名规范" |
+| 性能约束 | "列表渲染不能卡顿，考虑虚拟滚动" |
+| 兼容约束 | "支持 iOS 14+ 和 Android 8+" |
+| 类型约束 | "所有新代码必须类型安全，不用 dynamic" |
+
+实际例子：
+
+```
+重构 UserRepository，要求：
+- 保持 UserRepository 的公开接口不变
+- 将 HTTP 调用抽到 UserRemoteDataSource
+- 将缓存逻辑抽到 UserLocalDataSource
+- 不引入新依赖
+- 所有方法保持类型安全
+- 错误处理用 Either<Failure, T> 模式
+```
+
+### 2.3 分步优于一步到位
+
+Claude Code 的上下文窗口是有限的。一个巨大的 prompt 试图一次完成所有事情，往往会：
+
+- 遗漏细节
+- 前后矛盾
+- 上下文溢出
+
+更好的方式是分步推进：
+
+```
+第一步（当前）：
+创建 CheckInModel 数据模型，包含 userId、date、streak 字段。
+放在 lib/features/checkin/domain/models/ 下。
+
+---
+
+后续步骤（先不做）：
+- 第二步：创建 CheckInRepository 接口
+- 第三步：实现 Firebase 数据源
+- 第四步：写 Riverpod provider
+- 第五步：创建 UI 页面
+```
+
+关键技巧：**告诉 Claude 后续计划但明确说"先不做"**，这样它能在当前步骤做出更好的设计决策（比如预留接口），但不会越界。
+
+### 2.4 先看再改
+
+这是很多人忽略的技巧。在让 Claude 修改代码之前，先让它阅读相关文件：
+
+```
+先看一下这几个文件：
+- lib/features/auth/data/repositories/auth_repository_impl.dart
+- lib/features/auth/domain/repositories/auth_repository.dart
+- lib/core/network/api_client.dart
+
+然后重构 auth_repository_impl.dart，把 token 刷新逻辑抽成独立的 TokenManager 类。
+```
+
+为什么这很重要？
+
+1. Claude 会理解现有的代码风格和模式
+2. 避免生成与现有代码不兼容的方案
+3. 减少"我以为你的代码是这样的"类型的错误
+
+更进一步，你可以用 `@` 符号直接引用文件：
+
+```
+看一下 @lib/core/theme/app_theme.dart 的主题定义方式，
+然后给 CheckIn 页面创建一个符合现有设计系统的 UI。
+```
+
+### 2.5 给出参考
+
+Claude 最擅长的事情之一是"照葫芦画瓢"。给它一个参考，它能精确复制风格：
+
+```
+参考 lib/features/todo/presentation/pages/todo_list_page.dart 的结构，
+创建 checkin_list_page.dart。
+
+要求：
+- 同样的 ConsumerStatefulWidget 模式
+- 同样的 AppBar 风格
+- 列表用 SliverList 而不是 ListView
+- 空状态用同样的 EmptyStateWidget
+```
+
+你也可以参考外部代码：
+
+```
+参考这个 Riverpod 的官方示例写法：
+https://riverpod.dev/docs/essentials/first_request
+
+给 CheckInNotifier 实现异步状态管理。
+```
+
+### 2.6 明确验收标准
+
+告诉 Claude 怎么判断"做对了"：
+
+```
+实现 CheckIn 功能的单元测试，验收标准：
+- 覆盖正常签到、重复签到、连续签到中断三种场景
+- 每个测试用 arrange-act-assert 模式
+- Mock 用 mocktail
+- 运行 flutter test test/features/checkin/ 全部通过
+```
+
+没有验收标准的 prompt，Claude 不知道什么时候该停下来，容易过度实现或者遗漏关键场景。
+
+---
+
+## 三、Prompt 模板库
+
+以下是我日常使用频率最高的 prompt 模板，可以直接复制使用。
+
+### 3.1 Bug 修复模板
+
+```
+Bug 描述：[具体现象]
+复现步骤：[1. 2. 3.]
+期望行为：[应该怎样]
+实际行为：[实际怎样]
+
+相关文件：[文件路径]
+
+请先分析根因，再给出修复方案。修复后确保：
+- 不影响现有功能
+- 添加防止回归的测试
+```
+
+实际使用：
+
+```
+Bug 描述：签到页面在连续签到 7 天后，streak 显示为 0
+复现步骤：
+1. 连续签到 7 天
+2. 第 8 天打开签到页面
+3. streak 显示为 0 而不是 8
+
+期望行为：streak 应该显示 8
+实际行为：streak 显示 0
+
+相关文件：lib/features/checkin/data/repositories/checkin_repository_impl.dart
+
+请先分析根因，再给出修复方案。修复后确保：
+- 不影响其他签到逻辑
+- 添加 streak 跨周计算的单元测试
+```
+
+### 3.2 新功能模板
+
+```
+功能需求：[一句话描述]
+
+详细要求：
+- [要求 1]
+- [要求 2]
+- [要求 3]
+
+技术约束：
+- [约束 1]
+- [约束 2]
+
+参考：[现有文件或外部链接]
+
+先给出实现方案，确认后再写代码。
+```
+
+### 3.3 重构模板
+
+```
+重构目标：[要重构什么，为什么]
+
+当前问题：
+- [问题 1]
+- [问题 2]
+
+期望结果：
+- [结果 1]
+- [结果 2]
+
+约束：
+- 保持公开 API 不变
+- 不引入新依赖
+- 所有现有测试必须通过
+
+先看一下 [相关文件]，然后给出重构方案。
+```
+
+### 3.4 代码审查模板
+
+```
+Review 以下代码，关注：
+- 潜在的 bug 和边界情况
+- 性能问题
+- 类型安全
+- 错误处理是否完善
+- 是否符合项目的代码规范
+
+给出具体的改进建议和代码示例。
+```
+
+### 3.5 测试编写模板
+
+```
+给 [文件路径] 写单元测试：
+- 覆盖所有公开方法
+- 包含正常路径和异常路径
+- Mock 外部依赖（用 mocktail）
+- 测试文件放在 [测试路径]
+- 参考 [现有测试文件] 的风格
+```
+
+### 3.6 性能优化模板
+
+```
+[页面/功能] 存在性能问题：[具体表现]
+
+请分析可能的原因，并给出优化方案。要求：
+- 先 profile，找到瓶颈
+- 给出优化前后的对比
+- 不改变功能行为
+- 优先考虑投入产出比最高的优化
+```
+
+---
+
+## 四、上下文喂养技巧
+
+Prompt 本身只是一部分，**怎么给 Claude 喂上下文**同样关键。
+
+### 4.1 管道输入
+
+管道是 Claude Code 最被低估的能力之一。它让你把任何命令的输出直接喂给 Claude：
+
+```bash
+# 让 Claude 基于构建错误给出修复方案
+flutter build apk 2>&1 | claude "分析这些构建错误，给出修复方案"
+
+# 让 Claude 分析测试失败原因
+flutter test test/features/checkin/ 2>&1 | claude "分析失败的测试，找出根因"
+
+# 让 Claude review 最近的改动
+git diff HEAD~3 | claude "review 这些改动，关注潜在问题"
+
+# 让 Claude 基于 lint 结果修复代码
+flutter analyze 2>&1 | claude "修复所有 lint 警告"
+
+# 让 Claude 解释依赖冲突
+flutter pub get 2>&1 | claude "解释这个依赖冲突，给出解决方案"
+```
+
+管道输入的优势：
+
+- 精确的上下文（不是你描述的，是实际的输出）
+- 节省手动复制粘贴的时间
+- 可以组合多个命令
+
+### 4.2 @ 引用文件
+
+在 Claude Code 对话中，用 `@` 可以直接引用文件，Claude 会自动读取内容：
+
+```
+看一下 @lib/features/checkin/domain/models/checkin_model.dart
+和 @lib/features/checkin/data/repositories/checkin_repository.dart
+
+这两个文件的设计有什么问题？给出改进建议。
+```
+
+多文件引用特别适合需要理解上下文关系的场景。
+
+### 4.3 图片输入
+
+Claude Code 支持图片输入，这在 UI 开发中非常有用：
+
+```
+看一下这个设计稿 @design/checkin_page.png
+
+用 Flutter 实现这个页面，要求：
+- 使用项目现有的设计系统（@lib/core/theme/app_theme.dart）
+- 响应式布局，适配手机和平板
+- 动画效果用 Flutter 内置的 AnimationController
+```
+
+### 4.4 结构化上下文块
+
+当你需要给 Claude 大量上下文时，用结构化的格式：
+
+```
+## 项目背景
+这是一个 Flutter 签到应用，使用 Clean Architecture + Riverpod。
+
+## 当前架构
+- Domain 层：models, repositories (接口), use_cases
+- Data 层：repositories (实现), data_sources, DTOs
+- Presentation 层：pages, widgets, providers
+
+## 你要做的事
+在 Data 层实现 CheckInRemoteDataSource，对接 Firebase Firestore。
+
+## 约束
+- 遵循现有的 DataSource 接口模式（参考 @lib/features/auth/data/data_sources/auth_remote_data_source.dart）
+- 错误处理用 try-catch + ServerException
+- 所有 Firestore 操作用 batch write
+```
+
+### 4.5 利用剪贴板
+
+有时候上下文来自浏览器、Slack 或者其他工具。直接粘贴到 Claude Code 中：
+
+```
+这是用户反馈的 crash 日志：
+
+[粘贴 crash 日志]
+
+分析 crash 原因，找到对应的代码位置，给出修复方案。
+```
+
+---
+
+## 五、进阶技巧
+
+### 5.1 角色设定
+
+给 Claude 一个角色，可以显著影响输出质量：
+
+```
+你是一个资深 Flutter 架构师，精通 Clean Architecture 和 Riverpod。
+现在 review 这个 PR 的代码，重点关注架构合理性和可测试性。
+```
+
+常用角色：
+
+| 角色 | 适用场景 |
+|------|---------|
+| 资深 Flutter 架构师 | 架构设计、代码审查 |
+| 安全工程师 | 安全审计、漏洞排查 |
+| 性能优化专家 | 性能分析、优化建议 |
+| 技术文档作者 | API 文档、README |
+| QA 工程师 | 测试用例设计、边界分析 |
+
+### 5.2 思维链引导
+
+对于复杂问题，引导 Claude 分步思考：
+
+```
+CheckIn 页面在低端设备上卡顿。请：
+
+1. 先分析可能的性能瓶颈（列出至少 5 个可能原因）
+2. 对每个原因评估可能性（高/中/低）
+3. 针对可能性最高的 3 个原因，给出具体的优化方案
+4. 每个方案给出代码示例
+```
+
+这比直接说"优化性能"要好得多，因为它强制 Claude 先分析再行动。
+
+### 5.3 负面约束
+
+告诉 Claude **不要做什么**，有时比告诉它要做什么更有效：
+
+```
+重构 CheckInProvider，要求：
+- 不要用 StateNotifier（已废弃），用 Notifier
+- 不要在 Provider 里直接调用 Repository，通过 UseCase
+- 不要用 dynamic 类型
+- 不要添加任何 print 语句
+- 不要改变现有的 Provider 命名
+```
+
+### 5.4 多轮策略
+
+复杂任务不要试图一轮完成。设计一个多轮对话策略：
+
+```
+第一轮：分析和方案
+"分析 CheckIn 模块的现有架构，给出重构方案。只分析，不写代码。"
+
+第二轮：确认方案
+"方案 B 更好。但有两个调整：[调整 1]、[调整 2]。确认后开始实现。"
+
+第三轮：实现核心
+"先实现 Domain 层的改动：Model、Repository 接口、UseCase。"
+
+第四轮：实现数据层
+"接着实现 Data 层：Repository 实现、DataSource、DTO。"
+
+第五轮：实现 UI
+"最后实现 Presentation 层：Provider、Page、Widgets。"
+
+第六轮：测试
+"给所有新代码写单元测试。"
+
+每轮之间用 /compact 压缩上下文。
+```
+
+### 5.5 结合 CLAUDE.md
+
+把项目级的 prompt 规范写进 [CLAUDE.md](/zh/blog/claude-md-guide)，这样每次对话都自动生效：
+
+```markdown
+# CLAUDE.md
+
+## 代码规范
+- Flutter 项目使用 Clean Architecture
+- 状态管理用 Riverpod 2.x（Notifier，不是 StateNotifier）
+- 错误处理用 Either<Failure, T>
+- 所有 Repository 方法返回 Future<Either<Failure, T>>
+- 测试用 mocktail，不用 mockito
+
+## 命名规范
+- 文件名：snake_case
+- 类名：PascalCase
+- Provider 名：camelCase + Provider 后缀
+```
+
+这样你的 prompt 就不需要每次重复这些约束了。
+
+### 5.6 结合 Slash Commands
+
+把常用的 prompt 模板保存为 [Slash Commands](/zh/blog/claude-code-skills-guide)：
+
+```markdown
+<!-- .claude/commands/flutter-feature.md -->
+在 lib/features/$ARGUMENTS/ 下创建新功能模块：
+
+1. Domain 层：
+   - models/ 下创建数据模型
+   - repositories/ 下创建 Repository 接口
+   - use_cases/ 下创建 UseCase
+
+2. Data 层：
+   - repositories/ 下实现 Repository
+   - data_sources/ 下创建 Remote 和 Local DataSource
+   - dtos/ 下创建 DTO
+
+3. Presentation 层：
+   - providers/ 下创建 Riverpod Provider
+   - pages/ 下创建页面
+   - widgets/ 下创建组件
+
+遵循项目现有的 Clean Architecture 模式。
+先看一下 lib/features/auth/ 作为参考。
+```
+
+然后只需要输入 `/flutter-feature checkin` 就能触发完整的 prompt。
+
+---
+
+## 六、实战示例：Flutter 签到功能开发
+
+下面用一个完整的 Flutter 开发实战，展示如何用高效的 prompt 驱动 Claude Code 完成一个"每日签到"功能。
+
+### 6.1 需求分析（第一轮）
+
+```
+我要给 Flutter 应用添加"每日签到"功能。先不写代码，帮我分析需求和设计架构。
+
+功能描述：
+- 用户每天可以签到一次
+- 连续签到有 streak 计数
+- 签到日历展示（当月）
+- 签到有积分奖励（普通 1 分，连续 7 天 5 分，连续 30 天 20 分）
+
+技术栈：
+- Flutter + Riverpod
+- Firebase Firestore 存储
+- Clean Architecture
+
+请给出：
+1. 数据模型设计
+2. 目录结构
+3. 核心类和接口列表
+4. 需要注意的边界情况
+```
+
+Claude 会给出一个完整的架构方案。你可以在这一轮调整设计，比如：
+
+```
+方案整体不错，但有几个调整：
+1. CheckInRecord 不需要 location 字段，去掉
+2. streak 计算放在服务端（Cloud Function），不在客户端
+3. 积分系统先不做，后续再加
+4. 日历组件用 table_calendar 包
+
+确认这些调整后，我们开始实现。
+```
+
+### 6.2 数据模型（第二轮）
+
+```
+开始实现签到功能。第一步：创建数据模型。
+
+在 lib/features/checkin/domain/models/ 下创建：
+
+1. checkin_record.dart - 签到记录
+   - id: String
+   - userId: String
+   - date: DateTime（只保留日期，不要时间）
+   - streak: int（当前连续天数）
+   - createdAt: DateTime
+
+2. checkin_stats.dart - 签到统计
+   - totalDays: int
+   - currentStreak: int
+   - longestStreak: int
+   - thisMonthDays: int
+
+要求：
+- 用 freezed 生成不可变类
+- 包含 fromJson/toJson
+- date 字段序列化为 'yyyy-MM-dd' 字符串
+- 参考 @lib/features/auth/domain/models/user_model.dart 的风格
+```
+
+### 6.3 Repository 接口（第三轮）
+
+```
+/compact
+
+第二步：创建 Repository 接口。
+
+在 lib/features/checkin/domain/repositories/ 下创建 checkin_repository.dart：
+
+方法：
+- checkIn(userId: String) → Future<Either<Failure, CheckInRecord>>
+- getCheckInRecords(userId: String, month: DateTime) → Future<Either<Failure, List<CheckInRecord>>>
+- getCheckInStats(userId: String) → Future<Either<Failure, CheckInStats>>
+- isCheckedInToday(userId: String) → Future<Either<Failure, bool>>
+
+参考 @lib/features/auth/domain/repositories/auth_repository.dart 的接口风格。
+```
+
+注意这里用了 `/compact` 压缩上下文，因为前两轮的详细对话已经不需要了。
+
+### 6.4 数据层实现（第四轮）
+
+```
+/compact
+
+第三步：实现数据层。
+
+1. 在 lib/features/checkin/data/data_sources/ 下创建 checkin_remote_data_source.dart：
+   - 对接 Firebase Firestore
+   - collection 路径：users/{userId}/checkins
+   - 签到时用 server timestamp
+   - 查询当月记录用 where + orderBy
+
+2. 在 lib/features/checkin/data/repositories/ 下创建 checkin_repository_impl.dart：
+   - 实现 CheckInRepository 接口
+   - 错误处理：Firebase 异常转换为 Failure
+   - isCheckedInToday 用本地缓存优化（避免每次都查 Firestore）
+
+约束：
+- 不用 dynamic 类型
+- Firestore 操作全部 try-catch
+- 参考 @lib/features/auth/data/ 下的实现模式
+```
+
+### 6.5 UI 实现（第五轮）
+
+```
+/compact
+
+第四步：实现 UI 层。
+
+1. 在 lib/features/checkin/presentation/providers/ 下创建：
+   - checkin_provider.dart：管理签到状态
+   - checkin_records_provider.dart：管理日历数据
+
+2. 在 lib/features/checkin/presentation/pages/ 下创建 checkin_page.dart：
+   - 顶部：今日签到按钮（大的、醒目的）
+   - 中间：签到日历（用 table_calendar）
+   - 底部：签到统计卡片（总天数、当前连续、最长连续）
+   - 签到按钮点击后有动画反馈
+
+3. 在 lib/features/checkin/presentation/widgets/ 下创建：
+   - checkin_button.dart：签到按钮（带动画）
+   - checkin_stats_card.dart：统计卡片
+
+约束：
+- Provider 用 AsyncNotifier 模式
+- 页面用 ConsumerStatefulWidget
+- 所有文本用 l10n，不硬编码
+- 参考 @lib/features/todo/presentation/pages/todo_list_page.dart 的布局
+```
+
+### 6.6 测试（第六轮）
+
+```
+/compact
+
+第五步：写单元测试。
+
+给签到功能写测试，放在 test/features/checkin/ 下：
+
+1. checkin_repository_impl_test.dart：
+   - 正常签到成功
+   - 重复签到（今天已签到）
+   - 获取当月记录
+   - 获取统计数据
+   - Firestore 异常处理
+
+2. checkin_provider_test.dart：
+   - 初始状态
+   - 签到成功后状态更新
+   - 签到失败后错误状态
+
+要求：
+- Mock 用 mocktail
+- 每个测试用 arrange-act-assert 模式
+- 运行 flutter test test/features/checkin/ 全部通过
+```
+
+### 6.7 代码审查（第七轮）
+
+```
+/compact
+
+最后一步：review 整个签到功能的代码。
+
+请检查：
+1. 架构是否符合 Clean Architecture 原则
+2. 有没有潜在的 bug（特别是日期处理和时区问题）
+3. Riverpod Provider 的生命周期是否合理
+4. Firestore 查询是否有性能问题
+5. 错误处理是否完善
+6. 类型安全是否到位
+
+给出具体的改进建议。
+```
+
+这个完整的 7 轮对话展示了几个关键点：
+
+- **每轮只做一件事**：模型 → 接口 → 实现 → UI → 测试 → 审查
+- **每轮都有明确的约束和验收标准**
+- **用 `/compact` 管理上下文**
+- **后续步骤提前告知但不执行**
+- **最后一轮做整体审查**
+
+---
+
+## 七、反模式：这些 Prompt 别写
+
+### 7.1 "帮我做 XXX"
+
+```
+❌ 帮我做一个签到功能
+```
+
+问题：没有任何上下文。Claude 不知道你的技术栈、架构、约束。它会按自己的默认假设来，大概率不是你想要的。
+
+### 7.2 过度详细的实现指令
+
+```
+❌ 在第 15 行后面加一个 if 语句，判断 user.isCheckedIn 是否为 true，
+如果是就 return，如果不是就调用 repository.checkIn(user.id)，
+然后把结果赋值给 result 变量...
+```
+
+问题：你在用自然语言写代码。这比直接写代码还慢，而且 Claude 可能有更好的实现方式。**告诉它"做什么"，而不是"怎么做"。**
+
+### 7.3 一次性塞太多任务
+
+```
+❌ 帮我实现签到功能，包括数据模型、Repository、DataSource、Provider、
+UI 页面、动画效果、单元测试、集成测试、国际化、暗色模式适配，
+还有把签到数据同步到后端的 Cloud Function。
+```
+
+问题：任务太多，Claude 会顾此失彼。拆成多轮，每轮一个关注点。
+
+### 7.4 没有上下文的修改请求
+
+```
+❌ 修一下那个 bug
+```
+
+问题：哪个 bug？在哪个文件？什么现象？Claude 不是你肚子里的蛔虫。
+
+### 7.5 矛盾的约束
+
+```
+❌ 重构这个模块，要求：
+- 不改变任何现有代码
+- 把所有类拆分成更小的类
+```
+
+问题：不改代码怎么拆分？矛盾的约束会让 Claude 困惑，输出质量下降。
+
+### 7.6 期望 Claude 读心
+
+```
+❌ 这个代码不太好，优化一下
+```
+
+问题："不太好"是什么意思？性能不好？可读性差？架构不合理？不同的"不好"有完全不同的优化方向。
+
+---
+
+## 八、常见问题
+
+### Q1：Prompt 写得太长会不会浪费 token？
+
+不会。一个详细的 prompt 可能多花 200 token，但它能省下 3-4 轮迭代（每轮 5000+ token）。**前期投入，后期回报。**
+
+### Q2：英文 prompt 比中文效果好吗？
+
+在 Claude Code 中差异不大。Claude 对中文的理解能力很强。用你最舒服的语言写就行。唯一的例外是：如果你的代码库是全英文的，用英文 prompt 可以避免中英混杂的注释。
+
+### Q3：怎么知道 prompt 写得好不好？
+
+看两个指标：
+1. **迭代次数**：如果一个任务需要 3 轮以上才能完成，说明 prompt 可以改进
+2. **手动修改量**：如果 Claude 的输出需要大量手动调整，说明约束不够明确
+
+### Q4：Claude 理解错了怎么办？
+
+不要重复同样的 prompt。换一种方式表达：
+- 给更多上下文
+- 用具体的例子说明
+- 拆成更小的步骤
+- 直接指出它理解错的地方
+
+### Q5：长对话中 Claude 开始"忘记"之前的约束怎么办？
+
+这是上下文窗口的限制。解决方案：
+1. 用 `/compact` 压缩上下文
+2. 把关键约束写进 CLAUDE.md（每次对话自动加载）
+3. 在新的 prompt 中重复关键约束
+4. 开新会话，把关键上下文重新喂一遍
+
+### Q6：可以让 Claude 自己写 prompt 吗？
+
+可以。这是一个很好的技巧：
+
+```
+我要实现一个签到功能。请帮我写一个详细的 prompt，
+我可以用这个 prompt 来让你（或另一个 Claude 会话）实现这个功能。
+
+项目技术栈：Flutter + Riverpod + Firebase + Clean Architecture
+```
+
+Claude 生成的 prompt 通常比你手写的更结构化。
+
+### Q7：Prompt 模板会不会限制 Claude 的创造力？
+
+不会。模板提供的是结构，不是内容。就像写文章有大纲但内容是自由的。好的模板反而能让 Claude 把"创造力"用在解决问题上，而不是猜测你的意图。
+
+---
+
+## 总结
+
+写好 Prompt 不是什么玄学，就是三件事：
+
+1. **说清楚**——目标、��束、验收标准
+2. **给上下文**——文件引用、管道输入、参考代码
+3. **分步走**——一次一个关注点，迭代推进
+
+把这些原则内化成习惯，你和 Claude Code 的协作效率会有质的飞跃。
+
+---
+
+## 推荐阅读
+
+- [Claude Code 进阶指南](/zh/blog/claude-code-advanced-guide) — Prompt 技巧最初的介绍在这里
+- [CLAUDE.md 完全指南](/zh/blog/claude-md-guide) — 把项目级 Prompt 规范写进 CLAUDE.md
+- [Claude Code Hooks 指南](/zh/blog/claude-code-hooks-guide) — 用 Hooks 自动化重复操作
+- [上下文管理指南](/zh/blog/claude-code-context-guide) — 管好上下文，让 Prompt 更高效
+- [多 Agent 并行指南](/zh/blog/claude-code-multi-agent-guide) — 多终端协作的 Prompt 策略
+- [自定义 Slash Commands 指南](/zh/blog/claude-code-skills-guide) — 把 Prompt 模板变成一键命令
+- [MCP Server 深度指南](/zh/blog/claude-code-mcp-guide) — 用 MCP 扩展 Claude 的能力边界
