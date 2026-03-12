@@ -1,0 +1,845 @@
+---
+title: "Claude Code settings.json 完全指南：从权限控制到团队协作的配置艺术"
+date: "2026-03-18"
+description: 深入解析 Claude Code settings.json 的五层作用域、权限系统、环境变量、模型配置与企业管控，附带 Flutter 项目多层配置实战示例。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+在 [CLAUDE.md 完全指南](/zh/blog/claude-md-guide)里，我提过一句话：**CLAUDE.md 告诉 Claude "做什么"，settings.json 告诉 Claude "怎么做"。**
+
+之后的几篇文章分别深入了 settings.json 的局部：[Hooks 指南](/zh/blog/claude-code-hooks-guide)讲了 `hooks` 字段，[MCP 指南](/zh/blog/claude-code-mcp-guide)讲了 `mcpServers` 字段。但 settings.json 作为一个整体——它的作用域层级、合并机制、权限系统——一直没有专门讲过。
+
+特别是**权限系统**。这是 settings.json 最核心也最容易踩坑的部分，之前的文章完全没覆盖。
+
+这篇文章把 settings.json 讲透。
+
+---
+
+## 一、settings.json 全景图
+
+### 1.1 一句话定义
+
+settings.json 是 Claude Code 的**行为配置文件**。它控制的不是"Claude 应该知道什么"（那是 CLAUDE.md 的事），而是"Claude 被允许做什么、用什么模型、怎么调用工具"。
+
+### 1.2 完整 Schema 概览
+
+settings.json 的所有顶层字段：
+
+| 字段 | 类型 | 作用 | 详细说明 |
+|------|------|------|----------|
+| `permissions` | object | 工具调用权限控制 | 本文第三节 |
+| `hooks` | object | 生命周期钩子 | [Hooks 指南](/zh/blog/claude-code-hooks-guide) |
+| `mcpServers` | object | MCP 服务器配置 | [MCP 指南](/zh/blog/claude-code-mcp-guide) |
+| `env` | object | 环境变量注入 | 本文第四节 |
+| `model` | string | 默认模型 | 本文第五节 |
+| `maxTokens` | number | 最大输出 token 数 | 本文第五节 |
+| `apiProvider` | string | API 提供商 | 本文第五节 |
+| `customApiHeaders` | object | 自定义 API 请求头 | 本文第五节 |
+
+### 1.3 和其他配置文件的关系
+
+Claude Code 有四种配置文件，各司其职：
+
+| 文件 | 作用 | 类比 |
+|------|------|------|
+| `CLAUDE.md` | 项目知识、编码规范、工作流指令 | 员工手册 |
+| `settings.json` | 权限、工具、模型、环境变量 | 安全策略 + IT 配置 |
+| `.claude/commands/` | 可复用的 Prompt 模板 | SOP 文档 |
+| `.claudeignore` | 排除文件/目录 | .gitignore |
+
+一个常见的误区是把所有东西都塞进 CLAUDE.md。记住：**如果是"规则"，放 CLAUDE.md；如果是"配置"，放 settings.json。**
+
+---
+
+## 二、五层作用域与合并机制
+
+### 2.1 五层层级
+
+settings.json 有五个作用域，优先级从高到低：
+
+```
+① Enterprise (最高优先级)
+   /etc/claude-code/managed-settings.json (Linux/Mac)
+
+② Session
+   启动时通过 --settings 标志传入
+
+③ Project Shared (团队共享)
+   .claude/settings.json (提交到 Git)
+
+④ Project Local (个人本地)
+   .claude/settings.local.json (不提交到 Git)
+
+⑤ User Global (最低优先级)
+   ~/.claude/settings.json
+```
+
+最常用的是三层：**User Global**（个人偏好）、**Project Shared**（团队规范）、**Project Local**（个人覆盖）。
+
+### 2.2 合并规则
+
+不同类型的字段有不同的合并策略：
+
+**数组字段（permissions）—— 拼接合并**
+
+```jsonc
+// User Global: ~/.claude/settings.json
+{
+  "permissions": {
+    "allow": ["Read"]
+  }
+}
+
+// Project Shared: .claude/settings.json
+{
+  "permissions": {
+    "allow": ["Bash(npm test)"]
+  }
+}
+
+// 合并结果：两个 allow 数组拼接
+// allow: ["Read", "Bash(npm test)"]
+```
+
+**对象字段（env, mcpServers）—— 深度合并**
+
+```jsonc
+// User Global
+{
+  "env": {
+    "EDITOR": "vim"
+  }
+}
+
+// Project Shared
+{
+  "env": {
+    "NODE_ENV": "development"
+  }
+}
+
+// 合并结果：两个对象合并
+// env: { "EDITOR": "vim", "NODE_ENV": "development" }
+```
+
+同名 key 时，高优先级覆盖低优先级。
+
+**标量字段（model, maxTokens）—— 直接覆盖**
+
+```jsonc
+// User Global
+{ "model": "claude-sonnet-4-6" }
+
+// Project Shared
+{ "model": "claude-opus-4-6" }
+
+// 合并结果：高优先级的 Project Shared 生效
+// model: "claude-opus-4-6"
+```
+
+### 2.3 实际场景：该放哪一层
+
+| 场景 | 推荐层级 | 原因 |
+|------|----------|------|
+| 个人偏好的模型 | User Global | 跨项目生效 |
+| 团队统一的权限规则 | Project Shared | 提交到 Git，团队共享 |
+| 个人 API Key | Project Local | 不提交到 Git |
+| CI/CD 环境配置 | Session | 通过启动参数传入 |
+| 公司安全策略 | Enterprise | 最高优先级，不可覆盖 |
+| 项目专用 MCP 服务器 | Project Shared | 团队共享 |
+| 个人常用 MCP 服务器 | User Global | 跨项目可用 |
+| 个人 token/密钥 | Project Local 或 User Global | 绝不提交到 Git |
+
+---
+
+## 三、权限系统深度解析
+
+这是 settings.json 最重要的部分。权限系统决定了 Claude 能调用哪些工具、能执行哪些命令。
+
+### 3.1 权限的三种类型
+
+```jsonc
+{
+  "permissions": {
+    "allow": [],  // 自动允许，不弹确认
+    "deny": [],   // 直接拒绝，Claude 看不到这个工具
+    "ask": []     // 每次调用都弹确认（默认行为）
+  }
+}
+```
+
+没有显式配置的工具默认是 `ask`——每次调用都会弹出确认框让你选择。
+
+三种类型的使用场景：
+
+| 类型 | 场景 | 示例 |
+|------|------|------|
+| `allow` | 你完全信任的操作 | 读文件、运行测试 |
+| `deny` | 绝对不允许的操作 | 删除生产数据库、force push |
+| `ask` | 需要人工判断的操作 | 写文件、安装依赖（默认） |
+
+### 3.2 工具名称与模式语法
+
+权限规则的核心是**工具名称 + 参数模式**。
+
+**基础工具名称：**
+
+| 工具名 | 作用 |
+|--------|------|
+| `Read` | 读取文件 |
+| `Edit` | 编辑文件 |
+| `Write` | 创建/覆盖文件 |
+| `Bash` | 执行 shell 命令 |
+| `WebFetch` | 访问 URL |
+| `WebSearch` | 网页搜索 |
+
+**带参数的模式匹配：**
+
+`Bash` 工具支持参数模式，用来精确控制允许哪些命令：
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "Read",                    // 允许所有文件读取
+      "Bash(npm test)",          // 只允许 npm test
+      "Bash(npm run *)",         // 允许所有 npm run 子命令
+      "Bash(git log *)",         // 允许 git log
+      "Bash(git diff *)",        // 允许 git diff
+      "Bash(cd * && cat *)"      // 允许 cd + cat 组合
+    ],
+    "deny": [
+      "Bash(rm -rf *)",          // 禁止递归删除
+      "Bash(git push --force *)" // 禁止 force push
+    ]
+  }
+}
+```
+
+**Glob 模式规则：**
+
+- `*` 匹配任意字符（不跨参数边界）
+- 模式匹配的是 Claude 实际传给工具的参数
+- 对于 `Bash` 工具，参数就是完整的 shell 命令字符串
+
+**MCP 工具的权限：**
+
+MCP 工具使用 `mcp__<server>__<tool>` 格式：
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "mcp__github__create_issue",     // 允许创建 issue
+      "mcp__filesystem__read_file"     // 允许读文件
+    ],
+    "deny": [
+      "mcp__github__delete_repository" // 禁止删仓库
+    ]
+  }
+}
+```
+
+### 3.3 评估顺序与优先级
+
+权限评估遵循严格的顺序：
+
+```
+1. 检查 deny 列表 → 匹配则拒绝（最高优先级）
+2. 检查 allow 列表 → 匹配则允许
+3. 都不匹配 → 默认 ask（弹确认框）
+```
+
+**deny 永远优先于 allow。** 这意味着：
+
+```jsonc
+{
+  "permissions": {
+    "allow": ["Bash(git *)"],           // 允许所有 git 命令
+    "deny": ["Bash(git push --force *)"] // 但禁止 force push
+  }
+}
+// 结果：git push --force 被拒绝，其他 git 命令被允许
+```
+
+**跨作用域的行为：**
+
+当多个作用域都有权限配置时，所有 `deny` 规则合并后优先评估，然后是所有 `allow` 规则。这意味着**任何一层的 deny 都无法被其他层的 allow 覆盖**。
+
+```jsonc
+// Project Shared: .claude/settings.json
+{
+  "permissions": {
+    "deny": ["Bash(rm -rf *)"]
+  }
+}
+
+// User Global: ~/.claude/settings.json
+{
+  "permissions": {
+    "allow": ["Bash(rm -rf *)"]  // 试图覆盖项目的 deny
+  }
+}
+
+// 结果：rm -rf 仍然被拒绝。deny 不可覆盖。
+```
+
+### 3.4 常用权限配置模板
+
+**便捷模式（个人开发）：**
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(rm -rf *)"
+    ]
+  }
+}
+```
+
+**严格模式（团队项目）：**
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash(npm test *)",
+      "Bash(npm run lint *)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(rm *)",
+      "Bash(npm publish *)",
+      "Bash(curl *)",
+      "Bash(wget *)"
+    ]
+  }
+}
+```
+
+**CI/CD 模式（自动化流水线）：**
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Edit",
+      "Write",
+      "Bash(npm *)",
+      "Bash(git *)"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(rm -rf /)",
+      "WebFetch",
+      "WebSearch"
+    ]
+  }
+}
+```
+
+CI/CD 模式更宽松，因为流水线本身就是受控环境。但仍然禁止 force push 和危险删除。
+
+### 3.5 权限调试
+
+**查看当前生效的权限：**
+
+在 Claude Code 中输入 `/permissions` 命令，可以看到合并后的完整权限列表，包括每条规则来自哪个作用域。
+
+**常见踩坑：**
+
+1. **模式不匹配**：`Bash(npm test)` 只匹配精确的 `npm test`，不匹配 `npm test -- --watch`。需要用 `Bash(npm test*)` 或 `Bash(npm test *)`。
+
+2. **deny 写得太宽**：`deny: ["Bash(git *)"]` 会禁止所有 git 命令，包括 `git status` 和 `git diff`。应该只 deny 危险操作。
+
+3. **忘记 MCP 工具前缀**：MCP 工具必须用 `mcp__<server>__<tool>` 格式，直接写工具名不会匹配。
+
+4. **Project Shared 里放了敏感信息**：`.claude/settings.json` 会提交到 Git。API Key、Token 等敏感信息应该放在 `.claude/settings.local.json`。
+
+---
+
+## 四、环境变量配置
+
+### 4.1 env 字段
+
+settings.json 的 `env` 字段可以为 Claude Code 的运行环境注入环境变量：
+
+```jsonc
+{
+  "env": {
+    "NODE_ENV": "development",
+    "DEBUG": "true",
+    "API_BASE_URL": "https://api.example.com"
+  }
+}
+```
+
+这些环境变量会在 Claude Code 启动时注入，对所有 Bash 命令生效。
+
+常见用途：
+- 设置开发环境变量（`NODE_ENV`、`DEBUG`）
+- 配置 API 端点
+- 设置工具链路径
+
+### 4.2 和 MCP Server env 的区别
+
+`env` 字段有两个层级，容易混淆：
+
+```jsonc
+{
+  // 顶层 env：对所有 Bash 命令生效
+  "env": {
+    "GLOBAL_VAR": "value"
+  },
+
+  // MCP Server 内的 env：只对该 MCP Server 进程生效
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_xxx"  // 只有 github server 能看到
+      }
+    }
+  }
+}
+```
+
+**顶层 `env`** 影响 Claude Code 执行的所有 Bash 命令。**MCP Server 内的 `env`** 只影响该 Server 的进程，更安全。
+
+### 4.3 环境变量的作用域
+
+`env` 遵循对象合并规则——多层作用域的 `env` 会深度合并，同名 key 高优先级覆盖低优先级：
+
+```jsonc
+// User Global
+{ "env": { "EDITOR": "vim", "LANG": "en_US" } }
+
+// Project Shared
+{ "env": { "NODE_ENV": "development", "LANG": "zh_CN" } }
+
+// 合并结果
+// { "EDITOR": "vim", "NODE_ENV": "development", "LANG": "zh_CN" }
+// LANG 被 Project Shared 覆盖
+```
+
+---
+
+## 五、模型与 API 配置
+
+### 5.1 model 配置
+
+通过 `model` 字段指定 Claude Code 使用的模型：
+
+```jsonc
+{
+  "model": "claude-sonnet-4-6"
+}
+```
+
+常用模型：
+
+| 模型 ID | 特点 |
+|---------|------|
+| `claude-opus-4-6` | 最强能力，适合复杂任务 |
+| `claude-sonnet-4-6` | 平衡性能和成本 |
+| `claude-haiku-4-5` | 最快速度，适合简单任务 |
+
+你也可以在会话中用 `/model` 命令临时切换模型，不影响 settings.json 的配置。
+
+### 5.2 maxTokens
+
+限制单次响应的最大 token 数：
+
+```jsonc
+{
+  "maxTokens": 16384
+}
+```
+
+默认值通常够用。只有在需要生成超长内容时才需要调大。注意：这个值不能超过模型本身的上限。
+
+### 5.3 API Provider 配置
+
+Claude Code 默认使用 Anthropic API，但也支持 Amazon Bedrock 和 Google Vertex AI：
+
+**Anthropic（默认）：**
+
+```jsonc
+{
+  "apiProvider": "anthropic"
+  // 使用 ANTHROPIC_API_KEY 环境变量
+}
+```
+
+**Amazon Bedrock：**
+
+```jsonc
+{
+  "apiProvider": "bedrock",
+  "env": {
+    "AWS_REGION": "us-east-1",
+    "AWS_PROFILE": "my-profile"
+  }
+}
+```
+
+**Google Vertex AI：**
+
+```jsonc
+{
+  "apiProvider": "vertex",
+  "env": {
+    "CLOUD_ML_REGION": "us-east5",
+    "ANTHROPIC_VERTEX_PROJECT_ID": "my-project-id"
+  }
+}
+```
+
+**自定义 API 请求头：**
+
+```jsonc
+{
+  "customApiHeaders": {
+    "X-Custom-Header": "value",
+    "Authorization": "Bearer custom-token"
+  }
+}
+```
+
+这在需要通过 API 网关或代理访问时很有用。
+
+---
+
+## 六、企业管控
+
+### 6.1 Managed Settings
+
+企业环境下，管理员可以通过 Managed Settings 强制执行安全策略：
+
+```
+Linux/Mac: /etc/claude-code/managed-settings.json
+```
+
+这是优先级最高的作用域。用户和项目配置都无法覆盖它。
+
+```jsonc
+// /etc/claude-code/managed-settings.json
+{
+  "permissions": {
+    "deny": [
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(npm publish *)",
+      "Bash(git push --force *)",
+      "WebFetch",
+      "WebSearch"
+    ]
+  },
+  "model": "claude-sonnet-4-6"
+}
+```
+
+### 6.2 典型企业策略
+
+**禁止网络访问：**
+
+```jsonc
+{
+  "permissions": {
+    "deny": [
+      "Bash(curl *)",
+      "Bash(wget *)",
+      "Bash(ssh *)",
+      "WebFetch",
+      "WebSearch"
+    ]
+  }
+}
+```
+
+**强制使用指定模型（控制成本）：**
+
+```jsonc
+{
+  "model": "claude-sonnet-4-6"
+}
+```
+
+因为 Enterprise 层优先级最高，即使用户在 User Global 里配了 `claude-opus-4-6`，实际生效的仍然是 `claude-sonnet-4-6`。
+
+**限制 MCP Server：**
+
+```jsonc
+{
+  "mcpServers": {},
+  "permissions": {
+    "deny": [
+      "mcp__*"
+    ]
+  }
+}
+```
+
+通过 deny 所有 `mcp__*` 模式的工具，可以禁止使用任何 MCP Server。
+
+---
+
+## 七、实战示例：Flutter 项目完整配置
+
+### 7.1 项目背景
+
+假设你在一个 Flutter 团队工作：
+- 技术栈：Flutter + Riverpod + Firebase
+- 团队 5 人，使用 GitHub 协作
+- 有 CI/CD 流水线
+- 使用 GitHub MCP Server 管理 Issue
+
+### 7.2 团队共享配置
+
+`.claude/settings.json`（提交到 Git）：
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash(flutter test *)",
+      "Bash(flutter analyze *)",
+      "Bash(dart format *)",
+      "Bash(dart fix *)",
+      "Bash(flutter pub get)",
+      "Bash(git status)",
+      "Bash(git diff *)",
+      "Bash(git log *)",
+      "mcp__github__list_issues",
+      "mcp__github__get_issue",
+      "mcp__github__create_issue"
+    ],
+    "deny": [
+      "Bash(git push --force *)",
+      "Bash(rm -rf *)",
+      "Bash(flutter pub publish *)",
+      "mcp__github__delete_repository"
+    ]
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "dart format --line-length 80 $CLAUDE_FILE_PATH"
+          }
+        ]
+      }
+    ]
+  },
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": ""
+      }
+    }
+  },
+  "env": {
+    "FLUTTER_TEST_CONCURRENCY": "4"
+  }
+}
+```
+
+注意 `GITHUB_TOKEN` 留空——实际值由每个人在本地配置。
+
+### 7.3 个人本地配置
+
+`.claude/settings.local.json`（不提交到 Git）：
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "Edit",
+      "Write",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  },
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_xxxxxxxxxxxx"
+      }
+    }
+  },
+  "model": "claude-opus-4-6"
+}
+```
+
+这里做了三件事：
+1. 给自己额外的写权限（团队共享配置只允许 Read）
+2. 填入真实的 GitHub Token
+3. 选择自己偏好的模型
+
+### 7.4 全局配置
+
+`~/.claude/settings.json`（跨项目生效）：
+
+```jsonc
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Bash(cat *)",
+      "Bash(ls *)",
+      "Bash(which *)",
+      "Bash(echo *)"
+    ]
+  },
+  "env": {
+    "EDITOR": "code",
+    "LANG": "zh_CN.UTF-8"
+  }
+}
+```
+
+### 7.5 合并后的效果
+
+三层配置合并后，实际生效的权限：
+
+```
+allow（拼接合并）:
+  - Read                          ← User Global + Project Shared
+  - Bash(cat *), Bash(ls *)...    ← User Global
+  - Bash(flutter test *)...       ← Project Shared
+  - Edit, Write                   ← Project Local
+  - Bash(git add *), Bash(git commit *) ← Project Local
+  - mcp__github__list_issues...   ← Project Shared
+
+deny（拼接合并）:
+  - Bash(git push --force *)      ← Project Shared
+  - Bash(rm -rf *)                ← Project Shared
+  - Bash(flutter pub publish *)   ← Project Shared
+  - mcp__github__delete_repository ← Project Shared
+
+model: "claude-opus-4-6"          ← Project Local 覆盖
+
+env（深度合并）:
+  - EDITOR: "code"                ← User Global
+  - LANG: "zh_CN.UTF-8"          ← User Global
+  - FLUTTER_TEST_CONCURRENCY: "4" ← Project Shared
+
+mcpServers（深度合并）:
+  - github: GITHUB_TOKEN = "ghp_xxx" ← Project Local 覆盖 Project Shared 的空值
+```
+
+这就是多层配置的威力：团队共享安全规则，个人自定义偏好，敏感信息不入库。
+
+---
+
+## 八、常见问题
+
+### Q1：settings.json 和 CLAUDE.md 到底怎么分工？
+
+简单原则：
+- **CLAUDE.md**：自然语言指令。"用 Riverpod 做状态管理"、"函数命名用 camelCase"
+- **settings.json**：结构化配置。权限、Hooks、MCP、环境变量、模型
+
+如果你发现自己在 CLAUDE.md 里写 JSON 配置，那它应该在 settings.json 里。
+
+### Q2：.claude/settings.json 和 .claude/settings.local.json 有什么区别？
+
+`.claude/settings.json` 是团队共享的，应该提交到 Git。`.claude/settings.local.json` 是个人的，不应该提交。
+
+把 `.claude/settings.local.json` 加到 `.gitignore`：
+
+```
+# .gitignore
+.claude/settings.local.json
+```
+
+### Q3：权限配置写错了会怎样？
+
+不会崩溃。Claude Code 会忽略无法解析的规则，其他规则正常生效。但建议用 `/permissions` 命令验证配置是否符合预期。
+
+### Q4：可以完全禁用某个工具吗？
+
+可以。把工具名加到 `deny` 列表：
+
+```jsonc
+{
+  "permissions": {
+    "deny": ["WebFetch", "WebSearch"]
+  }
+}
+```
+
+这样 Claude 完全无法使用这些工具。
+
+### Q5：env 里的变量和系统环境变量冲突怎么办？
+
+settings.json 的 `env` 会覆盖同名的系统环境变量。如果你不想覆盖，就不要在 `env` 里设置同名的 key。
+
+### Q6：多个作用域的 hooks 会怎么合并？
+
+Hooks 遵循对象合并规则。同一个生命周期事件（如 `PostToolUse`）的 hooks 数组会拼接。详细的合并行为参考 [Hooks 指南](/zh/blog/claude-code-hooks-guide)。
+
+### Q7：Session 级别的 settings 怎么用？
+
+通过启动参数传入：
+
+```bash
+claude --settings /path/to/session-settings.json
+```
+
+适合 CI/CD 场景，每次运行用不同的配置。
+
+---
+
+## 总结
+
+settings.json 的核心就三件事：
+
+1. **权限控制**——deny/allow/ask 三层防线，deny 永远优先
+2. **作用域分层**——五层从企业到个人，合理分配配置
+3. **团队协作**——Shared 放规范，Local 放个人，敏感信息不入库
+
+掌握这些，你就能让 Claude Code 在安全可控的范围内发挥最大效能。
+
+---
+
+## 推荐阅读
+
+- [Claude Code 进阶指南](/zh/blog/claude-code-advanced-guide) — 从零开始的完整入门
+- [CLAUDE.md 完全指南](/zh/blog/claude-md-guide) — settings.json 的搭档，管"做什么"
+- [Claude Code Hooks 指南](/zh/blog/claude-code-hooks-guide) — settings.json 中 hooks 字段的深度解析
+- [上下文管理指南](/zh/blog/claude-code-context-guide) — 管好上下文，让配置更高效
+- [多 Agent 并行指南](/zh/blog/claude-code-multi-agent-guide) — 多终端协作的配置策略
+- [自定义 Slash Commands 指南](/zh/blog/claude-code-skills-guide) — 把常用操作变成一键命令
+- [MCP Server 深度指南](/zh/blog/claude-code-mcp-guide) — settings.json 中 mcpServers 字段的深度解析
+- [高效 Prompt 指南](/zh/blog/claude-code-prompt-guide) — 配置好环境后，写好 Prompt 是下一步
