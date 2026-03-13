@@ -1,0 +1,851 @@
+---
+title: "The Complete Claude Code Debugging Workflow Guide: AI-Powered Error Diagnosis"
+date: "2026-03-22"
+description: A systematic guide to Claude Code's debugging workflow capabilities, covering error interpretation, root cause analysis, runtime debugging, async and concurrency issues, environment configuration problems, performance debugging, production debugging, CLAUDE.md debugging conventions, with a complete SSR hydration mismatch debugging walkthrough.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+Debugging is where developers spend the most time — and often the most frustrating time. Throughout this series, we've touched on debugging in various contexts: the [Testing Guide](/en/blog/claude-code-testing-guide) covered debugging failing tests (Section 6), the [Git Guide](/en/blog/claude-code-git-guide) introduced `git bisect` for tracking down regressions, and the [Prompt Guide](/en/blog/claude-code-prompt-guide) showed how to describe bugs effectively. But we've never systematically covered: **how to build a complete debugging workflow with Claude Code**.
+
+This article is the dedicated debugging guide. We'll cover everything from interpreting cryptic error messages to diagnosing race conditions, from performance profiling to production incident response. If the [Refactoring Guide](/en/blog/claude-code-refactoring-guide) is about improving code that works, this guide is about fixing code that doesn't.
+
+Let's turn debugging from a frustrating guessing game into a systematic, AI-assisted process.
+
+## 1. Why Debugging Needs an AI Partner
+
+### The Debugging Pain Points
+
+| Pain Point | Description | Time Cost |
+|-----------|-------------|-----------|
+| Cryptic error messages | Stack traces pointing to compiled code, not your source | 15-30 min |
+| Scope uncertainty | "Is it the frontend, backend, or database?" | 30-60 min |
+| Intermittent bugs | Works 9 out of 10 times, fails unpredictably | 1-4 hours |
+| Environment differences | "Works on my machine" | 30-90 min |
+| Dependency conflicts | Version mismatches across packages | 30-60 min |
+| Knowledge gaps | Unfamiliar library internals or APIs | 1-2 hours |
+
+### Manual Debugging vs Claude Code Debugging
+
+| Dimension | Manual Debugging | Claude Code Debugging |
+|-----------|-----------------|----------------------|
+| Error interpretation | Google the error, scan Stack Overflow | Instant contextual explanation with your codebase |
+| Scope narrowing | Add console.logs, restart, repeat | Analyzes call chain and narrows scope in seconds |
+| Hypothesis testing | Manually edit code, test, revert | Suggests multiple hypotheses ranked by likelihood |
+| Fix generation | Write fix, hope it works | Generates fix with explanation of why it works |
+| Regression prevention | Maybe write a test afterward | Automatically suggests regression test |
+| Knowledge retention | Lives in your head (or a forgotten wiki) | Encoded in CLAUDE.md and test suites |
+
+### The Debugging Mental Model
+
+Effective debugging follows a consistent pattern, whether you're using AI or not:
+
+```
+Hypothesis → Verify → Narrow Scope → Repeat
+```
+
+Claude Code accelerates every step:
+
+```bash
+# Step 1: Hypothesis — describe the symptom
+> The checkout page shows a blank screen after clicking "Place Order".
+> No errors in the console. Network tab shows a 200 response.
+
+# Step 2: Verify — Claude Code suggests checks
+# Check error boundaries, silent promise rejections, conditional null renders
+
+# Step 3: Narrow — provide more context
+> The response body from /api/checkout is: {"status": "success", "orderId": null}
+> orderId is null — could that be the issue?
+
+# Step 4: Claude Code traces orderId through your components
+```
+
+The key insight: describe symptoms accurately and let Claude Code generate hypotheses.
+
+## 2. Error Message Interpretation
+
+### Error Type Classification
+
+| Error Type | Example | Typical Cause | Claude Code Approach |
+|-----------|---------|---------------|---------------------|
+| Syntax | `Unexpected token '}'` | Missing bracket, typo | Reads file, finds exact location |
+| Runtime | `TypeError: Cannot read properties of undefined` | Null reference, missing data | Traces variable origin through call chain |
+| Type | `Type 'string' is not assignable to type 'number'` | Type mismatch | Analyzes type definitions and suggests fix |
+| Network | `ERR_CONNECTION_REFUSED` | Server down, wrong port | Checks server config, port bindings |
+| Permission | `EACCES: permission denied` | File/port permission issue | Checks file ownership, suggests chmod/sudo |
+| Module | `Cannot find module './utils'` | Wrong path, missing export | Verifies file existence, checks tsconfig paths |
+
+### Stack Trace Reading Techniques
+
+Stack traces are the first clue. Feed them to Claude Code with context:
+
+```bash
+# Bad: just the error message
+> TypeError: Cannot read properties of undefined (reading 'map')
+
+# Good: full stack trace + what changed recently
+> I'm getting this error when loading the blog list page:
+> TypeError: Cannot read properties of undefined (reading 'map')
+>     at BlogList (app/[locale]/blog/page.tsx:42:18)
+>     at renderWithHooks (node_modules/react-dom/...)
+> The page was working yesterday. I recently changed getPostsByLocale
+> to add tag filtering.
+```
+
+Claude Code uses the stack trace to open the file at line 42, trace what `.map()` is called on, check `getPostsByLocale` for recent changes, and find the bug (likely the tag filter returns `undefined` instead of `[]`).
+
+### Prompt Templates for Error Interpretation
+
+```bash
+# Unknown error
+> I'm seeing this error and I don't understand it: [paste full error + stack trace]
+
+# Error with context
+> This error started after [describe recent change]: [paste error]
+
+# Intermittent error
+> This error happens about 30% of the time: [paste error]
+> What could cause it to be intermittent?
+```
+
+### Error Message → Root Cause Mapping
+
+| Error Message | Likely Root Cause | First Thing to Check |
+|--------------|-------------------|---------------------|
+| `Cannot read properties of undefined` | Variable not initialized or async data not loaded | Check if data is fetched before render |
+| `Hydration failed` | Server/client HTML mismatch | Check for browser-only APIs in SSR |
+| `Module not found` | Wrong import path or missing dependency | Check file path and `package.json` |
+| `CORS error` | Backend missing CORS headers | Check API server CORS configuration |
+| `ENOMEM` | Out of memory | Check for memory leaks, increase Node heap |
+| `ECONNREFUSED` | Target service not running | Check if the server/database is up |
+| `Maximum call stack size exceeded` | Infinite recursion | Check for circular function calls |
+| `ETIMEOUT` | Network or DNS issue | Check connectivity, DNS resolution |
+
+> For more on writing effective prompts when describing bugs, see the [Prompt Techniques Guide](/en/blog/claude-code-prompt-guide).
+
+## 3. Root Cause Analysis
+
+### Binary Search Debugging
+
+When you know a feature used to work but now it doesn't, binary search is the fastest approach.
+
+**Code-level binary search** — comment out half the code:
+
+```bash
+> The dashboard page is crashing. It has 8 widgets.
+> Comment out the bottom 4 widgets to check if the bug is in the top or bottom half.
+```
+
+If the crash stops, the bug is in the bottom half. Repeat until you find the culprit.
+
+**Git-level binary search** — `git bisect`:
+
+```bash
+git bisect start
+git bisect bad          # current commit is broken
+git bisect good abc123  # this older commit was working
+# Git checks out a middle commit — test it, then: git bisect good/bad
+# Repeat until git identifies the exact commit
+```
+
+### git bisect + Claude Code Automation
+
+```bash
+> The blog search is broken — it was working at commit a1b2c3d.
+> Use git bisect with `npm test -- --run search` to find the bad commit.
+```
+
+```bash
+git bisect start && git bisect bad HEAD && git bisect good a1b2c3d
+git bisect run npm test -- --run search
+```
+
+This automatically tests each bisect step. For more on git bisect, see the [Git Workflow Guide](/en/blog/claude-code-git-guide).
+
+### Log Analysis Strategy
+
+When the error isn't obvious, structured log analysis helps:
+
+```bash
+> Here are the last 50 lines of the server log when the error occurs:
+> [paste logs]
+> Identify the first error, any timing patterns, and which module is failing.
+```
+
+### Dependency Tracking
+
+```bash
+> Something broke after running npm update yesterday.
+> Compare package-lock.json with the previous version and identify
+> which packages changed. Check changelogs for breaking changes.
+```
+
+## 4. Runtime Debugging
+
+### console.log Strategy
+
+Not all console.logs are created equal. Ask Claude Code for structured logging:
+
+```bash
+> Add debugging logs to the checkout flow. Use structured logging with
+> timestamp, function name, sanitized parameters, and output/error.
+```
+
+Claude Code generates:
+
+```typescript
+// lib/debug.ts
+const DEBUG = process.env.NODE_ENV === 'development'
+
+export function debugLog(
+  fn: string,
+  action: 'enter' | 'exit' | 'error',
+  data?: Record<string, unknown>
+) {
+  if (!DEBUG) return
+  const prefix = { enter: '→', exit: '←', error: '✗' }[action]
+  console.log(`[${new Date().toISOString()}] ${prefix} ${fn}`, data ?? '')
+}
+
+// Usage
+export async function processCheckout(cart: Cart, user: User) {
+  debugLog('processCheckout', 'enter', { cartItems: cart.items.length, userId: user.id })
+  try {
+    const order = await createOrder(cart, user)
+    debugLog('processCheckout', 'exit', { orderId: order.id })
+    return order
+  } catch (error) {
+    debugLog('processCheckout', 'error', {
+      message: error instanceof Error ? error.message : 'Unknown error',
+    })
+    throw error
+  }
+}
+```
+
+### Conditional Logging
+
+For bugs that only appear with specific data:
+
+```typescript
+export async function fetchPosts(locale: string, tag?: string) {
+  const posts = await getPostsByLocale(locale)
+  const filtered = tag ? posts.filter(p => p.tags.includes(tag)) : posts
+
+  // Only log when results are unexpectedly empty
+  if (filtered.length === 0 && posts.length > 0) {
+    console.warn('[fetchPosts] Filter returned 0 results', {
+      locale, tag, totalPosts: posts.length,
+      availableTags: [...new Set(posts.flatMap(p => p.tags))],
+    })
+  }
+  return filtered
+}
+```
+
+### Network Request Debugging
+
+```bash
+> The dashboard is showing stale data. Add a fetch wrapper that logs all requests.
+```
+
+```typescript
+// lib/debug-fetch.ts
+const originalFetch = globalThis.fetch
+
+export function enableFetchDebugging() {
+  globalThis.fetch = async (input, init) => {
+    const url = typeof input === 'string' ? input : input.toString()
+    console.group(`[Fetch] ${init?.method ?? 'GET'} ${url}`)
+    try {
+      const response = await originalFetch(input, init)
+      console.log('Status:', response.status)
+      console.groupEnd()
+      return response
+    } catch (error) {
+      console.error('Fetch error:', error)
+      console.groupEnd()
+      throw error
+    }
+  }
+}
+```
+
+### State Tracking for React
+
+```bash
+> The shopping cart count doesn't update when I add items.
+> Add state change logging to the CartProvider.
+```
+
+```typescript
+// context/CartContext.tsx
+export function CartProvider({ children }: { children: React.ReactNode }) {
+  const [cart, setCart] = useState<CartState>(initialState)
+  const prevCartRef = useRef<CartState>(initialState)
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const prev = prevCartRef.current
+      console.log('[CartProvider] State changed:', {
+        prevItems: prev.items.length,
+        newItems: cart.items.length,
+        added: cart.items.filter(i => !prev.items.find(p => p.id === i.id)),
+        removed: prev.items.filter(i => !cart.items.find(c => c.id === i.id)),
+      })
+      prevCartRef.current = cart
+    }
+  }, [cart])
+  // ... rest of provider
+}
+```
+
+## 5. Async and Concurrency Issues
+
+Async bugs are among the hardest to debug because they're often intermittent.
+
+### Race Condition Diagnosis
+
+```bash
+> Users sometimes see stale profile data after updating their profile.
+> The update API returns 200, but the page still shows old data.
+> This happens maybe 20% of the time. Could this be a race condition?
+```
+
+```typescript
+// Bug: race condition between update and refetch
+async function handleProfileUpdate(data: ProfileData) {
+  await updateProfile(data)
+  router.refresh() // Doesn't wait for revalidation to complete
+}
+
+// Fix: optimistic update or wait for revalidation
+async function handleProfileUpdate(data: ProfileData) {
+  const updated = await updateProfile(data)
+  setProfile(updated) // Optimistic update — immediate UI feedback
+}
+```
+
+### Promise Chain Debugging
+
+Unhandled promise rejections are silent killers:
+
+```bash
+> Audit the API route handlers in app/api/ for unhandled promise rejections.
+> Check for missing try/catch, .then() without .catch(), and un-awaited promises.
+```
+
+```typescript
+// Bug: fire-and-forget promise — errors silently swallowed
+export async function POST(request: Request) {
+  const data = await request.json()
+  sendNotificationEmail(data.email, data.orderId) // Not awaited!
+  return Response.json({ success: true })
+}
+
+// Fix: await or explicitly handle the error
+export async function POST(request: Request) {
+  const data = await request.json()
+  sendNotificationEmail(data.email, data.orderId).catch(error => {
+    console.error('[POST /api/order] Email failed:', error)
+  })
+  return Response.json({ success: true })
+}
+```
+
+### Event Loop Issues
+
+```bash
+> The server becomes unresponsive for 2-3 seconds every minute.
+> CPU spikes to 100%. Could something be blocking the event loop?
+```
+
+```typescript
+// Bug: synchronous file read in a request handler
+export async function GET(request: Request) {
+  const data = fs.readFileSync('/path/to/large-file.json', 'utf-8') // Blocks!
+  return Response.json(JSON.parse(data))
+}
+
+// Fix: use async version
+export async function GET(request: Request) {
+  const data = await fs.promises.readFile('/path/to/large-file.json', 'utf-8')
+  return Response.json(JSON.parse(data))
+}
+```
+
+### Common Async Bug Patterns
+
+| Bug Pattern | Symptom | Root Cause | Fix |
+|------------|---------|------------|-----|
+| Missing `await` | Function returns `Promise<T>` instead of `T` | Forgot `await` on async call | Add `await` keyword |
+| Race condition | Intermittent stale data | Two async ops compete | Use mutex, queue, or optimistic update |
+| Unhandled rejection | Silent failure, no error logged | `.catch()` missing | Add error handling |
+| Event loop blocking | Server freezes periodically | Sync I/O in async context | Use async alternatives |
+| Zombie listeners | Memory leak, duplicate events | Event listener not cleaned up | Return cleanup in `useEffect` |
+| Stale closure | Callback uses outdated state | Closure captures old value | Use `useRef` or dependency array |
+
+## 6. Environment and Configuration Issues
+
+"Works on my machine" bugs are real, common, and Claude Code can help systematically eliminate them.
+
+### "Works on My Machine" Troubleshooting Checklist
+
+```bash
+> The app works locally but fails in CI/staging with this error: [paste error]
+> Walk me through the checklist: Node version? Env vars? Path case sensitivity?
+> OS-specific behavior? Dependency version differences?
+```
+
+### Environment Variable Issues
+
+```bash
+> The app crashes in production with "Invalid URL" but works locally.
+> Check all environment variable usage and identify any that might
+> be undefined in production.
+```
+
+```typescript
+// lib/env.ts — defensive environment variable access
+export function getRequiredEnv(key: string): string {
+  const value = process.env[key]
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${key}`)
+  }
+  return value
+}
+```
+
+### Path and Platform Differences
+
+| Issue | Windows | macOS | Linux |
+|-------|---------|-------|-------|
+| Path separator | `\` | `/` | `/` |
+| Case sensitivity | No | No (default) | Yes |
+| Line endings | `\r\n` | `\n` | `\n` |
+
+```typescript
+// Bug: works on Mac (case-insensitive), fails on Linux
+import { UserAvatar } from '@/components/userAvatar'
+// Actual file: components/UserAvatar.tsx — fix: match exact case
+```
+
+### Version Conflict Diagnosis
+
+```bash
+> I'm getting "Cannot find module 'react-dom/client'" in CI
+> but it works locally. Compare my local Node/npm versions with CI.
+```
+
+```bash
+node -v          # Local: v22.x, CI: v18.x
+npm -v           # Local: 10.x, CI: 9.x
+```
+
+Create a `.nvmrc` and add `engines` to `package.json` to prevent version drift:
+
+```json
+{
+  "engines": { "node": ">=20.0.0", "npm": ">=10.0.0" }
+}
+```
+
+> For more on configuring Claude Code's environment, see the [Settings Guide](/en/blog/claude-code-settings-guide).
+
+## 7. Performance Debugging
+
+Performance bugs are subtle — the app works, just slowly.
+
+### Frontend Performance
+
+```bash
+> Run a Lighthouse audit on the blog list page. Focus on LCP, CLS, and TBT.
+> Suggest specific fixes for any metric below 90.
+```
+
+| Core Web Vital | Good | Needs Improvement | Poor | Common Fix |
+|---------------|------|-------------------|------|------------|
+| LCP | < 2.5s | 2.5-4.0s | > 4.0s | Optimize images, preload fonts |
+| FID / INP | < 100ms | 100-300ms | > 300ms | Code split, defer non-critical JS |
+| CLS | < 0.1 | 0.1-0.25 | > 0.25 | Set image dimensions, avoid layout shifts |
+
+### Bundle Analysis
+
+```bash
+> The initial page load is 2.3MB of JavaScript.
+> Analyze the bundle and identify the largest packages,
+> lazy-loadable packages, and duplicate packages.
+```
+
+```bash
+# Enable Next.js bundle analyzer
+ANALYZE=true npm run build
+```
+
+```bash
+> The bundle analysis shows:
+> - lodash: 72KB (only using _.debounce)
+> - moment: 230KB (only using format)
+> - highlight.js: 180KB (loading all languages)
+>
+> Replace each with a lighter alternative or tree-shakeable import.
+```
+
+### Memory Leak Detection
+
+```bash
+> The app's memory grows from 150MB to 800MB over 2 hours.
+> Check for event listeners not cleaned up, intervals not cleared,
+> and growing caches without eviction.
+```
+
+```typescript
+// Bug: event listener leak in React component
+function SearchBar() {
+  const [query, setQuery] = useState('')
+
+  // Bug: new listener on every render, never removed
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+  }) // Missing dependency array
+
+  // Fix: add cleanup and dependency array
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
+}
+```
+
+```typescript
+// Bug: growing cache with no eviction
+const cache = new Map<string, unknown>()
+export async function getCachedData(key: string) {
+  if (cache.has(key)) return cache.get(key)
+  const data = await fetchData(key)
+  cache.set(key, data) // Cache grows forever — use LRU cache instead
+  return data
+}
+```
+
+### Database Slow Query Debugging
+
+```bash
+> The /api/posts endpoint takes 3-5 seconds to respond.
+> Add query timing to identify which database query is slow.
+```
+
+```typescript
+// lib/db-debug.ts
+export async function timedQuery<T>(name: string, queryFn: () => Promise<T>): Promise<T> {
+  const start = performance.now()
+  try {
+    const result = await queryFn()
+    const ms = performance.now() - start
+    if (ms > 1000) console.warn(`[SLOW QUERY] ${name}: ${ms.toFixed(0)}ms`)
+    return result
+  } catch (error) {
+    console.error(`[FAILED QUERY] ${name}: ${(performance.now() - start).toFixed(0)}ms`, error)
+    throw error
+  }
+}
+
+// Usage
+const posts = await timedQuery('getAllPosts', () =>
+  db.select().from(postsTable).where(eq(postsTable.published, true))
+)
+```
+
+> For more on code optimization techniques, see the [Refactoring Guide](/en/blog/claude-code-refactoring-guide).
+
+## 8. Production Debugging
+
+Production bugs are the highest-stakes scenario — you can't add `console.log` and refresh.
+
+### Log Aggregation Analysis
+
+```bash
+> Here are the last 100 error logs from production (from CloudWatch):
+> [paste logs]
+> Group by error type, frequency, affected endpoints, and time pattern.
+> Prioritize which to fix first based on user impact.
+```
+
+Claude Code identifies patterns:
+
+```
+- 45% "ECONNRESET" on /api/checkout → database connection pool exhausted
+- 30% "TimeoutError" on /api/search → search service slow under load
+- 15% "TypeError" on /blog/[slug] → specific post has malformed frontmatter
+- 10% "CORS" on /api/upload → new CDN domain not in allowed origins
+
+Priority: checkout (highest impact) → frontmatter (easy fix) → CORS → search
+```
+
+### Error Monitoring Integration
+
+```typescript
+// components/ErrorBoundary.tsx
+'use client'
+import * as Sentry from '@sentry/nextjs'
+import { Component, type ReactNode } from 'react'
+
+interface Props { children: ReactNode; fallback: ReactNode }
+
+export class ErrorBoundary extends Component<Props, { hasError: boolean }> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    Sentry.captureException(error, {
+      contexts: { react: { componentStack: errorInfo.componentStack } },
+    })
+  }
+
+  render() {
+    return this.state.hasError ? this.props.fallback : this.props.children
+  }
+}
+```
+
+### Reproducing Production Bugs Locally
+
+```bash
+> Blog post page crashes on mobile Safari: "ReferenceError: structuredClone is not defined"
+> Device: iPhone 12, iOS 16.2. Help me reproduce this locally.
+```
+
+```typescript
+// structuredClone unavailable in WKWebView (in-app browsers)
+// Fix: add a polyfill
+if (typeof structuredClone === 'undefined') {
+  globalThis.structuredClone = <T>(obj: T): T => JSON.parse(JSON.stringify(obj))
+}
+```
+
+### Canary Releases and Feature Flags
+
+For risky fixes, use feature flags to roll out to a subset of users:
+
+```typescript
+// lib/feature-flags.ts
+type FeatureFlag = 'new-checkout' | 'v2-search'
+
+const FLAGS: Record<FeatureFlag, { enabled: boolean; rollout: number }> = {
+  'new-checkout': { enabled: true, rollout: 0.1 },  // 10%
+  'v2-search': { enabled: false, rollout: 0 },
+}
+
+export function isFeatureEnabled(flag: FeatureFlag, userId: string): boolean {
+  const config = FLAGS[flag]
+  if (!config.enabled) return false
+  const hash = [...(userId + flag)].reduce(
+    (h, c) => ((h << 5) - h + c.charCodeAt(0)) | 0, 0
+  )
+  return (Math.abs(hash) % 100) / 100 < config.rollout
+}
+```
+
+## 9. CLAUDE.md Debugging Conventions
+
+Your [CLAUDE.md](/en/blog/claude-md-guide) is the perfect place to encode debugging conventions. Here's a section you can add:
+
+```markdown
+# Debugging Conventions
+
+## Error Handling Rules
+- All async functions must have try/catch with specific error types
+- Never catch and swallow errors silently — always log or rethrow
+- API routes must return structured error responses
+- Client components must have error boundaries
+
+## Logging Standards
+- Structured logging (JSON in production)
+- Levels: error, warn, info, debug
+- Always include: timestamp, request ID, user ID (anonymized)
+- Never log: passwords, tokens, PII
+
+## When Debugging
+1. Read the full error + stack trace before making changes
+2. Form a hypothesis, add targeted logging
+3. Verify fix doesn't break tests, add regression test
+4. Remove debug logging before committing
+
+## Debug Commands
+- `npm run build 2>&1 | head -50` — check build errors
+- `npx tsc --noEmit` — type check without building
+- `DEBUG=* npm run dev` — verbose debug output
+
+## Common Issues
+- Hydration mismatch: browser-only APIs in SSR → wrap in useEffect
+- "Module not found": check import path case sensitivity
+- Stale data: check revalidation settings in fetch()
+```
+
+> For the full CLAUDE.md configuration guide, see the [CLAUDE.md Guide](/en/blog/claude-md-guide).
+
+## 10. Complete Walkthrough: Debugging Next.js SSR Hydration Mismatch
+
+Let's walk through a real-world debugging scenario end to end.
+
+### The Scenario
+
+After adding a "last updated" timestamp to blog posts, you see:
+
+```
+Warning: Text content did not match. Server: "March 12, 2026 10:30 AM"
+Client: "March 12, 2026 3:30 PM"
+```
+
+### Step 1: Interpret the Error
+
+The 5-hour difference is a timezone issue. The server and client format the same `Date` object in different timezones.
+
+### Step 2: Locate the Bug
+
+```bash
+> Find where the "last updated" date is formatted in the blog post page.
+```
+
+Claude Code finds `formatDate` in `lib/utils.ts`:
+
+```typescript
+// lib/utils.ts — the problematic function
+export function formatDate(dateString: string, locale: Locale): string {
+  const date = new Date(dateString)
+  return date.toLocaleDateString(locale === 'zh' ? 'zh-CN' : 'en-US', {
+    year: 'numeric', month: 'long', day: 'numeric',
+    hour: 'numeric', minute: '2-digit', // includes time — timezone-sensitive!
+  })
+}
+```
+
+### Step 3: Root Cause Analysis
+
+`toLocaleDateString()` uses the runtime's local timezone. The server (EST/UTC-5) renders "10:30 AM" while the client (UTC) renders "3:30 PM" — same timestamp, different timezone output.
+
+### Step 4: Generate the Fix
+
+```typescript
+// Option 1: Use UTC explicitly (recommended for blogs)
+export function formatDate(dateString: string, locale: Locale): string {
+  return new Date(dateString).toLocaleDateString(
+    locale === 'zh' ? 'zh-CN' : 'en-US',
+    { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }
+  )
+}
+
+// Option 2: Client-only rendering with useEffect (for user-local times)
+// Option 3: suppressHydrationWarning (escape hatch — use sparingly)
+```
+
+For a blog, Option 1 is the best choice — one-line fix, no client-side JS, no layout shift.
+
+### Step 5: Apply, Verify, and Test
+
+```typescript
+// lib/utils.ts — fixed
+export function formatDate(dateString: string, locale: Locale): string {
+  return new Date(dateString).toLocaleDateString(
+    locale === 'zh' ? 'zh-CN' : 'en-US',
+    { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' }
+  )
+}
+```
+
+Verify with different timezones: `TZ=UTC npm run start`, `TZ=America/New_York npm run start` — all should render the same date.
+
+### Step 6: Regression Test
+
+```bash
+> Write a test for formatDate that verifies it produces the same output
+> regardless of the system timezone. This should prevent the hydration
+> mismatch from coming back.
+```
+
+```typescript
+// lib/__tests__/utils.test.ts
+import { describe, it, expect } from 'vitest'
+import { formatDate } from '../utils'
+
+describe('formatDate', () => {
+  it('formats dates consistently regardless of timezone', () => {
+    expect(formatDate('2026-03-12T15:30:00Z', 'en')).toBe('March 12, 2026')
+    expect(formatDate('2026-03-12T15:30:00Z', 'zh')).toBe('2026年3月12日')
+  })
+
+  it('handles midnight UTC without date shift', () => {
+    expect(formatDate('2026-03-12T00:00:00Z', 'en')).toBe('March 12, 2026')
+  })
+})
+```
+
+```bash
+# Run the test
+npx vitest run lib/__tests__/utils.test.ts
+```
+
+### Full Workflow Recap
+
+```
+Error → Interpret → Locate → Root cause → Fix → Verify → Regression test
+```
+
+### Common Hydration Mismatch Causes
+
+| Cause | Example | Fix |
+|-------|---------|-----|
+| Timezone differences | `new Date().toLocaleString()` | Add `timeZone: 'UTC'` |
+| `Math.random()` | Random IDs or keys | Use deterministic IDs |
+| `Date.now()` | "Posted 3 minutes ago" | Client-only rendering |
+| `window` / `document` | `window.innerWidth` in render | Wrap in `useEffect` |
+| `localStorage` | Theme from localStorage | Inline script in `<head>` |
+| Conditional rendering | `{isMobile && <MobileNav />}` | CSS media queries |
+
+### Debugging Checklist for Hydration Errors
+
+```bash
+> I have a hydration mismatch. Help me debug it:
+> 1. What exact text/HTML differs between server and client?
+> 2. Which component renders this content?
+> 3. Does it use Date/time, random values, window/document, or localStorage?
+> 4. Was this component recently changed?
+```
+
+This systematic approach works for any bug. Let Claude Code handle the tedious parts while you provide context and make decisions.
+
+> For debugging failing tests, see Section 6 of the [Testing Guide](/en/blog/claude-code-testing-guide). For `git bisect`, see the [Git Workflow Guide](/en/blog/claude-code-git-guide).
+
+## Summary
+
+| Chapter | Key Takeaway |
+|---------|-------------|
+| AI partner | Claude Code accelerates hypothesis → verify → narrow scope |
+| Error interpretation | Full stack traces + context = faster diagnosis |
+| Root cause analysis | Binary search (code or git) narrows scope systematically |
+| Runtime debugging | Structured logging beats shotgun console.logs |
+| Async issues | Race conditions and unhandled rejections are the usual suspects |
+| Environment issues | Version pins, case sensitivity, and env var validation prevent "works on my machine" |
+| Performance | Measure first (Lighthouse, bundle analyzer), then optimize |
+| Production | Log aggregation, error monitoring, and feature flags for safe rollouts |
+| CLAUDE.md | Encode debugging conventions so Claude Code follows them every time |
+| Walkthrough | Systematic debugging: interpret → locate → analyze → fix → verify → test |
+
+Debugging doesn't have to be a solo struggle. Describe the symptoms clearly, let Claude Code generate hypotheses, and use your judgment to guide the investigation.
+
+## Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-advanced-guide) — Complete getting-started guide for Claude Code
+- [Claude Code Testing Guide](/en/blog/claude-code-testing-guide) — Section 6 covers debugging failing tests in depth
+- [Claude Code Refactoring Guide](/en/blog/claude-code-refactoring-guide) — Companion article: improving code that works
+- [Claude Code Git Workflow Guide](/en/blog/claude-code-git-guide) — git bisect and regression tracking
+- [CLAUDE.md Guide](/en/blog/claude-md-guide) — Encode debugging conventions into project memory
+- [Claude Code Prompt Guide](/en/blog/claude-code-prompt-guide) — Write better bug descriptions for faster diagnosis
+- [Claude Code Context Management Guide](/en/blog/claude-code-context-guide) — Provide the right context for debugging sessions
+- [Claude Code Hooks Guide](/en/blog/claude-code-hooks-guide) — Automate debugging workflows with Hooks
+- [Claude Code MCP Guide](/en/blog/claude-code-mcp-guide) — Extend debugging capabilities with MCP servers
+- [Claude Code Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) — Parallelize debugging across multiple agents
+- [Claude Code Settings Guide](/en/blog/claude-code-settings-guide) — Configure permissions for debugging operations
+- [Custom Slash Commands Guide](/en/blog/claude-code-skills-guide) — Create reusable debugging command templates

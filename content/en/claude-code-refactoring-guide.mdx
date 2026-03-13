@@ -1,0 +1,848 @@
+---
+title: "The Complete Claude Code Refactoring Workflow Guide: AI-Powered Code Transformation"
+date: "2026-03-21"
+description: A systematic guide to Claude Code's refactoring workflow capabilities, covering extract and split patterns, rename and move operations, type system refactoring, API interface refactoring, large-scale refactoring strategies, test-driven refactoring, CLAUDE.md refactoring conventions, with a complete Navigation component split walkthrough.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+Refactoring is one of the most impactful — and most nerve-wracking — activities in software development. You know the code needs to change, but every rename, every file split, every interface adjustment carries the risk of breaking something downstream. That tension between "this code needs to improve" and "what if I break production" is exactly where Claude Code shines.
+
+In the [Advanced Guide](/en/blog/claude-code-advanced-guide), we briefly touched on refactoring in Section 9.3 — roughly 10 lines covering the basic flow. That was enough to get started, but real-world refactoring demands much more: systematic strategies, safety nets, and the ability to coordinate changes across dozens of files simultaneously.
+
+This article is the deep dive. We'll cover everything from extracting functions to migrating entire type systems, from single-file renames to multi-agent parallel refactoring across a monorepo. If you're also interested in the debugging side of things, check out the companion article: [The Complete Claude Code Debugging Guide](/en/blog/claude-code-debugging-guide).
+
+Let's get into it.
+
+---
+
+## 1. Why Refactoring Needs an AI Partner
+
+### The Refactoring Risk-Benefit Matrix
+
+Every refactoring decision involves weighing risk against benefit. Here's how common refactoring types stack up:
+
+| Refactoring Type | Benefit | Risk | Frequency | AI Leverage |
+|-----------------|---------|------|-----------|-------------|
+| Rename variable/function | Readability | Low | Very High | High |
+| Extract function | Modularity | Low | High | High |
+| Split file/module | Maintainability | Medium | Medium | Very High |
+| Change function signature | API clarity | Medium-High | Medium | High |
+| Migrate type system | Type safety | High | Low | Very High |
+| Restructure directory | Organization | High | Low | High |
+| API versioning | Compatibility | Very High | Low | Very High |
+
+The pattern is clear: the higher the risk and the broader the scope, the more value an AI partner provides. Claude Code doesn't just make refactoring faster — it makes risky refactoring *feasible*.
+
+### Manual Refactoring vs Claude Code Refactoring
+
+| Dimension | Manual Refactoring | Claude Code Refactoring |
+|-----------|-------------------|------------------------|
+| Speed | Hours for cross-file changes | Minutes for the same scope |
+| Scope analysis | Grep + manual tracing | Automatic dependency graph traversal |
+| Risk control | Relies on developer memory | Systematic check of all references |
+| Consistency | Style drift across files | Uniform application of patterns |
+| Documentation | Often skipped | Can generate changelog alongside |
+| Review readiness | Varies | Clean, atomic commits by default |
+
+### Refactoring vs Rewriting
+
+| Criteria | Refactor | Rewrite |
+|----------|----------|---------|
+| Test coverage exists | Yes — tests are your safety net | Either way |
+| Core logic is sound | Yes — preserve what works | No — fundamental design flaws |
+| Timeline pressure | Yes — ship improvements gradually | No — rewrite takes longer upfront |
+| Code size < 500 lines | Either way | Yes — small enough to redo |
+
+Rule of thumb: **if you have tests and the architecture is sound, refactor. If the architecture itself is the problem, rewrite.**
+
+---
+
+## 2. Pre-Refactoring Preparation
+
+Before touching any code, set up your safety net. Skipping this step is the #1 cause of refactoring disasters.
+
+### Test Coverage Check
+
+You need tests before you refactor. Period. The [Testing Guide](/en/blog/claude-code-testing-guide) Section 5 covers coverage analysis in detail.
+
+```bash
+> Run vitest with coverage. Show me which files I'm about to refactor
+> that have less than 70% coverage: Navigation.tsx, formatters.ts, useAuth.ts.
+```
+
+Claude Code will highlight gaps and tell you exactly what needs tests before you start.
+
+### Git Branch Strategy
+
+Never refactor on `main`. The [Git Guide](/en/blog/claude-code-git-guide) covers worktree workflows in depth.
+
+```bash
+git checkout -b refactor/split-navigation          # feature branch
+# or for large refactors:
+git worktree add ../refactor-nav refactor/split-navigation  # isolated worktree
+```
+
+### CLAUDE.md Refactoring Rules
+
+Add refactoring-specific rules to your CLAUDE.md before starting:
+
+```markdown
+## Refactoring Rules
+- Run existing tests before and after each refactoring step
+- Preserve public API signatures unless explicitly asked to change
+- When splitting files, update all import paths in the same commit
+- Use barrel exports (index.ts) when splitting a module into multiple files
+- Commit each step separately — never combine refactoring with feature changes
+```
+
+See the [CLAUDE.md Guide](/en/blog/claude-md-guide) for the full configuration reference.
+
+### Pre-Refactoring Checklist
+
+| Step | Action | Tool/Command |
+|------|--------|-------------|
+| 1 | Verify tests pass | `npx vitest --run` |
+| 2 | Check coverage on target files | `npx vitest --coverage` |
+| 3 | Create refactoring branch | `git checkout -b refactor/description` |
+| 4 | Update CLAUDE.md with refactoring rules | Edit CLAUDE.md |
+| 5 | Document current public API | Ask Claude Code to list exports |
+| 6 | Identify all consumers of target code | Ask Claude Code to find all imports |
+| 7 | Take a snapshot (tag or stash) | `git tag pre-refactor` |
+
+---
+
+## 3. Extract and Split Patterns
+
+The most common refactoring operations are extractions — pulling code out of a large unit into smaller, focused units. Claude Code handles these exceptionally well because it can trace all the dependencies automatically.
+
+### Extract Function
+
+When a function grows beyond 30-40 lines, extract sub-functions:
+
+```bash
+> In src/utils/dataProcessor.ts, the processUserData function is 80 lines.
+> Extract the validation logic into a separate validateUserInput function.
+> Keep it in the same file. Run tests after.
+```
+
+Before: one 80-line function mixing validation and transformation. After:
+
+```typescript
+function validateUserInput(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object') throw new ValidationError('Input must be an object');
+  // ... all validation checks moved here
+  return data;
+}
+
+export function processUserData(raw: unknown): ProcessedUser {
+  const data = validateUserInput(raw);  // one line replaces 20
+  return { name: (data.name as string).trim(), /* ... */ };
+}
+```
+
+### Extract Module
+
+When a file exceeds 300-400 lines, split it into multiple modules:
+
+```bash
+> src/lib/api.ts is 450 lines. Split it into:
+> - src/lib/api/client.ts (base fetch wrapper and error handling)
+> - src/lib/api/users.ts (user-related API calls)
+> - src/lib/api/posts.ts (post-related API calls)
+> - src/lib/api/index.ts (barrel export that re-exports everything)
+> Update all import paths across the project. Run tests after.
+```
+
+Claude Code will analyze all exports, create the new files, wire up the barrel export, update every consumer, and run tests. The barrel export is key — existing consumers keep importing from `src/lib/api` without changes:
+
+```typescript
+// src/lib/api/index.ts
+export { apiClient, ApiError } from './client';
+export { getUser, updateUser, deleteUser } from './users';
+export { getPosts, createPost, updatePost } from './posts';
+```
+
+### Split Component
+
+React components accumulate responsibilities. Here's the splitting pattern:
+
+```bash
+> src/components/Dashboard.tsx is 350 lines handling header, sidebar, content, footer.
+> Split into DashboardHeader, DashboardSidebar, DashboardContent, DashboardFooter.
+> Dashboard.tsx becomes the composition root. Keep all state there, pass via props.
+> Create TypeScript interfaces for each sub-component's props.
+```
+
+### Extract Pattern Comparison
+
+| Pattern | When to Use | Scope | Risk Level |
+|---------|------------|-------|------------|
+| Extract Function | Function > 30 lines | Single file | Low |
+| Extract Module | File > 300 lines | Multi-file imports | Medium |
+| Split Component | Component has 3+ responsibilities | Multi-file + props | Medium |
+| Extract Hook | Shared stateful logic | Multi-component | Medium |
+| Extract Utility | Repeated logic across files | Project-wide | Low |
+
+---
+
+## 4. Rename and Move Operations
+
+Renaming seems simple until you realize a single function is imported in 47 files. Claude Code handles the cascade automatically.
+
+### Safe Rename Workflow
+
+The key principle: **never rename manually**. Always let Claude Code find all references first.
+
+```bash
+# Variable, function, or file rename — same pattern
+> Rename `userData` to `authenticatedUser` in src/hooks/useAuth.ts. Update all references.
+> Rename `formatDate` to `formatDateForDisplay` in src/utils/formatters.ts. Update all 12 call sites.
+> Rename src/components/Card.tsx to ContentCard.tsx. Update all imports and tests.
+```
+
+### Cross-File Rename Strategy
+
+For renames that touch many files, scope the impact first:
+
+```bash
+# Step 1: Scope
+> How many files import `useUserData` from src/hooks/useUserData.ts? List them all.
+
+# Step 2: Execute
+> Rename the hook to `useCurrentUser`, rename the file to useCurrentUser.ts.
+> Update all 23 files. Run tests after.
+```
+
+This two-step pattern lets you review the blast radius before committing. The [Prompt Guide](/en/blog/claude-code-prompt-guide) covers more structured prompt techniques.
+
+### Moving Files
+
+```bash
+> Move all hook files from src/utils/ that start with "use" to src/hooks/.
+> Update all import paths. Maintain the same export names.
+```
+
+### Common Rename Pitfalls
+
+| Pitfall | What Goes Wrong | How Claude Code Prevents It |
+|---------|----------------|---------------------------|
+| String references | Rename misses string literals like `'formatDate'` | Searches strings and comments too |
+| Dynamic imports | `import()` expressions with variable paths | Traces dynamic import patterns |
+| Re-exports | Barrel files still export old name | Updates barrel exports automatically |
+| Test snapshots | Snapshots contain old component names | Flags snapshot updates needed |
+| CSS class names | Renamed component but not its CSS module | Updates `.module.css` references |
+| Config files | Jest config, webpack aliases reference old paths | Checks config files for path references |
+
+---
+
+## 5. Type System Refactoring
+
+Type system refactoring is where Claude Code provides perhaps its highest ROI. Migrating types across a codebase is tedious, error-prone, and exactly the kind of systematic work AI handles well.
+
+### JavaScript to TypeScript Gradual Migration
+
+Don't convert everything at once. Use a file-by-file strategy:
+
+```bash
+# Phase 1: Setup
+> Add TypeScript with strict mode and allowJs: true so existing .js files still work.
+
+# Phase 2: Convert one file at a time (start with utilities, end with pages)
+> Convert src/utils/formatters.js to TypeScript. Add proper types for all
+> parameters and return values. Don't use `any` — infer from usage patterns.
+
+# Phase 3: Convert consumers
+> Convert files that import from formatters.ts, starting with fewest dependencies.
+```
+
+Migration priority: utilities → type definitions → hooks → API layer → components → pages/routes.
+
+### Type Narrowing: Union to Discriminated Union
+
+One of the most impactful type refactors is converting loose unions to discriminated unions:
+
+```bash
+> Refactor the Event type in src/types/events.ts from a loose union with optional
+> fields to a discriminated union. Each event type should have exactly the fields
+> it needs. Update all consumers to use type narrowing via switch statements.
+```
+
+Before:
+
+```typescript
+// Loose union — everything is optional, nothing is safe
+type Event = { type: string; payload?: any; userId?: string; timestamp?: number; };
+
+function handleEvent(event: Event) {
+  if (event.type === 'login') console.log(event.userId); // might be undefined!
+}
+```
+
+After:
+
+```typescript
+// Discriminated union — each variant is fully typed
+type LoginEvent = { type: 'login'; userId: string; timestamp: number };
+type PurchaseEvent = { type: 'purchase'; userId: string; productId: string; amount: number };
+type PageViewEvent = { type: 'pageview'; path: string; timestamp: number };
+
+type Event = LoginEvent | PurchaseEvent | PageViewEvent;
+
+function handleEvent(event: Event) {
+  switch (event.type) {
+    case 'login':    console.log(event.userId);  break; // guaranteed string
+    case 'purchase': console.log(event.amount);  break; // guaranteed number
+    case 'pageview': console.log(event.path);    break; // guaranteed string
+  }
+}
+```
+
+### Eliminating `any`: Systematic Replacement
+
+The `any` type is technical debt. Here's how to systematically remove it:
+
+```bash
+# Step 1: Audit
+> Search src/ for all uses of `any`. Categorize by: function params, return types,
+> type assertions (as any), and explicit variable types. Show counts per category.
+
+# Step 2: Fix by category
+> Replace all `any` types in src/utils/ with concrete types.
+> Infer correct types from downstream usage. Use `unknown` for truly dynamic values.
+```
+
+The `any` to concrete type mapping:
+
+| Current Usage | Likely Correct Type | Why |
+|--------------|-------------------|-----|
+| `data: any` from API | `unknown` then validate | API responses need runtime validation |
+| `event: any` in handler | Specific event type | Events have known shapes |
+| `options: any` in config | `Record<string, unknown>` | Config objects have string keys |
+| `callback: any` | `(...args: unknown[]) => void` | Functions have callable signatures |
+| `error: any` in catch | `unknown` | Errors can be anything at runtime |
+| `props: any` in component | Defined interface | Components have known prop shapes |
+
+### Generic Refactoring
+
+When you find duplicated types with slight variations, extract generics:
+
+```bash
+> I have UserListResponse, PostListResponse, CommentListResponse — all identical
+> except the item type. Refactor into a generic PaginatedResponse<T>.
+```
+
+```typescript
+export interface PaginatedResponse<T> { items: T[]; total: number; page: number; }
+// Usage: PaginatedResponse<User>, PaginatedResponse<Post>, etc.
+```
+
+---
+
+## 6. API and Interface Refactoring
+
+API refactoring is the highest-stakes type of refactoring. Breaking changes can affect external consumers, downstream services, or your own frontend. Claude Code helps manage this complexity with systematic migration strategies.
+
+### Breaking Change Management
+
+| Strategy | When to Use | Complexity | Consumer Impact |
+|----------|------------|------------|----------------|
+| Additive only | Adding new fields/endpoints | Low | None |
+| Deprecate + migrate | Renaming or restructuring | Medium | Gradual |
+| Versioned API | Major interface changes | High | Controlled |
+| Adapter pattern | Internal refactor, stable external API | Medium | None |
+| Feature flags | Gradual rollout of new interface | Medium | Selective |
+
+### Adapter Pattern Transition
+
+The adapter pattern lets you refactor internals without breaking external consumers:
+
+```bash
+> Refactor UserService in src/services/userService.ts:
+> 1. Create UserServiceV2 with improved interface
+> 2. Create adapter wrapping V2 with the old interface
+> 3. Export adapter as default (no breaking change)
+> Don't migrate consumers yet.
+```
+
+```typescript
+// src/services/userService.ts — After adapter refactoring
+
+// New clean interface
+class UserServiceV2 {
+  async findById(id: string): Promise<User | null> { /* ... */ }
+  async search(query: UserQuery): Promise<PaginatedResponse<User>> { /* ... */ }
+  async upsert(data: UpsertUserInput): Promise<User> { /* ... */ }
+}
+
+// Adapter preserves old interface — no breaking change for consumers
+class UserServiceAdapter {
+  private v2 = new UserServiceV2();
+
+  async getUser(id: string) { return this.v2.findById(id); }
+  async searchUsers(name: string, page: number, limit: number) {
+    const result = await this.v2.search({ name, page, limit });
+    return { users: result.items, total: result.total };
+  }
+}
+
+export const userService = new UserServiceAdapter();  // old consumers use this
+export const userServiceV2 = new UserServiceV2();     // new consumers use this
+```
+
+### Deprecation Marking and Migration Guide Generation
+
+Claude Code can automate deprecation marking:
+
+```bash
+> Mark fetchUser, fetchPosts, updateUserProfile in src/lib/api.ts as deprecated.
+> Add JSDoc @deprecated tags with replacement names and migration examples.
+```
+
+```typescript
+/** @deprecated Use `getUser(id)` instead. Will be removed in v3.0. */
+export async function fetchUser(id: string): Promise<User> {
+  console.warn('fetchUser is deprecated. Use getUser instead.');
+  return getUser(id);
+}
+```
+
+### Versioned API Example
+
+For major API changes, versioning is the safest approach:
+
+```bash
+> Create v2 routes at /api/v2/posts/ with these changes:
+> - Rename `id` to `slug` in detail route
+> - Add pagination metadata to list response
+> - Accept markdown instead of HTML for content creation
+> Keep v1 routes working unchanged.
+```
+
+---
+
+## 7. Large-Scale Refactoring Strategies
+
+When refactoring spans dozens of files, you need a strategy beyond "ask Claude Code to do it all at once."
+
+### Multi-File Refactoring Step-by-Step
+
+The golden rule: **one logical change per step, verify after each.**
+
+```bash
+# Step 1: Plan first, don't change anything
+> I want to migrate state management from React Context to Zustand.
+> Affected: src/contexts/, src/providers/, and all useContext consumers.
+> Create a step-by-step migration plan. List files and changes per step.
+
+# Step 2: Execute incrementally
+> Execute step 1: Install zustand, create auth store to replace AuthContext.
+> Execute step 2: Migrate useAuth consumers to zustand store. Run tests.
+> Execute step 3: Remove AuthContext and AuthProvider. Run tests.
+```
+
+### Multi-Agent Parallel Refactoring
+
+For truly large refactors, use multiple Claude Code instances in parallel. The [Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) covers this in detail.
+
+```bash
+# Three terminals, each handling an independent module
+claude "Refactor src/features/auth/ — convert Context to Zustand. Run tests after."
+claude "Refactor src/features/dashboard/ — convert Context to Zustand. Run tests after."
+claude "Refactor src/features/settings/ — convert Context to Zustand. Run tests after."
+```
+
+Keys to parallel refactoring: divide by module boundaries, create shared types first, merge carefully, and run integration tests last.
+
+### Worktree-Isolated Refactoring
+
+For refactors that span multiple sessions, use git worktrees for isolation. The [Git Guide](/en/blog/claude-code-git-guide) covers worktree workflows:
+
+```bash
+git worktree add ../refactor-state refactor/zustand-migration
+cd ../refactor-state && claude    # work in isolation
+# When done:
+cd ../main-project
+git merge refactor/zustand-migration
+git worktree remove ../refactor-state
+```
+
+### Refactoring Progress Tracking
+
+For multi-day refactors, ask Claude Code to generate a tracking table:
+
+```bash
+> Create a refactoring progress tracker for the Context → Zustand migration.
+> List all files grouped by module, marked as: pending, in-progress, done, or verified.
+```
+
+| Module | File | Status | Tests |
+|--------|------|--------|-------|
+| auth | src/contexts/AuthContext.tsx | Done — removed | Passing |
+| auth | src/stores/authStore.ts | Done — created | Passing |
+| dashboard | src/contexts/DashboardContext.tsx | In Progress | — |
+| settings | src/contexts/SettingsContext.tsx | Pending | — |
+
+---
+
+## 8. The Refactoring Safety Net
+
+Refactoring without a safety net is like rock climbing without a rope. This section covers the tools that catch you when things go wrong.
+
+### Test-Driven Refactoring
+
+The [Testing Guide](/en/blog/claude-code-testing-guide) covers TDD in depth. For refactoring, the cycle is: verify tests exist → refactor → tests should pass without modification → if they fail, the refactoring changed behavior.
+
+```bash
+# Write characterization tests before refactoring
+> I'm about to refactor parseMarkdown in src/utils/markdown.ts.
+> Write comprehensive tests capturing its CURRENT behavior (including quirks).
+> Run them to confirm they pass. Don't change the implementation yet.
+```
+
+This "characterization test" approach is especially valuable for legacy code. You're testing what the code *currently* does, so you can detect any behavioral changes during refactoring.
+
+### Snapshot Comparison
+
+For UI components, snapshot tests provide an additional safety layer:
+
+```bash
+# Before refactoring: capture current rendering
+> Generate snapshot tests for Navigation: default, mobile menu open, active route.
+
+# After refactoring: compare
+> Run snapshot tests. Show me any diffs so I can verify changes are intentional.
+```
+
+```typescript
+describe('Navigation snapshots', () => {
+  it('renders default state', () => {
+    expect(render(<Navigation locale="en" />).container).toMatchSnapshot();
+  });
+  it('renders with mobile menu open', () => {
+    render(<Navigation locale="en" />);
+    fireEvent.click(screen.getByLabelText('Open menu'));
+    expect(screen.getByRole('dialog')).toMatchSnapshot();
+  });
+});
+```
+
+### Rollback Strategy
+
+Always have an escape plan:
+
+```bash
+git checkout -- src/components/Navigation.tsx  # undo uncommitted changes
+git reset --soft HEAD~1                        # undo last commit, keep changes staged
+git reset --hard pre-refactor                  # return to pre-refactoring tag
+```
+
+For multi-step refactors, commit after each step with `refactor(scope): description` format so you can roll back to any intermediate state.
+
+### Post-Refactoring Verification Checklist
+
+| Check | Command | Pass Criteria |
+|-------|---------|---------------|
+| Unit tests | `npx vitest --run` | All pass |
+| Type check | `npx tsc --noEmit` | Zero errors |
+| Lint | `npx eslint src/ --quiet` | No new warnings |
+| Build | `npm run build` | Successful |
+| Import cycles | `npx madge --circular src/` | No new cycles |
+
+```bash
+> Run post-refactoring verification: vitest, tsc --noEmit, eslint, build. Report results.
+```
+
+---
+
+## 9. CLAUDE.md Refactoring Conventions
+
+A well-configured CLAUDE.md ensures Claude Code follows your conventions consistently. For the full reference, see the [CLAUDE.md Guide](/en/blog/claude-md-guide). The [Git Guide](/en/blog/claude-code-git-guide) covers commit conventions in more detail.
+
+Here's a ready-to-use refactoring section:
+
+```markdown
+# Refactoring Guidelines
+
+## Naming
+- Components: PascalCase (UserProfile, NavBar)
+- Hooks: camelCase with "use" prefix (useAuth, useDarkMode)
+- Utilities: camelCase (formatDate, parseMarkdown)
+- Constants: UPPER_SNAKE_CASE (MAX_RETRIES, API_BASE_URL)
+- Types: PascalCase with descriptive suffix (UserProps, ApiResponse)
+
+## File Organization
+- Components: src/components/ (shared) or src/features/*/components/
+- When splitting: create directory with index.ts barrel export
+- Max file: 300 lines, max function: 30 lines, max params: 3
+
+## Code Style
+- Prefer named exports, interfaces over type aliases, early returns
+- Always destructure props in component signatures
+
+## Commits
+- Format: refactor(scope): description
+- One logical change per commit
+- Never combine refactoring with feature changes or bug fixes
+
+## Workflow
+- Run `npx vitest --run` before and after each step
+- Create git tag `pre-refactor-{feature}` before large refactors
+- If tests fail, fix the refactoring (not the tests)
+- Preserve public API signatures unless explicitly asked to change
+
+## Post-Refactoring
+- Run: vitest, tsc --noEmit, eslint, build
+- Verify no new circular dependencies
+```
+
+---
+
+## 10. Complete Walkthrough: Refactoring a Navigation Component
+
+Let's put everything together with a real-world example. We'll refactor a blog's Navigation component from a single 280-line file into a clean, modular structure.
+
+### The Scenario
+
+Our `Navigation.tsx` has grown to handle too many responsibilities:
+- Desktop navigation bar with logo and links
+- Mobile hamburger menu with slide-out panel
+- Individual nav link styling with active state detection
+- Theme toggle integration
+- Language switcher
+
+We want to split it into:
+- `NavBar.tsx` — the main container and desktop layout
+- `MobileMenu.tsx` — the hamburger button and slide-out panel
+- `NavLink.tsx` — individual link with active state styling
+- `Navigation.tsx` — composition root that assembles everything
+
+### Step 1: Analyze the Current Component
+
+```bash
+> Read src/components/Navigation.tsx and analyze its structure.
+> Identify: state variables, event handlers, JSX sections, props, imports.
+> Don't make any changes yet.
+```
+
+Claude Code's analysis reveals: `isMenuOpen` and `mounted` state, three handlers (`toggleMenu`, `closeMenu`, `handleKeyDown`), four JSX sections (nav wrapper, desktop links, hamburger button, mobile slide-out panel), and a single `locale: Locale` prop.
+
+### Step 2: Write Characterization Tests
+
+Before touching the component, capture its current behavior:
+
+```bash
+> Write tests for Navigation covering: all nav links render, hamburger opens
+> mobile menu, Escape closes it, active link has aria-current="page", theme toggle present.
+> Use @testing-library/react. Mock next-intl and usePathname. Run to confirm they pass.
+```
+
+```typescript
+// src/components/__tests__/Navigation.test.tsx
+jest.mock('next-intl', () => ({ useTranslations: () => (key: string) => key }));
+jest.mock('next/navigation', () => ({ usePathname: () => '/en/blog' }));
+
+describe('Navigation', () => {
+  it('renders all nav links', () => {
+    render(<Navigation locale="en" />);
+    expect(screen.getByText('Blog')).toBeInTheDocument();
+  });
+  it('marks active link', () => {
+    render(<Navigation locale="en" />);
+    expect(screen.getByText('Blog').closest('a')).toHaveAttribute('aria-current', 'page');
+  });
+  it('opens mobile menu', () => {
+    render(<Navigation locale="en" />);
+    fireEvent.click(screen.getByLabelText('Open menu'));
+    expect(screen.getByRole('dialog')).toBeVisible();
+  });
+  it('closes on Escape', () => {
+    render(<Navigation locale="en" />);
+    fireEvent.click(screen.getByLabelText('Open menu'));
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('dialog')).not.toBeVisible();
+  });
+});
+```
+
+### Step 3: Extract NavLink Component
+
+Start with the smallest, most self-contained piece:
+
+```bash
+> Extract nav link rendering from Navigation.tsx into NavLink.tsx.
+> Props: href, label, isActive, onClick?. Handle aria-current and active styling.
+> Update Navigation.tsx to use NavLink. Run tests after.
+```
+
+### NavLink Component
+
+```typescript
+// src/components/NavLink.tsx
+'use client';
+import Link from 'next/link';
+
+interface NavLinkProps {
+  href: string; label: string; isActive: boolean; onClick?: () => void;
+}
+
+export function NavLink({ href, label, isActive, onClick }: NavLinkProps) {
+  return (
+    <Link href={href} onClick={onClick} aria-current={isActive ? 'page' : undefined}
+          className={`nav-link ${isActive ? 'nav-link-active' : ''}`}>
+      {label}
+    </Link>
+  );
+}
+```
+
+Tests still pass (5/5). Commit: `refactor(nav): extract NavLink component`
+
+### Steps 4-5: Extract MobileMenu and NavBar
+
+Apply the same pattern for the remaining two components:
+
+```bash
+# Step 4: Mobile menu
+> Extract mobile menu from Navigation.tsx into MobileMenu.tsx.
+> Props: isOpen, onClose, locale, currentPath, navItems.
+> Handle: slide-out panel, Escape key, focus trap. Run tests after.
+
+# Step 5: Desktop nav bar
+> Extract desktop nav bar into NavBar.tsx.
+> Props: locale, currentPath, navItems, onMenuToggle.
+> Render: logo, NavLinks, theme toggle, hamburger. Run tests after.
+```
+
+Key interfaces for the extracted components:
+
+```typescript
+// MobileMenu — handles Escape key, focus trap, backdrop
+interface MobileMenuProps {
+  isOpen: boolean;
+  onClose: () => void;
+  locale: Locale;
+  currentPath: string;
+  navItems: Array<{ href: string; label: string }>;
+}
+
+// NavBar — desktop layout with hamburger for mobile
+interface NavBarProps {
+  locale: Locale;
+  currentPath: string;
+  navItems: Array<{ href: string; label: string }>;
+  onMenuToggle: () => void;
+}
+```
+
+After each extraction: run tests (5/5 passing), commit with `refactor(nav): extract [Component]`.
+
+### Step 6: Assemble the Composition Root
+
+Now Navigation.tsx becomes a thin composition root:
+
+```bash
+> Simplify Navigation.tsx to a composition root under 40 lines.
+> Manage isMenuOpen state, build navItems, render NavBar + MobileMenu. Run tests.
+```
+
+```typescript
+// src/components/Navigation.tsx — Final: 35 lines, composition root only
+'use client';
+
+import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { NavBar } from './NavBar';
+import { MobileMenu } from './MobileMenu';
+import type { Locale } from '@/i18n/routing';
+
+export function Navigation({ locale }: { locale: Locale }) {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const t = useTranslations('nav');
+  const navItems = navigationItems.map((item) => ({
+    href: `/${locale}${item.path}`, label: t(item.labelKey),
+  }));
+
+  return (
+    <>
+      <NavBar locale={locale} currentPath={pathname}
+              navItems={navItems} onMenuToggle={() => setIsMenuOpen(true)} />
+      <MobileMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)}
+                  locale={locale} currentPath={pathname} navItems={navItems} />
+    </>
+  );
+}
+```
+
+```bash
+# Final verification
+> Run the Navigation tests.
+# Result: 5/5 passing ✓
+```
+
+### Step 7: Verify and Commit
+
+```bash
+> Run vitest (all tests), tsc --noEmit, and npm run build. Report results.
+```
+
+```bash
+✓ vitest: 47 tests passed, 0 failed
+✓ tsc: no errors
+✓ build: compiled successfully
+
+git add -A
+git commit -m "refactor(nav): complete Navigation split into NavBar, MobileMenu, NavLink"
+```
+
+### Before and After
+
+| Metric | Before | After |
+|--------|--------|-------|
+| Files | 1 (280 lines) | 4 (35 + 65 + 55 + 75 lines) |
+| Largest file | 280 lines | 75 lines |
+| Responsibilities per file | 5 | 1 each |
+| Reusability | None | NavLink reusable across app |
+
+### Quick Reference: The 7-Step Sequence
+
+```
+1. Analyze  2. Test  3. Extract NavLink  4. Extract MobileMenu
+5. Extract NavBar  6. Simplify to composition root  7. Full verification
+```
+
+Small steps with tests after each — that's the foundation of safe refactoring.
+
+---
+
+## Summary
+
+Refactoring with Claude Code transforms a high-risk activity into a systematic, verifiable process:
+
+1. **Prepare** — tests, branches, and CLAUDE.md rules
+2. **Small steps** — one logical change at a time, tests after each
+3. **Let AI handle tedium** — import rewiring, reference updates, type migrations
+4. **Right pattern** — extract, rename, move, or type refactor as needed
+5. **Rollback plan** — git tags, branches, and worktrees
+
+The [Advanced Guide](/en/blog/claude-code-advanced-guide) Section 9.3 gave you the basics. Now you have the complete toolkit. Combine with the [Testing Guide](/en/blog/claude-code-testing-guide) for safety, the [Git Guide](/en/blog/claude-code-git-guide) for version control, and the [Debugging Guide](/en/blog/claude-code-debugging-guide) for when things go sideways.
+
+---
+
+## Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-advanced-guide) — The foundation, including refactoring overview in Section 9.3
+- [Claude Code Testing Guide](/en/blog/claude-code-testing-guide) — TDD workflows and test-driven refactoring
+- [Claude Code Debugging Guide](/en/blog/claude-code-debugging-guide) — Companion article for when refactoring introduces issues
+- [Claude Code Git Guide](/en/blog/claude-code-git-guide) — Worktree workflows and commit conventions
+- [CLAUDE.md Guide](/en/blog/claude-md-guide) — Complete reference for configuring Claude Code
+- [Claude Code Prompt Guide](/en/blog/claude-code-prompt-guide) — Structured prompt techniques for multi-step tasks
+- [Claude Code Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) — Parallel agent workflows for large-scale refactoring
+- [Claude Code Slash Commands Guide](/en/blog/claude-code-skills-guide) — The /review command for post-refactoring review
+- [Claude Code Context Guide](/en/blog/claude-code-context-guide) — Managing context during large refactoring sessions
+- [Claude Code Hooks Guide](/en/blog/claude-code-hooks-guide) — Automating pre-commit checks and verification
+- [Claude Code Settings Guide](/en/blog/claude-code-settings-guide) — Configuring Claude Code for your workflow
+- [Claude Code MCP Guide](/en/blog/claude-code-mcp-guide) — Custom tools for specialized refactoring tasks

@@ -1,0 +1,899 @@
+---
+title: "Claude Code 调试工作流完全指南：从报错到根因的 AI 排错之道"
+date: "2026-03-22"
+description: 系统讲解 Claude Code 的调试工作流能力，涵盖错误信息解读、根因定位、运行时调试、异步与并发问题、环境配置问题、性能问题调试、生产环境调试、CLAUDE.md 调试规范，附带完整 SSR Hydration Mismatch 调试实战。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+调试是开发者日常中最耗时、最考验耐心的环节。你可能在 [测试指南](/zh/blog/claude-code-testing-guide) 的第六章里见过"调试失败测试"的内容，但那只是调试工作流的冰山一角。测试失败只是 bug 的一种表现形式——实际开发中，你面对的可能是一个莫名其妙的运行时报错、一个只在生产环境出现的诡异行为、一个拖慢页面加载的性能瓶颈，或者一个让你抓狂的异步竞态条件。
+
+这篇文章要做的，就是系统地讲清楚：**怎么用 Claude Code 建立一套完整的调试工作流**——从看到报错的第一秒，到定位根因、修复问题、防止回归的全过程。
+
+如果你刚读完 [重构指南](/zh/blog/claude-code-refactoring-guide)，会发现调试和重构是天然的搭档：调试帮你找到问题，重构帮你从根本上消除问题。两篇文章配合阅读效果更好。
+
+## 一、为什么调试需要 AI 搭档
+
+### 调试的痛点
+
+每个开发者都经历过这些场景：
+
+| 痛点 | 典型表现 | 时间成本 |
+|------|---------|---------|
+| 报错信息看不懂 | `Cannot read properties of undefined (reading 'map')` 到底哪个变量是 undefined？ | 10-30 分钟 |
+| 范围太大 | "页面白屏了"——是接口问题？渲染问题？路由问题？ | 30-120 分钟 |
+| 难以复现 | "我这边是好的啊"——环境差异、时序问题 | 1-4 小时 |
+| 假设验证慢 | 改一行代码，等编译，刷新页面，看结果 | 每次 1-5 分钟 |
+| 修了又破 | 修了 A 问题，引入了 B 问题 | 循环往复 |
+| 知识断层 | 这段代码是前同事写的，没有文档 | 数小时到数天 |
+
+### 手动调试 vs Claude Code 调试
+
+| 维度 | 手动调试 | Claude Code 调试 |
+|------|---------|-----------------|
+| 错误解读 | 搜索 Stack Overflow，逐条筛选 | 直接分析错误上下文，给出可能原因 |
+| 范围缩小 | 凭经验猜测，逐步排除 | 分析调用链，快速定位可疑区域 |
+| 假设验证 | 手动改代码、加 log、重新运行 | 生成验证代码，批量测试假设 |
+| 修复生成 | 自己写修复代码 | 生成修复方案 + 解释原因 |
+| 回归预防 | 可能忘记写测试 | 修复后自动建议回归测试 |
+| 知识沉淀 | 记在脑子里或者忘掉 | 写入 CLAUDE.md，团队共享 |
+
+### 调试心智模型
+
+不管用不用 AI，好的调试都遵循同一个模型：
+
+```
+观察现象 → 提出假设 → 验证假设 → 缩小范围 → 定位根因 → 修复 → 验证修复 → 防止回归
+```
+
+Claude Code 的价值在于**加速每一个环节**——它能更快地解读现象、提出更多假设、生成验证代码、并在修复后建议测试用例。
+
+## 二、错误信息解读
+
+拿到一个报错，第一步不是急着修，而是**读懂它在说什么**。
+
+### 常见错误类型分类
+
+| 错误类型 | 典型示例 | 出现时机 | 严重程度 |
+|---------|---------|---------|---------|
+| 语法错误 | `SyntaxError: Unexpected token` | 编译/解析时 | 低（IDE 直接标红） |
+| 类型错误 | `TypeError: x is not a function` | 运行时 | 中 |
+| 引用错误 | `ReferenceError: x is not defined` | 运行时 | 中 |
+| 网络错误 | `Failed to fetch`、`CORS error` | 运行时 | 中高 |
+| 权限错误 | `EACCES: permission denied` | 运行时/构建时 | 中 |
+| 类型系统错误 | `Type 'string' is not assignable to type 'number'` | 编译时 | 低（TS 提示） |
+| 内存错误 | `JavaScript heap out of memory` | 运行时 | 高 |
+| 超时错误 | `TimeoutError`、`ETIMEDOUT` | 运行时 | 中高 |
+
+### Stack Trace 阅读技巧
+
+Stack trace 是调试的第一手线索。很多人看到一大堆堆栈信息就头疼，其实只需要关注几个关键点：
+
+```typescript
+// 一个典型的 Node.js 错误堆栈
+TypeError: Cannot read properties of undefined (reading 'title')
+    at PostCard (/app/components/PostCard.tsx:12:28)        // ← 你的代码，重点看这里
+    at renderWithHooks (/node_modules/react-dom/...)         // ← 框架代码，通常跳过
+    at mountIndeterminateComponent (/node_modules/react-dom/...)
+    at beginWork (/node_modules/react-dom/...)
+    at HTMLUnknownElement.callCallback (/node_modules/react-dom/...)
+```
+
+**阅读规则**：
+1. 从上往下读，第一行是错误描述
+2. 找到**第一个属于你项目的文件**（不在 `node_modules` 里的）
+3. 记下文件名、行号、列号
+4. 往下再看 1-2 层调用者，理解调用链
+
+### 让 Claude Code 解读错误
+
+把错误信息直接丢给 Claude Code 是最高效的做法：
+
+```bash
+# 基础用法：直接粘贴错误
+> 这个报错是什么意思，怎么修？
+> TypeError: Cannot read properties of undefined (reading 'title')
+>     at PostCard (/app/components/PostCard.tsx:12:28)
+
+# 进阶用法：带上下文
+> 运行 npm run build 时报了这个错：
+> [粘贴完整错误]
+> 相关文件是 PostCard.tsx 和 lib/posts.ts
+> 这个错误只在 build 时出现，dev 模式正常
+
+# 批量错误分析
+> 控制台有以下 3 个警告和 1 个错误，帮我按优先级排序并逐个分析：
+> [粘贴所有错误信息]
+```
+
+### 错误信息 → 根因映射表
+
+这张表可以帮你快速建立直觉：
+
+| 错误信息 | 常见根因 | 排查方向 |
+|---------|---------|---------|
+| `Cannot read properties of undefined` | 数据未加载就访问、可选链缺失 | 检查数据流，加 `?.` |
+| `x is not a function` | 导入错误、变量被覆盖 | 检查 import 语句和变量作用域 |
+| `Module not found` | 路径错误、包未安装 | 检查路径拼写、运行 `npm install` |
+| `Hydration mismatch` | 服务端/客户端渲染不一致 | 检查 `useEffect`、`typeof window` |
+| `CORS error` | 跨域配置缺失 | 检查后端 CORS 头、代理配置 |
+| `ENOENT: no such file` | 文件路径错误、文件不存在 | 检查路径、文件是否在 `.gitignore` 中 |
+| `Maximum call stack exceeded` | 无限递归 | 检查递归终止条件 |
+| `ETIMEOUT` / `ECONNREFUSED` | 服务未启动、网络不通 | 检查服务状态、端口、防火墙 |
+
+## 三、定位问题根因
+
+知道了错误是什么，下一步是找到**为什么会出错**。这一步最考验功力，也是 Claude Code 最能帮上忙的地方。
+
+### 二分法调试
+
+二分法是最朴素也最有效的调试策略——把问题空间一分为二，快速缩小范围。
+
+**代码层面的二分法**：
+
+```typescript
+// 假设一个复杂函数返回了错误结果
+function processData(input: RawData): ProcessedData {
+  const step1 = parseInput(input)
+  console.log('step1:', step1)  // ← 检查点 1
+
+  const step2 = validateData(step1)
+  console.log('step2:', step2)  // ← 检查点 2
+
+  const step3 = transformData(step2)
+  console.log('step3:', step3)  // ← 检查点 3
+
+  const step4 = enrichData(step3)
+  console.log('step4:', step4)  // ← 检查点 4
+
+  return formatOutput(step4)
+}
+
+// 先在中间加 log（step2），确定问题在前半段还是后半段
+// 然后继续二分，2-3 轮就能定位到具体步骤
+```
+
+### git bisect + Claude Code
+
+当你知道"某个版本是好的，当前版本是坏的"，`git bisect` 是神器。[Git 指南](/zh/blog/claude-code-git-guide)里介绍过基础用法，这里讲怎么和 Claude Code 配合：
+
+```bash
+# 启动 bisect
+git bisect start
+git bisect bad                    # 当前版本有 bug
+git bisect good abc1234           # 这个 commit 是好的
+
+# 自动化 bisect（推荐）
+git bisect run npm test           # 用测试结果自动判断 good/bad
+
+# bisect 结束后，让 Claude Code 分析
+> git bisect 定位到这个 commit 引入了 bug：
+> [粘贴 commit hash 和 diff]
+> 分析一下这个改动为什么会导致 [描述 bug 现象]
+```
+
+让 Claude Code 帮你写 bisect 脚本：
+
+```bash
+> 帮我写一个 git bisect 脚本，判断条件是：
+> 运行 node scripts/check.js 后，输出中不包含 "ERROR"
+> 如果包含 ERROR 就是 bad，不包含就是 good
+```
+
+Claude Code 会生成：
+
+```bash
+#!/bin/bash
+# bisect-check.sh
+output=$(node scripts/check.js 2>&1)
+if echo "$output" | grep -q "ERROR"; then
+  exit 1  # bad
+else
+  exit 0  # good
+fi
+```
+
+### 日志分析策略
+
+当问题不容易通过代码审查发现时，日志是你的眼睛：
+
+```bash
+# 让 Claude Code 分析日志
+> 这是最近 1 小时的应用日志，帮我找出异常模式：
+> [粘贴日志]
+
+# 更精确的 prompt
+> 分析这段日志，关注以下几点：
+> 1. 有没有重复出现的错误
+> 2. 错误之间有没有时间规律
+> 3. 有没有某个请求路径的错误率特别高
+> 4. 内存/CPU 使用有没有异常趋势
+```
+
+### 依赖追踪
+
+很多 bug 的根因不在报错的那个文件里，而是在上游依赖中：
+
+```bash
+# 让 Claude Code 追踪数据流
+> PostCard 组件报了 undefined 错误。
+> 帮我追踪 post.title 这个数据从哪里来的：
+> 从 API 响应 → 数据处理 → 状态管理 → 组件 props
+> 找出哪一步可能丢失了 title 字段
+
+# 追踪函数调用链
+> getPostBySlug 函数返回了 null，但不应该。
+> 帮我找出所有调用 getPostBySlug 的地方，
+> 以及 getPostBySlug 内部调用的所有函数，画出调用关系。
+```
+
+## 四、运行时调试
+
+有些 bug 只有在代码跑起来的时候才能看到。这一章讲怎么用 Claude Code 配合运行时调试工具。
+
+### console.log 的正确姿势
+
+别笑，`console.log` 是最常用的调试工具。但大多数人用得太粗糙了：
+
+```typescript
+// ❌ 不好的 log
+console.log(data)
+console.log('here')
+console.log(result)
+
+// ✅ 结构化 log
+console.log('[PostCard] props:', { slug: post.slug, title: post.title })
+console.log('[API] /posts response:', { status: res.status, count: data.length })
+console.log('[Auth] token check:', { hasToken: !!token, expired: isExpired(token) })
+```
+
+让 Claude Code 帮你加 log：
+
+```bash
+# 自动加结构化 log
+> 在 lib/posts.ts 的每个函数入口和出口加上结构化 log，
+> 格式：console.log('[Posts] functionName:', { 关键参数 })
+> 出口 log 包含返回值的摘要（不要打印完整对象，只打印 count 或 id）
+
+# 条件 log（不影响生产环境）
+> 帮我在 processOrder 函数里加调试 log，但要满足：
+> 1. 只在 NODE_ENV=development 时输出
+> 2. 用 console.debug 而不是 console.log
+> 3. 调试完后容易一键删除（加 // DEBUG 注释标记）
+```
+
+关键技巧：用 `// DEBUG` 注释标记所有调试 log，调试完成后一行命令清理：
+
+```bash
+# 清理所有调试 log
+grep -n "// DEBUG" lib/orders.ts
+```
+
+### 断点调试集成
+
+对于复杂的逻辑，断点比 log 更高效：
+
+```bash
+# 让 Claude Code 帮你配置调试环境
+> 生成一个 .vscode/launch.json，包含以下调试配置：
+> - Next.js 开发服务器调试
+> - Vitest 单测调试（能调试单个测试文件）
+> - Node.js 脚本调试
+> 要求支持 TypeScript source map
+```
+
+### 网络请求调试
+
+前后端联调时，让 Claude Code 生成 fetch 拦截器：
+
+```bash
+> 帮我写一个 debugFetch wrapper，在开发环境下自动记录：
+> - 请求方法和 URL
+> - 响应状态码和耗时
+> - 错误响应的 body（截取前 500 字符）
+```
+
+### 状态追踪
+
+React 应用中，状态管理是 bug 的重灾区：
+
+```bash
+# 让 Claude Code 帮你追踪状态变化
+> 我的 React 组件 UserProfile 渲染了错误的数据。
+> 帮我写一个 useStateWithLog hook，在 setState 时打印旧值和新值，
+> 方便追踪状态变化的来源。
+```
+
+## 五、异步与并发问题
+
+异步 bug 是最难调试的一类问题——它们不稳定、难复现、堆栈信息经常没用。但 Claude Code 在分析异步代码方面有天然优势，因为它能同时看到整个异步流程。
+
+### 竞态条件诊断
+
+竞态条件（Race Condition）是异步 bug 的头号杀手：
+
+```typescript
+// ❌ 经典竞态：快速切换页面时，旧请求的响应覆盖新请求
+function UserProfile({ userId }: { userId: string }) {
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    fetch(`/api/users/${userId}`)
+      .then(res => res.json())
+      .then(data => setUser(data))  // 如果用户快速切换，旧请求可能后到
+  }, [userId])
+
+  return <div>{user?.name}</div>
+}
+
+// ✅ 修复：用 AbortController 取消过期请求
+function UserProfile({ userId }: { userId: string }) {
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    fetch(`/api/users/${userId}`, { signal: controller.signal })
+      .then(res => res.json())
+      .then(data => setUser(data))
+      .catch(err => {
+        if (err.name !== 'AbortError') throw err
+      })
+
+    return () => controller.abort()  // 清理：取消上一次请求
+  }, [userId])
+
+  return <div>{user?.name}</div>
+}
+```
+
+让 Claude Code 帮你排查竞态：
+
+```bash
+> 检查 components/UserProfile.tsx 中的 useEffect，
+> 有没有竞态条件的风险？如果有，帮我修复。
+> 要求用 AbortController 模式。
+```
+
+### Promise 链调试
+
+Promise 链一旦出错，错误信息经常指向错误的位置：
+
+```typescript
+// ❌ 难以调试的 Promise 链
+async function syncData() {
+  const users = await fetchUsers()
+  const enriched = await enrichUsers(users)
+  const validated = await validateUsers(enriched)
+  await saveUsers(validated)
+}
+
+// ✅ 加上错误上下文的 Promise 链
+async function syncData() {
+  let step = ''
+  try {
+    step = 'fetchUsers'
+    const users = await fetchUsers()
+
+    step = 'enrichUsers'
+    const enriched = await enrichUsers(users)
+
+    step = 'validateUsers'
+    const validated = await validateUsers(enriched)
+
+    step = 'saveUsers'
+    await saveUsers(validated)
+  } catch (error) {
+    throw new Error(`syncData failed at ${step}: ${error.message}`, {
+      cause: error,
+    })
+  }
+}
+```
+
+### Event Loop 问题
+
+有些 bug 是因为不理解 JavaScript 的事件循环：
+
+```bash
+# 让 Claude Code 分析事件循环问题
+> 这段代码的执行顺序是什么？为什么 console.log 的输出顺序和我预期的不一样？
+> [粘贴代码]
+```
+
+```typescript
+// 经典面试题，也是真实 bug 的来源
+console.log('1')
+setTimeout(() => console.log('2'), 0)
+Promise.resolve().then(() => console.log('3'))
+console.log('4')
+// 输出：1, 4, 3, 2（不是 1, 2, 3, 4）
+```
+
+### 常见异步 Bug 对照表
+
+| Bug 类型 | 症状 | 根因 | 修复方案 |
+|---------|------|------|---------|
+| 竞态条件 | 数据闪烁、显示旧数据 | 多个异步操作竞争同一状态 | AbortController / 版本号检查 |
+| 未处理的 rejection | 控制台警告、静默失败 | Promise 没有 `.catch()` | 添加错误处理、全局 `unhandledrejection` 监听 |
+| 死锁 | 页面卡死、请求永不返回 | 循环等待、互相依赖的 Promise | 重新设计依赖关系、添加超时 |
+| 内存泄漏 | 内存持续增长 | 未清理的定时器/监听器/订阅 | useEffect 返回清理函数 |
+| 顺序依赖 | 偶发的 undefined 错误 | 假设了异步操作的执行顺序 | 用 `Promise.all` 或显式排序 |
+| 重复执行 | 接口被调用多次 | React StrictMode 双重渲染 | 理解 StrictMode 行为，确保幂等 |
+
+## 六、环境与配置问题
+
+"我本地跑得好好的啊"——这句话是团队协作中最常听到的调试起点。环境问题往往不是代码 bug，而是配置差异。
+
+### "Works on My Machine" 排查清单
+
+当遇到"别人能跑我不能"的情况，按这个清单逐项排查：
+
+| 排查项 | 检查命令 | 常见问题 |
+|-------|---------|---------|
+| Node.js 版本 | `node -v` | 版本不一致，API 差异 |
+| npm/pnpm 版本 | `npm -v` / `pnpm -v` | lockfile 格式不兼容 |
+| 依赖安装 | `rm -rf node_modules && npm install` | 缓存污染、幽灵依赖 |
+| 环境变量 | `env \| grep NEXT` | 缺少必要的环境变量 |
+| 操作系统 | `uname -a` | 路径分隔符、大小写敏感 |
+| 端口占用 | `lsof -i :3000` | 端口被其他进程占用 |
+| 磁盘空间 | `df -h` | 磁盘满导致写入失败 |
+| Git 状态 | `git status` | 未提交的本地改动 |
+
+```bash
+# 让 Claude Code 帮你生成环境诊断脚本
+> 帮我写一个 scripts/doctor.sh，检查 Node 版本、npm 版本、
+> .env.local 是否存在、node_modules 是否完整、端口是否被占用
+```
+
+### 环境变量问题
+
+```typescript
+// ❌ 直接使用，未验证
+const apiUrl = process.env.API_URL  // 可能是 undefined
+
+// ✅ 启动时验证
+function getRequiredEnv(key: string): string {
+  const value = process.env[key]
+  if (!value) throw new Error(`Missing env: ${key}`)
+  return value
+}
+```
+
+```bash
+> 扫描项目中所有 process.env 的使用，列出哪些有默认值、哪些没有
+```
+
+### 路径与平台差异
+
+```typescript
+// ❌ 硬编码路径分隔符
+const filePath = 'content/' + locale + '/' + slug + '.mdx'
+
+// ✅ 使用 path.join（跨平台安全）
+import path from 'path'
+const filePath = path.join('content', locale, `${slug}.mdx`)
+```
+
+注意：macOS 文件系统默认大小写不敏感，Linux 敏感。`import { X } from './myComponent'` 在 macOS 能跑，部署到 Linux 就报错。
+
+### 版本冲突诊断
+
+```bash
+> npm ls react 显示有多个版本，帮我分析哪些包引入了不同版本，
+> 怎么用 overrides 统一
+```
+
+## 七、性能问题调试
+
+性能问题和功能 bug 不同——代码"能跑"，但跑得太慢。这类问题需要不同的调试思路和工具。
+
+### 前端性能调试
+
+```bash
+# 让 Claude Code 分析 Lighthouse 报告
+> 我的 Lighthouse 性能分数只有 62，这是报告摘要：
+> - FCP: 3.2s
+> - LCP: 5.1s
+> - TBT: 890ms
+> - CLS: 0.15
+> 帮我按优先级列出优化方案，先解决影响最大的。
+
+# Core Web Vitals 逐项优化
+> LCP 是 5.1s，目标是降到 2.5s 以下。
+> 当前页面的 LCP 元素是一张 hero image。
+> 帮我分析可能的优化方向并生成代码。
+```
+
+Claude Code 会给出系统性的分析，比如 LCP 优化：
+
+```typescript
+// ❌ 原始写法
+<img src="/hero.jpg" alt="Hero" />
+
+// ✅ 使用 next/image + priority（LCP 元素禁用懒加载）
+import Image from 'next/image'
+<Image src="/hero.jpg" alt="Hero" width={1200} height={630} priority sizes="100vw" />
+```
+
+其他常见优化：`next/font` 避免 FOIT/FOUT、关键 CSS 内联（App Router 默认支持）。
+
+### Bundle 分析
+
+```bash
+> 帮我配置 @next/bundle-analyzer，分析 build 产物中哪些包最大、有没有重复打包
+```
+
+### 内存泄漏检测
+
+```typescript
+// ❌ 内存泄漏：定时器未清理
+useEffect(() => {
+  setInterval(() => fetchNotifications(), 5000)
+}, [])
+
+// ✅ 修复：返回清理函数
+useEffect(() => {
+  const timer = setInterval(() => fetchNotifications(), 5000)
+  return () => clearInterval(timer)
+}, [])
+```
+
+其他常见泄漏：全局缓存无限增长、EventEmitter 监听器未移除、闭包引用大对象。
+
+```bash
+> 检查项目中所有 useEffect，找出没有返回清理函数但创建了定时器或监听器的地方
+```
+
+### 数据库慢查询
+
+```bash
+> 这个 API 接口响应时间 > 2s，帮我分析数据库查询日志：
+> 哪个查询最慢、是否缺少索引、有没有 N+1 问题
+```
+
+## 八、生产环境调试
+
+生产环境的调试和开发环境完全不同——你不能随便加 `console.log`，不能用断点，甚至不能轻易重启服务。
+
+### 日志聚合分析
+
+生产环境的日志量巨大，需要结构化和聚合：
+
+```typescript
+// 结构化日志格式（方便后续搜索和分析）
+const logger = {
+  info: (message: string, context: Record<string, unknown>) =>
+    console.log(JSON.stringify({ level: 'info', message, timestamp: new Date().toISOString(), ...context })),
+  error: (message: string, error: Error, context: Record<string, unknown>) =>
+    console.error(JSON.stringify({
+      level: 'error', message, timestamp: new Date().toISOString(),
+      error: { name: error.name, message: error.message, stack: error.stack },
+      ...context,
+    })),
+}
+```
+
+```bash
+# 让 Claude Code 分析生产日志
+> 这是过去 1 小时的错误日志（JSON 格式），帮我分析：
+> 1. 按错误类型分组，统计各类型出现次数
+> 2. 找出错误率最高的 API 路径
+> 3. 有没有错误集中爆发的时间段
+> 4. 给出排查优先级建议
+```
+
+### 错误监控集成
+
+Sentry 是最常用的错误监控工具。让 Claude Code 帮你集成：
+
+```bash
+> 帮我在 Next.js 项目中集成 Sentry：
+> 1. 安装 @sentry/nextjs
+> 2. 配置 client 和 server 的 sentry config
+> 3. 配置 source map 上传
+> 4. 过滤掉 AbortError 等无需上报的错误
+> 5. 确保不会泄露 PII
+```
+
+### 本地复现生产 Bug
+
+```bash
+# 让 Claude Code 帮你构造复现环境
+> 生产环境报了这个错误：[粘贴 Sentry 错误详情]
+> 帮我分析复现条件（数据、用户状态、时序），
+> 然后写一个测试用例来复现这个 bug。
+```
+
+### 金丝雀发布与特性开关
+
+预防生产 bug 的最佳策略是控制发布范围。用特性开关（Feature Flags）可以按比例灰度发布新功能，出问题时一键关闭，不需要回滚代码：
+
+```bash
+> 帮我实现一个简单的特性开关系统：
+> - 支持按用户 ID 哈希做百分比灰度
+> - 支持从环境变量读取开关状态
+> - 在组件中用 useFeatureFlag('newCheckout') 调用
+```
+
+## 九、CLAUDE.md 调试规范
+
+在 [CLAUDE.md 指南](/zh/blog/claude-md-guide) 里我们讲过如何配置项目规范。这一章专门讲调试相关的规范——把团队的调试经验沉淀下来，让 Claude Code 每次都按最佳实践来。
+
+### 错误处理规范
+
+核心原则：所有 async 函数必须有 try-catch，错误信息必须包含上下文，不允许空 catch 块。
+
+```typescript
+// 自定义错误类，包含 code 字段用于分类
+class AppError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public statusCode: number = 500,
+  ) {
+    super(message)
+    this.name = 'AppError'
+  }
+}
+
+// API 路由统一错误格式：{ error: { code, message } }
+```
+
+### 日志规范
+
+| 级别 | 用途 | 生产环境 |
+|------|------|---------|
+| error | 必须处理的错误 | ✓ 输出 |
+| warn | 需要关注的异常 | ✓ 输出 |
+| info | 正常业务流程 | ✓ 输出 |
+| debug | 调试信息 | ✗ 不输出 |
+
+格式：`[模块名] 操作描述 { 关键数据 }`。不要在日志中打印密码、token、PII。
+
+### 完整的 CLAUDE.md 调试配置示例
+
+```markdown
+# Debugging
+
+## Error Handling Conventions
+- Custom errors: use AppError class from lib/errors.ts
+- API errors: return { error: { code, message, details? } }
+- All async functions must have try-catch
+- Never swallow errors silently
+- Include context in error messages: function name, key params, operation
+
+## Logging Conventions
+- Format: [Module] action { key: value }
+- Levels: error > warn > info > debug
+- Production: info and above only
+- Never log: passwords, tokens, PII
+- Always log: requestId, duration for slow operations (>500ms)
+
+## Debug Workflow
+- First: read the error message carefully
+- Second: check recent git changes (git log --oneline -10)
+- Third: add structured logs at key checkpoints
+- Fourth: write a failing test that reproduces the bug
+- Fifth: fix and verify the test passes
+- Sixth: check for similar patterns elsewhere in the codebase
+
+## Known Issues
+- Hydration mismatch: check for Date/time rendering without useEffect
+- CORS errors in dev: use next.config.ts rewrites, not proxy
+- Hot reload breaks WebSocket: restart dev server
+```
+
+## 十、完整实战：调试 Next.js SSR Hydration Mismatch
+
+这是 Next.js 开发中最经典也最让人头疼的问题之一。我们用一个完整的案例，走一遍从报错到修复的全流程。
+
+### 场景描述
+
+你在开发一个博客系统（没错，就像这个博客），突然控制台出现了这个错误：
+
+```
+Warning: Text content did not match. Server: "2026年3月22日" Client: "3/22/2026"
+Error: Hydration failed because the initial UI does not match what was rendered on the server.
+```
+
+页面看起来能正常显示，但控制台一片红，而且偶尔会出现页面闪烁。
+
+### Step 1：解读错误
+
+把错误丢给 Claude Code：
+
+```bash
+> Next.js 控制台报了 Hydration Mismatch 错误：
+> Server: "2026年3月22日" Client: "3/22/2026"
+> 这是什么意思？可能的原因有哪些？
+```
+
+Claude Code 的分析：
+
+> **Hydration Mismatch** 意味着服务端渲染（SSR）生成的 HTML 和客户端 JavaScript 渲染的结果不一致。React 在 hydration 阶段会对比两者，发现不匹配就会报错。
+>
+> 从错误信息看，服务端输出的是中文日期格式 "2026年3月22日"，客户端输出的是 "3/22/2026"。这说明日期格式化的结果在服务端和客户端不同。
+>
+> 可能的原因：
+> 1. 使用了 `toLocaleDateString()` 且服务端和客户端的 locale 设置不同
+> 2. 使用了 `Intl.DateTimeFormat` 且服务端没有安装对应的 locale 数据
+> 3. 直接在 JSX 中渲染 `new Date()`，服务端和客户端的时区不同
+
+### Step 2：定位问题代码
+
+```bash
+> 帮我在项目中搜索所有日期格式化的代码，
+> 特别是 toLocaleDateString、Intl.DateTimeFormat、new Date() 在 JSX 中的使用
+```
+
+Claude Code 找到了问题文件：
+
+```typescript
+// components/PostDate.tsx（问题代码）
+export function PostDate({ date }: { date: string }) {
+  const formatted = new Date(date).toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+
+  return <time dateTime={date}>{formatted}</time>
+}
+```
+
+### Step 3：分析根因
+
+```bash
+> 找到了问题代码在 components/PostDate.tsx。
+> 分析一下为什么 toLocaleDateString('zh-CN') 在服务端和客户端的结果不同？
+```
+
+Claude Code 的根因分析：
+
+> `toLocaleDateString` 的输出依赖于运行环境的 ICU（International Components for Unicode）数据。
+>
+> - **Node.js 服务端**：默认可能使用 `small-icu` 构建，只包含英文 locale 数据。当请求 `zh-CN` 时，会 fallback 到默认格式。
+> - **浏览器客户端**：通常包含完整的 locale 数据，能正确输出中文格式。
+>
+> 这就导致了同一段代码在服务端和客户端产生不同的输出。
+
+### Step 4：生成修复方案
+
+```bash
+> 明白了根因。帮我修复这个问题，要求：
+> 1. 服务端和客户端的输出必须一致
+> 2. 保持中文日期格式
+> 3. 不依赖运行环境的 locale 数据
+```
+
+Claude Code 给出了修复方案——手动格式化，不依赖运行环境的 ICU 数据：
+
+```typescript
+// components/PostDate.tsx（修复后）
+export function formatDate(dateString: string, locale: string): string {
+  const date = new Date(dateString)
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+
+  if (locale === 'zh') {
+    return `${year}年${month}月${day}日`
+  }
+  const months = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+  ]
+  return `${months[date.getMonth()]} ${day}, ${year}`
+}
+
+export function PostDate({ date, locale }: { date: string; locale: string }) {
+  return <time dateTime={date}>{formatDate(date, locale)}</time>
+}
+```
+
+> 另一种方案是用 `'use client'` + `useEffect` 在客户端渲染日期，适合需要用户本地时区的场景。但对于博客文章的发布日期，手动格式化更简单可靠。
+
+### Step 5：验证修复
+
+```bash
+> 用方案 A 修复。修复后帮我验证：
+> 1. 运行 npm run build，确认没有 hydration 警告
+> 2. 检查中文和英文两种 locale 的日期显示是否正确
+```
+
+```bash
+# 构建验证
+npm run build
+# ✓ 无 hydration 警告
+
+# 手动验证
+# 访问 /zh/blog/test-post → 显示 "2026年3月22日" ✓
+# 访问 /en/blog/test-post → 显示 "Mar 22, 2026" ✓
+```
+
+### Step 6：编写回归测试
+
+```bash
+> 修复验证通过了。帮我写回归测试，覆盖中英文格式和边界情况。
+```
+
+```typescript
+// __tests__/format-date.test.ts
+import { describe, it, expect } from 'vitest'
+import { formatDate } from '@/components/PostDate'
+
+describe('formatDate', () => {
+  it('中文格式：YYYY年M月D日', () => {
+    expect(formatDate('2026-03-22', 'zh')).toBe('2026年3月22日')
+    expect(formatDate('2026-01-01', 'zh')).toBe('2026年1月1日')
+    expect(formatDate('2024-02-29', 'zh')).toBe('2024年2月29日')  // 闰年
+  })
+
+  it('英文格式：Mon DD, YYYY', () => {
+    expect(formatDate('2026-03-22', 'en')).toBe('Mar 22, 2026')
+    expect(formatDate('2026-12-25', 'en')).toBe('Dec 25, 2026')
+  })
+})
+```
+
+### Step 7：沉淀经验
+
+最后，把这次调试的经验写入 CLAUDE.md，防止团队其他人踩同样的坑：
+
+```markdown
+# 在 CLAUDE.md 的 Known Issues 中添加：
+
+## Known Issues
+- Hydration mismatch with dates: Never use toLocaleDateString() in SSR components.
+  Use the manual formatDate() function from components/PostDate.tsx instead.
+  Reason: Node.js and browsers have different ICU locale data.
+```
+
+### 调试流程回顾
+
+| 步骤 | 动作 | Claude Code 的作用 |
+|------|------|-------------------|
+| 1. 解读错误 | 理解 Hydration Mismatch 的含义 | 解释错误原因，列出可能性 |
+| 2. 定位代码 | 搜索日期格式化相关代码 | 全局搜索，快速定位 |
+| 3. 分析根因 | 理解 Node.js vs 浏览器的 ICU 差异 | 提供底层原理解释 |
+| 4. 生成修复 | 两种修复方案 | 生成完整代码，解释取舍 |
+| 5. 验证修复 | 构建 + 手动测试 | 提供验证步骤 |
+| 6. 回归测试 | 编写测试用例 | 生成完整测试，覆盖边界 |
+| 7. 沉淀经验 | 写入 CLAUDE.md | 格式化经验，方便团队共享 |
+
+这就是一个完整的 Claude Code 调试工作流。从报错到根因，从修复到预防，每一步都有 AI 搭档的参与。
+
+## 总结
+
+调试是一门手艺，而 Claude Code 是一个称手的工具。它不会替你思考，但它能帮你更快地走完"观察 → 假设 → 验证 → 修复"的循环。
+
+这篇文章覆盖了调试工作流的方方面面：
+
+- 错误信息解读——看懂报错是第一步
+- 根因定位——二分法、git bisect、日志分析
+- 运行时调试——结构化 log、断点、网络请求拦截
+- 异步问题——竞态条件、Promise 链、事件循环
+- 环境问题——跨平台、版本冲突、环境变量
+- 性能调试——Lighthouse、bundle 分析、内存泄漏
+- 生产调试——日志聚合、Sentry、本地复现
+- CLAUDE.md 规范——把调试经验沉淀为团队知识
+- 完整实战——从 Hydration Mismatch 报错到修复的全流程
+
+记住，最好的调试是不需要调试——好的代码规范、完善的测试、清晰的错误处理，能在 bug 出现之前就把它们挡在门外。这也是为什么这篇文章和 [测试指南](/zh/blog/claude-code-testing-guide)、[重构指南](/zh/blog/claude-code-refactoring-guide) 是三位一体的：测试预防 bug，调试定位 bug，重构消除 bug 的土壤。
+
+## 推荐阅读
+
+- [Claude Code 进阶指南](/zh/blog/claude-code-advanced-guide) — Claude Code 的进阶用法和高级技巧
+- [Claude Code 测试工作流指南](/zh/blog/claude-code-testing-guide) — TDD、Mock、Coverage 和失败测试调试
+- [Claude Code 重构工作流指南](/zh/blog/claude-code-refactoring-guide) — 代码重构的系统方法论，调试的天然搭档
+- [Claude Code Git 工作流指南](/zh/blog/claude-code-git-guide) — git bisect 等调试相关的 Git 技巧
+- [Claude Code Prompt 技巧指南](/zh/blog/claude-code-prompt-guide) — 写出更精准的调试 prompt
+- [CLAUDE.md 编写指南](/zh/blog/claude-md-guide) — 把调试规范写入项目配置
+- [Claude Code 上下文管理指南](/zh/blog/claude-code-context-guide) — 管理调试时的上下文窗口
+- [Claude Code Hooks 指南](/zh/blog/claude-code-hooks-guide) — 自动化调试工作流的钩子机制
+- [Claude Code MCP Server 指南](/zh/blog/claude-code-mcp-guide) — 扩展调试能力的 MCP 工具
+- [Claude Code Settings 指南](/zh/blog/claude-code-settings-guide) — 调试相关的编辑器和工具配置
+- [Claude Code 多 Agent 指南](/zh/blog/claude-code-multi-agent-guide) — 多 Agent 协作调试复杂问题
+- [Claude Code Slash Commands 指南](/zh/blog/claude-code-skills-guide) — 自定义调试命令模板
