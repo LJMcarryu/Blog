@@ -7,7 +7,7 @@ tags: ["AI", "Engineering"]
 
 ## Introduction
 
-This series now has 16 posts. From [writing CLAUDE.md](/en/blog/claude-md-guide) to [context management](/en/blog/claude-code-context-guide), from [prompt techniques](/en/blog/claude-code-prompt-guide) to [testing workflows](/en/blog/claude-code-testing-guide), from [debugging](/en/blog/claude-code-debugging-guide) to [CI/CD integration](/en/blog/claude-code-cicd-guide) — each post focuses on a single skill.
+This series now has 16 posts. From [writing CLAUDE.md](/en/blog/claude-code-claude-md) to [context management](/en/blog/claude-code-context), from [prompt techniques](/en/blog/claude-code-prompt) to [testing workflows](/en/blog/claude-code-testing), from [debugging](/en/blog/claude-code-debugging) to [CI/CD integration](/en/blog/claude-code-cicd) — each post focuses on a single skill.
 
 What we have been missing is a post that ties everything together.
 
@@ -58,7 +58,7 @@ Claude: This is a very practical tool. Let me break it down:
 
 Notice the prompt strategy here: **describe the idea first, let Claude analyze feasibility and architecture**, rather than jumping straight to "write me a link checker." This surfaces potential issues before you start coding.
 
-> See [Prompt Guide](/en/blog/claude-code-prompt-guide) for more prompt techniques.
+> See [Prompt Guide](/en/blog/claude-code-prompt) for more prompt techniques.
 
 ### 1.2 Project Initialization
 
@@ -119,7 +119,7 @@ You: Write a CLAUDE.md with project overview, tech stack, code conventions,
 
 // CODE BLOCK NOT FOUND: Markdown link checker CLI tool
 
-> See [CLAUDE.md Writing Guide](/en/blog/claude-md-guide) for more tips on writing effective CLAUDE.md files.
+> See [CLAUDE.md Writing Guide](/en/blog/claude-code-claude-md) for more tips on writing effective CLAUDE.md files.
 
 ### 1.4 Configuring settings.json
 
@@ -141,7 +141,7 @@ Set up appropriate permissions so Claude Code can work efficiently:
 
 This way Claude can run tests and builds without asking for confirmation each time.
 
-> See [settings.json Guide](/en/blog/claude-code-settings-guide) for detailed configuration options.
+> See [settings.json Guide](/en/blog/claude-code-settings) for detailed configuration options.
 
 ---
 
@@ -166,7 +166,7 @@ Benefits of this approach:
 - Incremental implementation, each step verifiable, easy to pinpoint issues
 - Context window does not explode all at once
 
-> This is the "zoom rhythm" from the [Prompt Guide](/en/blog/claude-code-prompt-guide) — zoom out for the big picture, then zoom in for details.
+> This is the "zoom rhythm" from the [Prompt Guide](/en/blog/claude-code-prompt) — zoom out for the big picture, then zoom in for details.
 
 ### 2.2 File Scanner Module: scanFiles()
 
@@ -519,7 +519,7 @@ program.parse();
 
 Notice `Promise.all(allLinks.map(checkLink))` — all links checked simultaneously with no concurrency control. Works fine with few links, but breaks with many. We intentionally leave this problem for Phase 4.
 
-> See [Prompt Guide](/en/blog/claude-code-prompt-guide) and [Context Management Guide](/en/blog/claude-code-context-guide) for more prompt-driven development techniques.
+> See [Prompt Guide](/en/blog/claude-code-prompt) and [Context Management Guide](/en/blog/claude-code-context) for more prompt-driven development techniques.
 
 ---
 
@@ -535,7 +535,7 @@ The core TDD cycle is simple:
 
 TDD works especially well with Claude Code: you write the tests (or have Claude write them), then let Claude implement the code to make them pass. Tests are the most precise requirements specification.
 
-> See [Testing Workflow Guide](/en/blog/claude-code-testing-guide) for the complete TDD workflow.
+> See [Testing Workflow Guide](/en/blog/claude-code-testing) for the complete TDD workflow.
 
 ### 3.2 Unit Tests for extractLinks
 
@@ -750,7 +750,7 @@ You: reporter.ts has 0% coverage, but it is mostly console.log output —
 
 Claude precisely fills in the missing test cases without rewriting the entire test file. This is the "check coverage report first, then fill gaps strategically" approach.
 
-> See [Testing Workflow Guide](/en/blog/claude-code-testing-guide) for more testing strategies.
+> See [Testing Workflow Guide](/en/blog/claude-code-testing) for more testing strategies.
 
 ---
 
@@ -802,7 +802,7 @@ Claude: This is a classic concurrent resource exhaustion problem.
 
 Notice the prompt strategy: **paste the error directly** and let Claude analyze. No need to guess the cause yourself. Claude can determine root cause from the error stack, error code, and surrounding code context.
 
-> See [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) for more debugging techniques.
+> See [Debugging Workflow Guide](/en/blog/claude-code-debugging) for more debugging techniques.
 
 ### 4.3 Fix and Verify
 
@@ -901,7 +901,7 @@ Summary:
 
 Problem solved. From discovery to fix to verification, the entire process took under 5 minutes.
 
-> See [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) for more debugging patterns.
+> See [Debugging Workflow Guide](/en/blog/claude-code-debugging) for more debugging patterns.
 
 ---
 
@@ -1057,7 +1057,7 @@ $ npm test
 
 All passing. This is the safety net from Phase 3 protecting you — refactor boldly, tests will tell you if anything broke.
 
-> See [Refactoring Workflow Guide](/en/blog/claude-code-refactoring-guide) for more refactoring patterns.
+> See [Refactoring Workflow Guide](/en/blog/claude-code-refactoring) for more refactoring patterns.
 
 ---
 
@@ -1122,7 +1122,7 @@ Claude: Creating PR:
      All 17 tests passing. Coverage at 82%.
 ```
 
-> See [Git Workflow Guide](/en/blog/claude-code-git-guide) for the complete Git workflow.
+> See [Git Workflow Guide](/en/blog/claude-code-git) for the complete Git workflow.
 
 ### 6.3 Configuring GitHub Actions
 
@@ -1160,7 +1160,7 @@ jobs:
 
 Simple and effective. CI configuration does not need to be fancy — lint, test, and build is enough.
 
-> See [CI/CD Integration Guide](/en/blog/claude-code-cicd-guide) for more CI/CD patterns.
+> See [CI/CD Integration Guide](/en/blog/claude-code-cicd) for more CI/CD patterns.
 
 ### 6.4 Hooks for Safety
 
@@ -1189,7 +1189,7 @@ Configure Claude Code Hooks to automatically run tests before commits:
 
 Now every time Claude tries to commit code, tests run first. If tests fail, the commit is blocked — preventing bad code from entering the repository at the source.
 
-> See [Hooks Guide](/en/blog/claude-code-hooks-guide) for complete Hooks usage and [Security Practices Guide](/en/blog/claude-code-security-guide) for security best practices.
+> See [Hooks Guide](/en/blog/claude-code-hooks) for complete Hooks usage and [Security Practices Guide](/en/blog/claude-code-security) for security best practices.
 
 ---
 
@@ -1316,7 +1316,7 @@ Session 5: Debug + fix → git commit → /clear
 Session 6: Refactor + CI + finishing → git commit
 ```
 
-> See [Context Management Guide](/en/blog/claude-code-context-guide) for detailed session strategies.
+> See [Context Management Guide](/en/blog/claude-code-context) for detailed session strategies.
 
 ### 8.3 The Human-AI Collaboration Boundary
 
@@ -1359,7 +1359,7 @@ Tips for saving tokens:
 - Use `/compact` to compress long conversations
 - Use Haiku for simple tasks, Sonnet/Opus for complex ones
 
-> See [Performance Optimization Guide](/en/blog/claude-code-performance-guide) for detailed cost strategies and [Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) for parallel agent strategies.
+> See [Performance Optimization Guide](/en/blog/claude-code-performance) for detailed cost strategies and [Multi-Agent Guide](/en/blog/claude-code-multi-agent) for parallel agent strategies.
 
 ---
 
@@ -1369,14 +1369,14 @@ This post used a complete project (mdcheck) to connect all the core skills from 
 
 | Phase | Core Skills | Corresponding Guide |
 |-------|------------|-------------------|
-| Planning | CLAUDE.md, settings.json | [CLAUDE.md Guide](/en/blog/claude-md-guide), [settings.json Guide](/en/blog/claude-code-settings-guide) |
-| Development | Prompt techniques, context management | [Prompt Guide](/en/blog/claude-code-prompt-guide), [Context Management Guide](/en/blog/claude-code-context-guide) |
-| Testing | TDD, mocking, coverage | [Testing Workflow Guide](/en/blog/claude-code-testing-guide) |
-| Debugging | Error analysis, root cause identification | [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) |
-| Refactoring | Code review, type optimization | [Refactoring Workflow Guide](/en/blog/claude-code-refactoring-guide) |
-| Git/CI | Commits, PR, CI, Hooks | [Git Guide](/en/blog/claude-code-git-guide), [CI/CD Guide](/en/blog/claude-code-cicd-guide), [Hooks Guide](/en/blog/claude-code-hooks-guide) |
-| Security | Permission control, Hooks safety | [Security Practices Guide](/en/blog/claude-code-security-guide) |
-| Efficiency | Cost control, session management | [Performance Guide](/en/blog/claude-code-performance-guide), [Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) |
+| Planning | CLAUDE.md, settings.json | [CLAUDE.md Guide](/en/blog/claude-code-claude-md), [settings.json Guide](/en/blog/claude-code-settings) |
+| Development | Prompt techniques, context management | [Prompt Guide](/en/blog/claude-code-prompt), [Context Management Guide](/en/blog/claude-code-context) |
+| Testing | TDD, mocking, coverage | [Testing Workflow Guide](/en/blog/claude-code-testing) |
+| Debugging | Error analysis, root cause identification | [Debugging Workflow Guide](/en/blog/claude-code-debugging) |
+| Refactoring | Code review, type optimization | [Refactoring Workflow Guide](/en/blog/claude-code-refactoring) |
+| Git/CI | Commits, PR, CI, Hooks | [Git Guide](/en/blog/claude-code-git), [CI/CD Guide](/en/blog/claude-code-cicd), [Hooks Guide](/en/blog/claude-code-hooks) |
+| Security | Permission control, Hooks safety | [Security Practices Guide](/en/blog/claude-code-security) |
+| Efficiency | Cost control, session management | [Performance Guide](/en/blog/claude-code-performance), [Multi-Agent Guide](/en/blog/claude-code-multi-agent) |
 
 AI-assisted development is not about having AI write code for you. It is about working at a higher level — you handle the "what" and "why," Claude handles the "how." Once you master this workflow, one person can match the output of a small team.
 
@@ -1386,19 +1386,19 @@ AI-assisted development is not about having AI write code for you. It is about w
 
 All posts in this series:
 
-- [CLAUDE.md Writing Guide](/en/blog/claude-md-guide) — How to write effective project memory files
-- [Claude Code Advanced Guide](/en/blog/claude-code-advanced-guide) — From beginner to power user
-- [Context Management Guide](/en/blog/claude-code-context-guide) — Making every token count
-- [Performance and Cost Optimization Guide](/en/blog/claude-code-performance-guide) — Fast and efficient strategies
-- [Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) — One person, one team
-- [Custom Slash Commands Guide](/en/blog/claude-code-skills-guide) — Build your own command library
-- [MCP Server Guide](/en/blog/claude-code-mcp-guide) — Turn your AI assistant into a full-stack platform
-- [Prompt Guide](/en/blog/claude-code-prompt-guide) — Making AI understand your intent precisely
-- [settings.json Guide](/en/blog/claude-code-settings-guide) — From permissions to team collaboration
-- [Git Workflow Guide](/en/blog/claude-code-git-guide) — AI-assisted Git from commit to merge
-- [Testing Workflow Guide](/en/blog/claude-code-testing-guide) — From TDD to CI/CD testing
-- [Refactoring Workflow Guide](/en/blog/claude-code-refactoring-guide) — From small steps to large-scale refactoring
-- [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) — From error to root cause
-- [CI/CD Integration Guide](/en/blog/claude-code-cicd-guide) — From local development to automation pipelines
-- [Hooks Guide](/en/blog/claude-code-hooks-guide) — Deterministic automation execution
-- [Security Practices Guide](/en/blog/claude-code-security-guide) — From permission models to multi-layer defense
+- [CLAUDE.md Writing Guide](/en/blog/claude-code-claude-md) — How to write effective project memory files
+- [Claude Code Advanced Guide](/en/blog/claude-code-overview) — From beginner to power user
+- [Context Management Guide](/en/blog/claude-code-context) — Making every token count
+- [Performance and Cost Optimization Guide](/en/blog/claude-code-performance) — Fast and efficient strategies
+- [Multi-Agent Guide](/en/blog/claude-code-multi-agent) — One person, one team
+- [Custom Slash Commands Guide](/en/blog/claude-code-skills) — Build your own command library
+- [MCP Server Guide](/en/blog/claude-code-mcp) — Turn your AI assistant into a full-stack platform
+- [Prompt Guide](/en/blog/claude-code-prompt) — Making AI understand your intent precisely
+- [settings.json Guide](/en/blog/claude-code-settings) — From permissions to team collaboration
+- [Git Workflow Guide](/en/blog/claude-code-git) — AI-assisted Git from commit to merge
+- [Testing Workflow Guide](/en/blog/claude-code-testing) — From TDD to CI/CD testing
+- [Refactoring Workflow Guide](/en/blog/claude-code-refactoring) — From small steps to large-scale refactoring
+- [Debugging Workflow Guide](/en/blog/claude-code-debugging) — From error to root cause
+- [CI/CD Integration Guide](/en/blog/claude-code-cicd) — From local development to automation pipelines
+- [Hooks Guide](/en/blog/claude-code-hooks) — Deterministic automation execution
+- [Security Practices Guide](/en/blog/claude-code-security) — From permission models to multi-layer defense
