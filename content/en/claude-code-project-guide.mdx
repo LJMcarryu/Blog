@@ -1,0 +1,1404 @@
+---
+title: "Claude Code in Practice: Building a Complete Project from Scratch"
+date: "2026-03-14"
+description: Build a complete CLI tool from scratch with Claude Code, connecting CLAUDE.md setup, prompt techniques, TDD testing, debugging, refactoring, Git workflow, and CI integration to demonstrate the full AI-assisted development lifecycle.
+tags: ["AI", "Engineering"]
+---
+
+## Introduction
+
+This series now has 16 posts. From [writing CLAUDE.md](/en/blog/claude-md-guide) to [context management](/en/blog/claude-code-context-guide), from [prompt techniques](/en/blog/claude-code-prompt-guide) to [testing workflows](/en/blog/claude-code-testing-guide), from [debugging](/en/blog/claude-code-debugging-guide) to [CI/CD integration](/en/blog/claude-code-cicd-guide) — each post focuses on a single skill.
+
+What we have been missing is a post that ties everything together.
+
+Today we fix that. We will build a complete CLI tool from scratch using Claude Code: **mdcheck** — a command-line tool that checks Markdown files for broken links.
+
+Why this project?
+
+- **Practical**: Every developer who writes docs or blog posts needs dead link detection
+- **Modular**: Naturally splits into file scanning, link extraction, HTTP checking, and report output
+- **Challenging**: Involves async concurrency, error handling, CLI argument parsing — creating natural debugging and refactoring opportunities
+- **Right-sized**: ~500 lines of code, fits in a single article
+
+The process follows 7 project lifecycle phases, each drawing on skills from previous posts in the series.
+
+---
+
+## Phase 1: Project Planning — From Requirements to CLAUDE.md
+
+### 1.1 Requirements Analysis with Claude Code
+
+When you have a vague idea, the first step is not writing code — it is letting Claude help you think it through.
+
+```text
+You: I want to build a CLI tool that checks links in Markdown files.
+     The idea: give it a directory, it scans all .md files, extracts links,
+     checks each one, and outputs a report. What do you think?
+
+Claude: This is a very practical tool. Let me break it down:
+
+     Core modules:
+     1. File scanner - glob pattern matching for .md/.mdx files
+     2. Link extractor - regex parsing of [text](url) and bare links
+     3. Link checker - HTTP HEAD request validation with concurrency
+     4. Report generator - colored terminal output + optional JSON
+
+     Tech stack suggestion:
+     - TypeScript + Node.js (type safety, rich ecosystem)
+     - commander.js (CLI argument parsing)
+     - chalk (colored terminal output)
+     - glob (file matching)
+
+     Key considerations:
+     - Concurrency control: cannot fire hundreds of HTTP requests at once
+     - Timeout handling: some servers respond slowly
+     - Relative vs absolute links: different handling logic
+     - Anchor links: #section needs heading existence check
+```
+
+Notice the prompt strategy here: **describe the idea first, let Claude analyze feasibility and architecture**, rather than jumping straight to "write me a link checker." This surfaces potential issues before you start coding.
+
+> See [Prompt Guide](/en/blog/claude-code-prompt-guide) for more prompt techniques.
+
+### 1.2 Project Initialization
+
+Once the direction is confirmed, let Claude scaffold the project:
+
+```text
+You: Let us go with this plan. Initialize the project:
+     - Name: mdcheck
+     - TypeScript + Node.js
+     - vitest for testing
+     - commander.js for CLI
+     - Set up tsconfig and package.json
+```
+
+Claude generates the complete project structure:
+
+// CODE BLOCK NOT FOUND: src/index.ts          # CLI
+
+```json
+// package.json
+{
+  "name": "mdcheck",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "mdcheck": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "glob": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "tsx": "^4.7.0"
+  }
+}
+```
+
+### 1.3 Writing CLAUDE.md
+
+Once the skeleton is in place, **write CLAUDE.md immediately**. This is one of the most important configuration files in the project — it tells Claude Code the rules and constraints for this project.
+
+```text
+You: Write a CLAUDE.md with project overview, tech stack, code conventions,
+     testing requirements, and common commands.
+```
+
+// CODE BLOCK NOT FOUND: Markdown link checker CLI tool
+
+> See [CLAUDE.md Writing Guide](/en/blog/claude-md-guide) for more tips on writing effective CLAUDE.md files.
+
+### 1.4 Configuring settings.json
+
+Set up appropriate permissions so Claude Code can work efficiently:
+
+```json
+// .claude/settings.json
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc --noEmit)"
+    ]
+  }
+}
+```
+
+This way Claude can run tests and builds without asking for confirmation each time.
+
+> See [settings.json Guide](/en/blog/claude-code-settings-guide) for detailed configuration options.
+
+---
+
+## Phase 2: Core Development — Prompt-Driven Implementation
+
+### 2.1 Step-by-Step Development Strategy
+
+A common mistake when developing multi-module projects is asking Claude to write everything at once. A better strategy: **give the big picture first, then implement module by module**.
+
+```text
+You: We will develop in this order:
+     1. scanner (file scanning) — simplest, no external dependencies
+     2. extractor (link extraction) — pure string processing
+     3. checker (link checking) — most complex, involves network requests
+     4. reporter + CLI entry — wire everything together
+
+     Run tests after each module. Start with scanner.
+```
+
+Benefits of this approach:
+- Claude knows the overall architecture, so interface designs stay consistent
+- Incremental implementation, each step verifiable, easy to pinpoint issues
+- Context window does not explode all at once
+
+> This is the "zoom rhythm" from the [Prompt Guide](/en/blog/claude-code-prompt-guide) — zoom out for the big picture, then zoom in for details.
+
+### 2.2 File Scanner Module: scanFiles()
+
+```text
+You: Implement src/scanner.ts:
+     - Takes a directory path and optional glob pattern (default **/*.md)
+     - Returns array of matching file paths
+     - Handle non-existent directory
+```
+
+```typescript
+// src/scanner.ts
+import { glob } from "glob";
+import { access } from "fs/promises";
+
+export interface ScanOptions {
+  /** glob 模式，默认匹配所有 .md 文件 */
+  pattern?: string;
+  /** 要忽略的目录 */
+  ignore?: string[];
+}
+
+const DEFAULT_PATTERN = "**/*.md";
+const DEFAULT_IGNORE = ["node_modules/**", ".git/**"];
+
+/**
+ * 扫描目录中的 Markdown 文件
+ */
+export async function scanFiles(
+  dir: string,
+  options: ScanOptions = {}
+): Promise<string[]> {
+  const { pattern = DEFAULT_PATTERN, ignore = DEFAULT_IGNORE } = options;
+
+  try {
+    await access(dir);
+  } catch {
+    throw new Error("Directory not found: " + dir);
+  }
+
+  const files = await glob(pattern, {
+    cwd: dir,
+    absolute: true,
+    ignore,
+  });
+
+  return files.sort();
+}
+```
+
+Clean, type-safe, proper error handling. This is the output quality you get when you give Claude clear constraints.
+
+### 2.3 Link Extractor Module: extractLinks()
+
+This module uses the "read first, then modify" pattern — let Claude understand the various Markdown link formats before writing extraction logic.
+
+```text
+You: Implement src/extractor.ts. Markdown links come in these formats:
+     1. [text](url) — standard links
+     2. [text](url "title") — links with titles
+     3. ![alt](url) — images
+     4. <https://example.com> — autolinks
+     5. [text][ref] + [ref]: url — reference links
+
+     Handle the first 4 for now, add reference links later.
+     Each link should record: url, line number, raw text.
+```
+
+```typescript
+// src/extractor.ts
+import { readFile } from "fs/promises";
+
+export interface LinkInfo {
+  /** 链接 URL */
+  url: string;
+  /** 所在行号（从 1 开始） */
+  line: number;
+  /** 原始匹配文本 */
+  raw: string;
+  /** 来源文件路径 */
+  file: string;
+}
+
+// 匹配 [text](url) 和 ![alt](url)
+const INLINE_LINK = /!?\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+// 匹配 <https://...>
+const AUTO_LINK = /<(https?:\/\/[^>]+)>/g;
+
+/**
+ * 从 Markdown 文件中提取所有链接
+ */
+export async function extractLinks(filePath: string): Promise<LinkInfo[]> {
+  const content = await readFile(filePath, "utf-8");
+  const lines = content.split("\n");
+  const links: LinkInfo[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+
+    // 跳过代码块
+    if (line.trimStart().startsWith("```")) continue;
+
+    // 标准链接和图片
+    let match: RegExpExecArray | null;
+    INLINE_LINK.lastIndex = 0;
+    while ((match = INLINE_LINK.exec(line)) !== null) {
+      links.push({
+        url: match[2],
+        line: lineNum,
+        raw: match[0],
+        file: filePath,
+      });
+    }
+
+    // 自动链接
+    AUTO_LINK.lastIndex = 0;
+    while ((match = AUTO_LINK.exec(line)) !== null) {
+      links.push({
+        url: match[1],
+        line: lineNum,
+        raw: match[0],
+        file: filePath,
+      });
+    }
+  }
+
+  return links;
+}
+```
+
+> Note the code block skipping logic is still naive (no multi-line code block state tracking). This is something we will improve in the refactoring phase.
+
+### 2.4 Link Checker Module: checkLink()
+
+The most complex module, involving network requests and concurrency.
+
+```text
+You: Implement src/checker.ts:
+     - HTTP/HTTPS links: send HEAD request, 10s timeout
+     - Relative links: check if file exists
+     - Skip mailto: and tel: links
+     - Return check result (ok/broken/skipped + reason)
+     - No concurrency control for now, we will add it in the debugging phase
+```
+
+```typescript
+// src/checker.ts
+import { access } from "fs/promises";
+import { resolve, dirname } from "path";
+import { LinkInfo } from "./extractor.js";
+
+export type LinkStatus = "ok" | "broken" | "skipped";
+
+export interface CheckResult {
+  link: LinkInfo;
+  status: LinkStatus;
+  statusCode?: number;
+  error?: string;
+}
+
+const SKIP_PROTOCOLS = ["mailto:", "tel:", "javascript:"];
+const TIMEOUT_MS = 10_000;
+
+/**
+ * 检查单个链接的可访问性
+ */
+export async function checkLink(link: LinkInfo): Promise<CheckResult> {
+  const { url } = link;
+
+  // 跳过特殊协议
+  if (SKIP_PROTOCOLS.some((p) => url.startsWith(p))) {
+    return { link, status: "skipped", error: "Special protocol" };
+  }
+
+  // 锚点链接暂时跳过
+  if (url.startsWith("#")) {
+    return { link, status: "skipped", error: "Anchor link" };
+  }
+
+  // HTTP/HTTPS 链接
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return checkHttpLink(link);
+  }
+
+  // 相对链接
+  return checkRelativeLink(link);
+}
+
+async function checkHttpLink(link: LinkInfo): Promise<CheckResult> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    const response = await fetch(link.url, {
+      method: "HEAD",
+      signal: controller.signal,
+      headers: { "User-Agent": "mdcheck/0.1.0" },
+      redirect: "follow",
+    });
+
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      return { link, status: "ok", statusCode: response.status };
+    }
+
+    // 有些服务器不支持 HEAD，降级到 GET
+    if (response.status === 405) {
+      const getResponse = await fetch(link.url, {
+        method: "GET",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { "User-Agent": "mdcheck/0.1.0" },
+        redirect: "follow",
+      });
+      return {
+        link,
+        status: getResponse.ok ? "ok" : "broken",
+        statusCode: getResponse.status,
+      };
+    }
+
+    return { link, status: "broken", statusCode: response.status };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { link, status: "broken", error: message };
+  }
+}
+
+async function checkRelativeLink(link: LinkInfo): Promise<CheckResult> {
+  const targetPath = resolve(dirname(link.file), link.url.split("#")[0]);
+  try {
+    await access(targetPath);
+    return { link, status: "ok" };
+  } catch {
+    return { link, status: "broken", error: "File not found" };
+  }
+}
+```
+
+A few notable design decisions:
+- HEAD-to-GET fallback when servers reject HEAD requests
+- AbortController for timeout control
+- Relative links strip anchors before checking file existence
+
+Deliberately no concurrency control — this will surface as a bug in Phase 4.
+
+### 2.5 CLI Entry Point and Report Output
+
+```text
+You: Implement CLI entry src/index.ts and report module src/reporter.ts:
+     - CLI with commander.js, support --pattern, --ignore, --json options
+     - Default colored terminal output, --json for JSON format
+     - Exit code: 0 = all ok, 1 = broken links found
+```
+
+```typescript
+// src/reporter.ts
+import chalk from "chalk";
+import { CheckResult } from "./checker.js";
+
+export function reportToConsole(results: CheckResult[]): void {
+  const broken = results.filter((r) => r.status === "broken");
+  const ok = results.filter((r) => r.status === "ok");
+  const skipped = results.filter((r) => r.status === "skipped");
+
+  if (broken.length > 0) {
+    console.log(chalk.red.bold("\n✗ " + broken.length + " broken link(s) found:\n"));
+    for (const r of broken) {
+      console.log(chalk.red("  ✗ " + r.link.url));
+      console.log(chalk.gray("    " + r.link.file + ":" + r.link.line));
+      if (r.statusCode) console.log(chalk.gray("    HTTP " + r.statusCode));
+      if (r.error) console.log(chalk.gray("    " + r.error));
+      console.log();
+    }
+  }
+
+  console.log(chalk.bold("Summary:"));
+  console.log(chalk.green("  ✓ " + ok.length + " ok"));
+  console.log(chalk.red("  ✗ " + broken.length + " broken"));
+  console.log(chalk.yellow("  ⊘ " + skipped.length + " skipped"));
+}
+
+export function reportToJson(results: CheckResult[]): void {
+  const output = results.map((r) => ({
+    url: r.link.url,
+    file: r.link.file,
+    line: r.link.line,
+    status: r.status,
+    statusCode: r.statusCode,
+    error: r.error,
+  }));
+  console.log(JSON.stringify(output, null, 2));
+}
+```
+
+```typescript
+// src/index.ts
+#!/usr/bin/env node
+import { program } from "commander";
+import { scanFiles } from "./scanner.js";
+import { extractLinks } from "./extractor.js";
+import { checkLink } from "./checker.js";
+import { reportToConsole, reportToJson } from "./reporter.js";
+
+program
+  .name("mdcheck")
+  .description("Check Markdown files for broken links")
+  .version("0.1.0")
+  .argument("<dir>", "Directory to scan")
+  .option("-p, --pattern <glob>", "File glob pattern", "**/*.md")
+  .option("-i, --ignore <dirs...>", "Directories to ignore")
+  .option("--json", "Output results as JSON")
+  .action(async (dir, options) => {
+    try {
+      const files = await scanFiles(dir, {
+        pattern: options.pattern,
+        ignore: options.ignore?.map((d: string) => d + "/**"),
+      });
+
+      if (files.length === 0) {
+        console.log("No Markdown files found.");
+        process.exit(0);
+      }
+
+      console.log("Found " + files.length + " file(s), extracting links...");
+
+      const allLinks = (await Promise.all(files.map(extractLinks))).flat();
+      console.log("Found " + allLinks.length + " link(s), checking...");
+
+      // 注意：这里没有并发控制，所有链接同时检查
+      const results = await Promise.all(allLinks.map(checkLink));
+
+      if (options.json) {
+        reportToJson(results);
+      } else {
+        reportToConsole(results);
+      }
+
+      const hasBroken = results.some((r) => r.status === "broken");
+      process.exit(hasBroken ? 1 : 0);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(2);
+    }
+  });
+
+program.parse();
+```
+
+Notice `Promise.all(allLinks.map(checkLink))` — all links checked simultaneously with no concurrency control. Works fine with few links, but breaks with many. We intentionally leave this problem for Phase 4.
+
+> See [Prompt Guide](/en/blog/claude-code-prompt-guide) and [Context Management Guide](/en/blog/claude-code-context-guide) for more prompt-driven development techniques.
+
+---
+
+## Phase 3: Test-Driven Development — Building a Safety Net
+
+### 3.1 TDD Quick Recap
+
+The core TDD cycle is simple:
+
+1. **Red** — Write a failing test first
+2. **Green** — Write the minimum code to make it pass
+3. **Refactor** — Improve the code under test protection
+
+TDD works especially well with Claude Code: you write the tests (or have Claude write them), then let Claude implement the code to make them pass. Tests are the most precise requirements specification.
+
+> See [Testing Workflow Guide](/en/blog/claude-code-testing-guide) for the complete TDD workflow.
+
+### 3.2 Unit Tests for extractLinks
+
+```text
+You: Write unit tests for extractLinks covering these scenarios:
+     1. Standard Markdown links [text](url)
+     2. Image links ![alt](url)
+     3. Links with titles [text](url "title")
+     4. Autolinks <https://...>
+     5. Links inside code blocks should be skipped
+     6. Empty file returns empty array
+
+     Write tests only, no implementation.
+```
+
+```typescript
+// tests/extractor.test.ts
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { extractLinks } from "../src/extractor.js";
+import { writeFile, mkdir, rm } from "fs/promises";
+import { join } from "path";
+
+const TEST_DIR = join(__dirname, ".tmp-test");
+
+beforeEach(async () => {
+  await mkdir(TEST_DIR, { recursive: true });
+});
+
+afterEach(async () => {
+  await rm(TEST_DIR, { recursive: true, force: true });
+});
+
+async function createTestFile(name: string, content: string): Promise<string> {
+  const filePath = join(TEST_DIR, name);
+  await writeFile(filePath, content);
+  return filePath;
+}
+
+describe("extractLinks", () => {
+  it("should extract standard markdown links", async () => {
+    const file = await createTestFile("test.md", "[Google](https://google.com)\n[GitHub](https://github.com)");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(2);
+    expect(links[0].url).toBe("https://google.com");
+    expect(links[1].url).toBe("https://github.com");
+  });
+
+  it("should extract image links", async () => {
+    const file = await createTestFile("test.md", "![logo](./images/logo.png)");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toBe("./images/logo.png");
+  });
+
+  it("should extract links with titles", async () => {
+    const file = await createTestFile("test.md", '[Google](https://google.com "Search Engine")');
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toBe("https://google.com");
+  });
+
+  it("should extract auto links", async () => {
+    const file = await createTestFile("test.md", "Visit <https://example.com> for more.");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toBe("https://example.com");
+  });
+
+  it("should skip links inside code blocks", async () => {
+    const file = await createTestFile("test.md", "```\n[not a link](https://skip.me)\n```");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(0);
+  });
+
+  it("should return empty array for empty file", async () => {
+    const file = await createTestFile("test.md", "");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(0);
+  });
+
+  it("should record correct line numbers", async () => {
+    const file = await createTestFile("test.md", "line 1\n[link](https://example.com)\nline 3");
+    const links = await extractLinks(file);
+    expect(links[0].line).toBe(2);
+  });
+});
+```
+
+The benefit of writing tests first: when you show these tests to Claude, it knows the exact behavioral specification for `extractLinks`. More precise than any natural language description.
+
+### 3.3 Tests for checkLink
+
+Network request tests need mocking. Here we use `msw` (Mock Service Worker) to intercept HTTP requests:
+
+```text
+You: Write tests for checkLink. Mock HTTP requests, no real requests.
+     Cover:
+     1. Normal 200 response → ok
+     2. 404 response → broken
+     3. Timeout → broken
+     4. mailto link → skipped
+     5. Relative link to existing file → ok
+     6. Relative link to missing file → broken
+```
+
+```typescript
+// tests/checker.test.ts
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { checkLink, CheckResult } from "../src/checker.js";
+import { LinkInfo } from "../src/extractor.js";
+import { writeFile, mkdir, rm } from "fs/promises";
+import { join } from "path";
+
+const TEST_DIR = join(__dirname, ".tmp-checker-test");
+
+// Mock HTTP server
+const server = setupServer(
+  http.head("https://example.com/ok", () => {
+    return new HttpResponse(null, { status: 200 });
+  }),
+  http.head("https://example.com/not-found", () => {
+    return new HttpResponse(null, { status: 404 });
+  }),
+  http.head("https://example.com/slow", async () => {
+    await new Promise((r) => setTimeout(r, 15000));
+    return new HttpResponse(null, { status: 200 });
+  })
+);
+
+beforeAll(() => server.listen());
+afterAll(() => server.close());
+
+beforeEach(async () => {
+  await mkdir(TEST_DIR, { recursive: true });
+  server.resetHandlers();
+});
+
+afterEach(async () => {
+  await rm(TEST_DIR, { recursive: true, force: true });
+});
+
+function makeLink(url: string, file?: string): LinkInfo {
+  return { url, line: 1, raw: url, file: file || join(TEST_DIR, "test.md") };
+}
+
+describe("checkLink", () => {
+  it("should return ok for 200 response", async () => {
+    const result = await checkLink(makeLink("https://example.com/ok"));
+    expect(result.status).toBe("ok");
+    expect(result.statusCode).toBe(200);
+  });
+
+  it("should return broken for 404 response", async () => {
+    const result = await checkLink(makeLink("https://example.com/not-found"));
+    expect(result.status).toBe("broken");
+    expect(result.statusCode).toBe(404);
+  });
+
+  it("should return broken on timeout", async () => {
+    const result = await checkLink(makeLink("https://example.com/slow"));
+    expect(result.status).toBe("broken");
+    expect(result.error).toBeDefined();
+  });
+
+  it("should skip mailto links", async () => {
+    const result = await checkLink(makeLink("mailto:test@example.com"));
+    expect(result.status).toBe("skipped");
+  });
+
+  it("should return ok for existing relative file", async () => {
+    const targetFile = join(TEST_DIR, "readme.md");
+    await writeFile(targetFile, "hello");
+    const result = await checkLink(makeLink("readme.md"));
+    expect(result.status).toBe("ok");
+  });
+
+  it("should return broken for missing relative file", async () => {
+    const result = await checkLink(makeLink("nonexistent.md"));
+    expect(result.status).toBe("broken");
+  });
+});
+```
+
+### 3.4 Coverage Check
+
+```text
+You: Run test coverage and see where we need more tests.
+```
+
+```bash
+$ npm run test:coverage
+
+ ✓ tests/extractor.test.ts (7 tests)
+ ✓ tests/checker.test.ts (6 tests)
+
+Coverage:
+  src/scanner.ts    | 85.7%  | Missing: error branch
+  src/extractor.ts  | 92.3%  | Missing: auto-link edge case
+  src/checker.ts    | 78.4%  | Missing: HEAD→GET fallback, anchor links
+  src/reporter.ts   | 0%     | No tests yet
+
+Overall: 64.1% (target: 80%)
+```
+
+```text
+You: reporter.ts has 0% coverage, but it is mostly console.log output —
+     snapshot tests are not worth much there. Fill in the missing branch
+     tests for checker.ts and add a directory-not-found test for scanner.ts.
+```
+
+Claude precisely fills in the missing test cases without rewriting the entire test file. This is the "check coverage report first, then fill gaps strategically" approach.
+
+> See [Testing Workflow Guide](/en/blog/claude-code-testing-guide) for more testing strategies.
+
+---
+
+## Phase 4: Debugging in Action — Solving a Real Bug
+
+### 4.1 The Bug Scenario
+
+At this point, basic functionality is complete. You excitedly test it on a real documentation directory:
+
+```bash
+$ npx tsx src/index.ts ./docs
+
+Found 23 file(s), extracting links...
+Found 187 link(s), checking...
+Error: fetch failed
+    at Object.fetch (node:internal/deps/undici/undici:11576:11)
+    cause: Error: connect EMFILE 93.184.216.34:443
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1595:16)
+```
+
+187 links all firing HTTP requests simultaneously — the operating system runs out of file descriptors (sockets).
+
+A classic concurrency problem: works perfectly with few links, crashes with many.
+
+### 4.2 Root Cause Analysis with Claude Code
+
+```text
+You: Running mdcheck on a directory with 187 links throws this error:
+     Error: fetch failed
+     cause: Error: connect EMFILE 93.184.216.34:443
+
+     Full stack trace above. Help me analyze the cause.
+
+Claude: This is a classic concurrent resource exhaustion problem.
+
+     Root cause analysis:
+     1. In src/index.ts line 34, Promise.all(allLinks.map(checkLink))
+        fires 187 HTTP requests simultaneously
+     2. Each HTTP request needs a TCP socket (file descriptor)
+     3. The OS limits file descriptors per process (typically 1024)
+     4. While 187 connections is under 1024, DNS resolution and
+        TLS handshake queuing actually consume more descriptors
+     5. EMFILE error means "too many open files"
+
+     Solution:
+     Use p-limit for concurrency control, limiting simultaneous
+     HTTP requests. Recommended concurrency: 10-20.
+```
+
+Notice the prompt strategy: **paste the error directly** and let Claude analyze. No need to guess the cause yourself. Claude can determine root cause from the error stack, error code, and surrounding code context.
+
+> See [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) for more debugging techniques.
+
+### 4.3 Fix and Verify
+
+```text
+You: Fix this concurrency issue with p-limit. Default concurrency 10,
+     adjustable via --concurrency CLI option.
+```
+
+Install the dependency:
+
+```bash
+$ npm install p-limit
+```
+
+Then modify `src/checker.ts`:
+
+```typescript
+// src/checker.ts（新增并发控制）
+import pLimit from "p-limit";
+
+// ... 其他代码不变 ...
+
+/**
+ * 批量检查链接，带并发控制
+ */
+export async function checkLinks(
+  links: LinkInfo[],
+  concurrency = 10
+): Promise<CheckResult[]> {
+  const limit = pLimit(concurrency);
+  return Promise.all(links.map((link) => limit(() => checkLink(link))));
+}
+```
+
+Update `src/index.ts`:
+
+```typescript
+// 把 Promise.all(allLinks.map(checkLink)) 替换为：
+import { checkLinks } from "./checker.js";
+
+const concurrency = parseInt(options.concurrency || "10");
+const results = await checkLinks(allLinks, concurrency);
+```
+
+Write a regression test to confirm the fix:
+
+```typescript
+// tests/checker.test.ts（新增）
+describe("checkLinks concurrency", () => {
+  it("should respect concurrency limit", async () => {
+    let concurrent = 0;
+    let maxConcurrent = 0;
+
+    server.use(
+      http.head("https://example.com/concurrent-test", async () => {
+        concurrent++;
+        maxConcurrent = Math.max(maxConcurrent, concurrent);
+        await new Promise((r) => setTimeout(r, 50));
+        concurrent--;
+        return new HttpResponse(null, { status: 200 });
+      })
+    );
+
+    const links = Array.from({ length: 20 }, (_, i) =>
+      makeLink("https://example.com/concurrent-test")
+    );
+
+    await checkLinks(links, 5);
+    expect(maxConcurrent).toBeLessThanOrEqual(5);
+  });
+});
+```
+
+```bash
+$ npm test
+
+ ✓ tests/extractor.test.ts (7 tests)
+ ✓ tests/checker.test.ts (7 tests)
+
+ All tests passed!
+```
+
+Verify with the real directory:
+
+```bash
+$ npx tsx src/index.ts ./docs --concurrency 10
+
+Found 23 file(s), extracting links...
+Found 187 link(s), checking...
+
+Summary:
+  ✓ 162 ok
+  ✗ 8 broken
+  ⊘ 17 skipped
+```
+
+Problem solved. From discovery to fix to verification, the entire process took under 5 minutes.
+
+> See [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) for more debugging patterns.
+
+---
+
+## Phase 5: Refactoring — Making the Code Better
+
+### 5.1 Identifying Refactoring Opportunities
+
+With features complete and bugs fixed, it is time to review code quality.
+
+```text
+You: Review the current code quality. Focus on:
+     type safety, module responsibilities, testability.
+
+Claude: Reviewed all source files. Found several improvement areas:
+
+     1. extractor.ts code block skipping has a bug
+        - Currently only checks if line starts with ```, does not track
+          multi-line code block state
+        - Links inside multi-line code blocks get incorrectly extracted
+
+     2. checker.ts checkLink function has too many responsibilities
+        - Handles HTTP, relative paths, and special protocols in one function
+        - Suggest splitting into checkHttpLink, checkRelativeLink (already exists)
+        - Main function should only do routing/dispatch
+
+     3. Types could be more precise
+        - CheckResult status is a string union, but does not use
+          discriminated unions to associate status with other fields
+        - e.g., status: "ok" should not have an error field
+
+     4. Code block state tracking needs fixing (highest priority)
+```
+
+### 5.2 Extract and Split
+
+Fix the code block skipping logic first:
+
+```text
+You: Fix the code block state tracking in extractor.ts.
+     Properly handle multi-line code blocks (skip everything between pairs).
+```
+
+```typescript
+// src/extractor.ts（重构后）
+export async function extractLinks(filePath: string): Promise<LinkInfo[]> {
+  const content = await readFile(filePath, "utf-8");
+  const lines = content.split("\n");
+  const links: LinkInfo[] = [];
+  let inCodeBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+
+    // 追踪代码块状态
+    if (line.trimStart().startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+
+    // 代码块内部跳过
+    if (inCodeBlock) continue;
+
+    // ... 链接提取逻辑不变 ...
+  }
+
+  return links;
+}
+```
+
+### 5.3 Type System Improvements
+
+Use discriminated unions for more precise types:
+
+```text
+You: Refactor CheckResult into a discriminated union:
+     - ok status: has statusCode, no error
+     - broken status: has statusCode or error
+     - skipped status: has reason, no statusCode
+```
+
+```text
+You: 帮我审查一下当前代码的质量，看看有哪些可以改进的地方。
+     重点关注：类型安全、模块职责、可测试性。
+
+Claude: 审查了所有源文件，发现几个改进点：
+
+     1. extractor.ts 的代码块跳过逻辑有 Bug
+        - 当前只检查行首是否有 ```，没有追踪多行代码块状态
+        - 多行代码块内部的链接会被错误提取
+
+     2. checker.ts 的 checkLink 函数职责过重
+        - 同时处理 HTTP、相对路径、特殊协议三种逻辑
+        - 建议拆分为 checkHttpLink、checkRelativeLink（已有）
+        - 主函数只做路由分发
+
+     3. 类型可以更精确
+        - CheckResult 的 status 是字符串联合类型，但没有用
+          discriminated union 来关联 status 和其他字段
+        - 比如 status: "ok" 时不应该有 error 字段
+
+     4. 代码块状态追踪需要修复（优先级最高）
+```
+
+Now TypeScript can enforce: when `status === "ok"`, `statusCode` is guaranteed to exist; when `status === "skipped"`, there is no `statusCode` field.
+
+The reporter needs updating accordingly:
+
+```typescript
+// src/reporter.ts（适配新类型）
+export function reportToConsole(results: CheckResult[]): void {
+  const broken = results.filter((r): r is Extract<CheckResult, { status: "broken" }> =>
+    r.status === "broken"
+  );
+  const ok = results.filter((r) => r.status === "ok");
+  const skipped = results.filter((r) => r.status === "skipped");
+
+  if (broken.length > 0) {
+    console.log(chalk.red.bold("\n✗ " + broken.length + " broken link(s) found:\n"));
+    for (const r of broken) {
+      console.log(chalk.red("  ✗ " + r.link.url));
+      console.log(chalk.gray("    " + r.link.file + ":" + r.link.line));
+      if (r.statusCode) console.log(chalk.gray("    HTTP " + r.statusCode));
+      if (r.error) console.log(chalk.gray("    " + r.error));
+      console.log();
+    }
+  }
+
+  console.log(chalk.bold("Summary:"));
+  console.log(chalk.green("  ✓ " + ok.length + " ok"));
+  console.log(chalk.red("  ✗ " + broken.length + " broken"));
+  console.log(chalk.yellow("  ⊘ " + skipped.length + " skipped"));
+}
+```
+
+### 5.4 Post-Refactoring Verification
+
+The most important step after refactoring: **run all tests**.
+
+```text
+You: Refactoring done. Run all tests to make sure nothing is broken.
+```
+
+```bash
+$ npm test
+
+ ✓ tests/extractor.test.ts (7 tests)
+ ✓ tests/checker.test.ts (7 tests)
+ ✓ tests/scanner.test.ts (3 tests)
+
+ 17 tests passed!
+```
+
+All passing. This is the safety net from Phase 3 protecting you — refactor boldly, tests will tell you if anything broke.
+
+> See [Refactoring Workflow Guide](/en/blog/claude-code-refactoring-guide) for more refactoring patterns.
+
+---
+
+## Phase 6: Git Workflow and CI
+
+### 6.1 Branch Strategy and Commits
+
+Throughout development, commit after each completed phase. Claude Code’s `/commit` command auto-generates high-quality commit messages:
+
+```text
+You: /commit
+
+Claude: Analyzed staged changes, generated commit message:
+
+     feat: add concurrent link checking with p-limit
+
+     - Add p-limit dependency for concurrency control
+     - Extract checkLinks() function with configurable concurrency
+     - Add --concurrency CLI option (default: 10)
+     - Add regression test for concurrency limit
+     - Fix EMFILE error when checking 50+ links simultaneously
+```
+
+Claude automatically determines the commit type (feat/fix/refactor), summarizes changes, and connects relevant context. Far more accurate than writing commit messages by hand.
+
+Recommended branch strategy:
+
+```bash
+main                    # 稳定版本
+├── feat/scanner        # 第二阶段：文件扫描
+├── feat/extractor      # 第二阶段：链接提取
+├── feat/checker        # 第二阶段：链接检查
+├── fix/concurrency     # 第四阶段：并发修复
+└── refactor/types      # 第五阶段：类型重构
+```
+
+Merge each feature branch to main when complete, keeping commit history clean.
+
+### 6.2 Creating a PR
+
+```text
+You: Create a PR to merge feat/checker into main.
+
+Claude: Creating PR:
+
+     Title: feat: add link checker with HTTP validation
+
+     ## Summary
+     Implements the core link checking module with:
+     - HTTP HEAD requests with 10s timeout
+     - HEAD → GET fallback for 405 responses
+     - Relative link file existence check
+     - Special protocol (mailto, tel) skipping
+
+     ## Changes
+     - src/checker.ts: New module with checkLink() and checkLinks()
+     - src/reporter.ts: Console and JSON report output
+     - src/index.ts: CLI entry point with commander.js
+     - tests/checker.test.ts: 7 test cases with MSW mocking
+
+     ## Testing
+     All 17 tests passing. Coverage at 82%.
+```
+
+> See [Git Workflow Guide](/en/blog/claude-code-git-guide) for the complete Git workflow.
+
+### 6.3 Configuring GitHub Actions
+
+```text
+You: Set up GitHub Actions:
+     - Trigger on push and PR
+     - Run lint + tests
+     - Node.js 20
+```
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+```
+
+Simple and effective. CI configuration does not need to be fancy — lint, test, and build is enough.
+
+> See [CI/CD Integration Guide](/en/blog/claude-code-cicd-guide) for more CI/CD patterns.
+
+### 6.4 Hooks for Safety
+
+Configure Claude Code Hooks to automatically run tests before commits:
+
+```json
+// .claude/settings.json（添加 hooks）
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)"
+    ]
+  },
+  "hooks": {
+    "PreCommit": [
+      {
+        "matcher": "**/*.ts",
+        "command": "npm test"
+      }
+    ]
+  }
+}
+```
+
+Now every time Claude tries to commit code, tests run first. If tests fail, the commit is blocked — preventing bad code from entering the repository at the source.
+
+> See [Hooks Guide](/en/blog/claude-code-hooks-guide) for complete Hooks usage and [Security Practices Guide](/en/blog/claude-code-security-guide) for security best practices.
+
+---
+
+## Phase 7: Finishing Touches and Publishing
+
+### 7.1 README Generation
+
+```text
+You: Generate a README.md based on the project code, including:
+     - Project description
+     - Installation
+     - Usage examples
+     - CLI options
+     - Contributing guide
+```
+
+Claude reads all source files, understands the project functionality, and generates a complete README. Much faster than writing from scratch, and it will not miss any CLI options.
+
+```markdown
+# mdcheck
+
+A fast CLI tool to check Markdown files for broken links.
+
+## Install
+
+npm install -g mdcheck
+
+## Usage
+
+mdcheck ./docs
+mdcheck ./docs --pattern "**/*.mdx" --concurrency 20
+mdcheck ./docs --json > report.json
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| -p, --pattern | File glob pattern | **/*.md |
+| -i, --ignore | Directories to ignore | node_modules, .git |
+| --concurrency | Max concurrent HTTP requests | 10 |
+| --json | Output as JSON | false |
+
+## Exit Codes
+
+- 0: All links are valid
+- 1: Broken links found
+- 2: Runtime error
+```
+
+### 7.2 npm Publishing Preparation
+
+Make sure the `bin` field in `package.json` is correctly configured:
+
+```json
+{
+  "name": "mdcheck",
+  "version": "1.0.0",
+  "bin": {
+    "mdcheck": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  }
+}
+```
+
+Do not forget the shebang at the top of `src/index.ts`:
+
+```typescript
+#!/usr/bin/env node
+```
+
+```bash
+$ npm run build
+$ npm link
+$ mdcheck ./docs  # Test the global command locally
+```
+
+
+### 7.3 Review Table
+
+Looking back, here are the Claude Code skills used in each phase:
+
+| Phase | What We Did | Claude Code Skills Used |
+|-------|------------|------------------------|
+| 1. Planning | Requirements analysis, project init, CLAUDE.md | Conversational analysis, code generation, config writing |
+| 2. Development | 4 core modules + CLI | Step-by-step prompts, code generation, "read first" pattern |
+| 3. Testing | Unit tests, mocking, coverage | TDD workflow, test generation, coverage analysis |
+| 4. Debugging | EMFILE concurrency bug | Error analysis, root cause identification, fix verification |
+| 5. Refactoring | Type improvements, code block fix | Code review, refactoring suggestions, type system optimization |
+| 6. Git/CI | Commits, PR, CI, Hooks | /commit, PR generation, CI config, Hooks |
+| 7. Finishing | README, publish prep | Documentation generation, config review |
+
+---
+
+## Lessons Learned: Best Practices for AI-Assisted Development
+
+### 8.1 Project-Level Prompt Strategy
+
+Across the entire project, prompts follow a clear "zoom rhythm":
+
+- **Planning phase**: Zoom out — describe overall requirements, let Claude analyze architecture
+- **Development phase**: Zoom in — focus on individual modules, give precise interface constraints
+- **Review phase**: Zoom out — let Claude review overall code quality
+
+This rhythm is not linear — it repeats within each phase too. For example, when developing the checker module, we zoomed out to discuss concurrency strategy, then zoomed in to write the implementation.
+
+### 8.2 Session Management Strategy
+
+A complete project should not be built in a single session. Recommended approach:
+
+- **Use `/clear` between phases**: After completing each phase, clear context, start fresh
+- **CLAUDE.md is cross-session memory**: Project conventions live in CLAUDE.md, readable by every new session
+- **Git commits are checkpoints**: Commit at the end of each phase, start the next session from a clean state
+
+```text
+# Typical session rhythm
+Session 1: Planning + init + CLAUDE.md → git commit → /clear
+Session 2: scanner + extractor modules → git commit → /clear
+Session 3: checker + reporter + CLI → git commit → /clear
+Session 4: Write tests + run coverage → git commit → /clear
+Session 5: Debug + fix → git commit → /clear
+Session 6: Refactor + CI + finishing → git commit
+```
+
+> See [Context Management Guide](/en/blog/claude-code-context-guide) for detailed session strategies.
+
+### 8.3 The Human-AI Collaboration Boundary
+
+After this project, the collaboration boundary is much clearer:
+
+| Responsibility | Human | Claude | Both |
+|---------------|-------|--------|------|
+| Architecture decisions | ✓ | | |
+| Requirements analysis | | | ✓ |
+| Code implementation | | ✓ | |
+| Test writing | | ✓ | |
+| Code review | | | ✓ |
+| Bug identification | | ✓ | |
+| Fix strategy selection | ✓ | | |
+| Refactoring direction | ✓ | | |
+| Refactoring execution | | ✓ | |
+
+Core principle: **Architecture and direction are decided by humans, implementation and execution are delegated to Claude, review is shared.**
+
+Do not let Claude make architecture decisions for you — it will give you a "reasonable-looking" solution that may not fit your specific context. Conversely, do not hand-write every line of code — let Claude handle repetitive implementation work while you focus on design and review.
+
+### 8.4 Cost Awareness
+
+How many tokens did this project consume from start to finish?
+
+| Phase | Estimated Token Usage | Notes |
+|-------|----------------------|-------|
+| Planning | ~15K | Requirements discussion + project init |
+| Development | ~40K | Code generation for 4 modules |
+| Testing | ~25K | Test code + coverage analysis |
+| Debugging | ~10K | Error analysis + fix |
+| Refactoring | ~20K | Code review + type refactoring |
+| Git/CI | ~10K | Commits + PR + CI config |
+| Finishing | ~5K | README + publish prep |
+| **Total** | **~125K** | **About $3-5 (Sonnet pricing)** |
+
+Tips for saving tokens:
+- `/clear` between phases to prevent context bloat
+- Write good CLAUDE.md conventions to reduce repeated explanations
+- Use `/compact` to compress long conversations
+- Use Haiku for simple tasks, Sonnet/Opus for complex ones
+
+> See [Performance Optimization Guide](/en/blog/claude-code-performance-guide) for detailed cost strategies and [Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) for parallel agent strategies.
+
+---
+
+## Conclusion
+
+This post used a complete project (mdcheck) to connect all the core skills from the Claude Code series. Here is the full picture:
+
+| Phase | Core Skills | Corresponding Guide |
+|-------|------------|-------------------|
+| Planning | CLAUDE.md, settings.json | [CLAUDE.md Guide](/en/blog/claude-md-guide), [settings.json Guide](/en/blog/claude-code-settings-guide) |
+| Development | Prompt techniques, context management | [Prompt Guide](/en/blog/claude-code-prompt-guide), [Context Management Guide](/en/blog/claude-code-context-guide) |
+| Testing | TDD, mocking, coverage | [Testing Workflow Guide](/en/blog/claude-code-testing-guide) |
+| Debugging | Error analysis, root cause identification | [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) |
+| Refactoring | Code review, type optimization | [Refactoring Workflow Guide](/en/blog/claude-code-refactoring-guide) |
+| Git/CI | Commits, PR, CI, Hooks | [Git Guide](/en/blog/claude-code-git-guide), [CI/CD Guide](/en/blog/claude-code-cicd-guide), [Hooks Guide](/en/blog/claude-code-hooks-guide) |
+| Security | Permission control, Hooks safety | [Security Practices Guide](/en/blog/claude-code-security-guide) |
+| Efficiency | Cost control, session management | [Performance Guide](/en/blog/claude-code-performance-guide), [Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) |
+
+AI-assisted development is not about having AI write code for you. It is about working at a higher level — you handle the "what" and "why," Claude handles the "how." Once you master this workflow, one person can match the output of a small team.
+
+---
+
+## Recommended Reading
+
+All posts in this series:
+
+- [CLAUDE.md Writing Guide](/en/blog/claude-md-guide) — How to write effective project memory files
+- [Claude Code Advanced Guide](/en/blog/claude-code-advanced-guide) — From beginner to power user
+- [Context Management Guide](/en/blog/claude-code-context-guide) — Making every token count
+- [Performance and Cost Optimization Guide](/en/blog/claude-code-performance-guide) — Fast and efficient strategies
+- [Multi-Agent Guide](/en/blog/claude-code-multi-agent-guide) — One person, one team
+- [Custom Slash Commands Guide](/en/blog/claude-code-skills-guide) — Build your own command library
+- [MCP Server Guide](/en/blog/claude-code-mcp-guide) — Turn your AI assistant into a full-stack platform
+- [Prompt Guide](/en/blog/claude-code-prompt-guide) — Making AI understand your intent precisely
+- [settings.json Guide](/en/blog/claude-code-settings-guide) — From permissions to team collaboration
+- [Git Workflow Guide](/en/blog/claude-code-git-guide) — AI-assisted Git from commit to merge
+- [Testing Workflow Guide](/en/blog/claude-code-testing-guide) — From TDD to CI/CD testing
+- [Refactoring Workflow Guide](/en/blog/claude-code-refactoring-guide) — From small steps to large-scale refactoring
+- [Debugging Workflow Guide](/en/blog/claude-code-debugging-guide) — From error to root cause
+- [CI/CD Integration Guide](/en/blog/claude-code-cicd-guide) — From local development to automation pipelines
+- [Hooks Guide](/en/blog/claude-code-hooks-guide) — Deterministic automation execution
+- [Security Practices Guide](/en/blog/claude-code-security-guide) — From permission models to multi-layer defense

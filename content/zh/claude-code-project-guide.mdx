@@ -1,0 +1,1439 @@
+---
+title: "Claude Code 实战项目篇：从零构建 Markdown 链接检查器"
+date: "2026-03-14"
+description: 用 Claude Code 从零构建一个完整的 CLI 工具项目，串联 CLAUDE.md 配置、Prompt 技巧、TDD 测试、调试排错、重构优化、Git 工作流与 CI 集成，展示 AI 辅助开发的完整生命周期。
+tags: ["AI", "工程实践"]
+---
+
+## 前言
+
+这个系列写到现在，已经有 16 篇了。从 [CLAUDE.md 怎么写](/zh/blog/claude-md-guide)到[上下文管理](/zh/blog/claude-code-context-guide)，从 [Prompt 技巧](/zh/blog/claude-code-prompt-guide)到[测试工作流](/zh/blog/claude-code-testing-guide)，从[调试排错](/zh/blog/claude-code-debugging-guide)到 [CI/CD 集成](/zh/blog/claude-code-cicd-guide)——每篇都聚焦一个独立技能。
+
+但一直缺一篇把所有技能串起来的文章。
+
+今天就来补上。我们从零开始，用 Claude Code 构建一个完整的 CLI 工具项目：**mdcheck**——一个检查 Markdown 文件中死链的命令行工具。
+
+为什么选这个项目？
+
+- **实用**：每个写文档、写博客的开发者都需要检查死链
+- **模块化**：自然拆分为文件扫描、链接提取、HTTP 检查、报告输出四个模块
+- **有挑战**：涉及异步并发、错误处理、CLI 参数解析——天然产生调试和重构机会
+- **规模合适**：~500 行代码，一篇文章装得下
+
+整个过程按项目生命周期分为 7 个阶段，每个阶段都会用到之前系列文章中的技能。
+
+---
+
+## 一、项目规划：从需求到 CLAUDE.md
+
+### 1.1 用 Claude Code 做需求分析
+
+拿到一个模糊的想法后，第一步不是写代码，而是让 Claude 帮你理清思路。
+
+```text
+You: 我想做一个 CLI 工具，用来检查 Markdown 文件里的链接是不是还能访问。
+     大概的想法是：给它一个目录，它扫描所有 .md 文件，提取里面的链接，
+     然后逐个检查，最后输出一个报告。你觉得这个项目怎么样？
+
+Claude: 这是个很实用的工具，我来分析一下：
+
+     核心模块：
+     1. 文件扫描器 - glob 模式匹配 .md/.mdx 文件
+     2. 链接提取器 - 正则解析 [text](url) 和裸链接
+     3. 链接检查器 - HTTP HEAD 请求验证，需要处理并发
+     4. 报告生成器 - 终端彩色输出 + 可选 JSON 格式
+
+     技术选型建议：
+     - TypeScript + Node.js（类型安全，生态丰富）
+     - commander.js（CLI 参数解析）
+     - chalk（终端彩色输出）
+     - glob（文件匹配）
+
+     需要注意的点：
+     - 并发控制：不能同时发几百个 HTTP 请求
+     - 超时处理：有些服务器响应很慢
+     - 相对链接 vs 绝对链接：处理逻辑不同
+     - 锚点链接：#section 这种需要检查标题是否存在
+```
+
+注意这里的 Prompt 策略：**先描述想法，让 Claude 分析可行性和架构**，而不是直接说"帮我写一个链接检查器"。这样你能在动手之前就发现潜在问题。
+
+> 📖 更多 Prompt 技巧见 [Prompt 完全指南](/zh/blog/claude-code-prompt-guide)
+
+### 1.2 项目初始化
+
+确认方向后，让 Claude 搭建项目骨架：
+
+```text
+You: 好的，就按这个方案来。帮我初始化项目：
+     - 项目名 mdcheck
+     - TypeScript + Node.js
+     - 用 vitest 做测试
+     - 用 commander.js 做 CLI
+     - 配置好 tsconfig 和 package.json
+```
+
+Claude 会生成完整的项目结构：
+
+```
+mdcheck/
+├── src/
+│   ├── index.ts          # CLI 入口
+│   ├── scanner.ts        # 文件扫描
+│   ├── extractor.ts      # 链接提取
+│   ├── checker.ts        # 链接检查
+│   └── reporter.ts       # 报告输出
+├── tests/
+│   ├── scanner.test.ts
+│   ├── extractor.test.ts
+│   └── checker.test.ts
+├── package.json
+├── tsconfig.json
+└── CLAUDE.md
+```
+
+```json
+// package.json
+{
+  "name": "mdcheck",
+  "version": "0.1.0",
+  "type": "module",
+  "bin": {
+    "mdcheck": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src/"
+  },
+  "dependencies": {
+    "chalk": "^5.3.0",
+    "commander": "^12.0.0",
+    "glob": "^10.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0",
+    "tsx": "^4.7.0"
+  }
+}
+```
+
+### 1.3 编写 CLAUDE.md
+
+项目骨架搭好后，**立刻写 CLAUDE.md**。这是整个项目最重要的配置文件之一——它告诉 Claude Code 这个项目的规范和约束。
+
+```text
+You: 帮我写一个 CLAUDE.md，包含项目概述、技术栈、代码规范、
+     测试要求和常用命令。
+```
+
+```markdown
+# mdcheck
+
+Markdown 链接检查器 CLI 工具。
+
+## 技术栈
+- TypeScript 5.4 + Node.js 20
+- commander.js (CLI)、chalk (输出)、glob (文件匹配)
+- vitest (测试)
+
+## 代码规范
+- 严格模式：tsconfig strict: true
+- 函数优先，避免 class（除非确实需要）
+- 所有公开函数必须有 JSDoc 注释
+- 错误处理：用自定义 Error 类型，不要 throw 字符串
+- 异步函数统一用 async/await，不用 .then()
+
+## 测试要求
+- 所有新功能必须有对应测试
+- 测试文件放在 tests/ 目录，命名 *.test.ts
+- Mock 外部 HTTP 请求，不要在测试中发真实请求
+- 覆盖率目标：行覆盖 > 80%
+
+## 常用命令
+- `npm test` — 跑测试
+- `npm run build` — 编译
+- `npm run dev -- ./docs` — 本地运行检查 ./docs 目录
+- `npm run lint` — 代码检查
+
+## 项目结构
+- src/scanner.ts — 文件扫描（glob 匹配）
+- src/extractor.ts — 链接提取（正则解析）
+- src/checker.ts — 链接检查（HTTP HEAD + 并发控制）
+- src/reporter.ts — 报告输出（终端 + JSON）
+- src/index.ts — CLI 入口（commander.js）
+```
+
+> 📖 CLAUDE.md 的编写技巧见 [CLAUDE.md 编写指南](/zh/blog/claude-md-guide)
+
+### 1.4 配置 settings.json
+
+为项目配置合适的权限，让 Claude Code 能高效工作：
+
+```json
+// .claude/settings.json
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc --noEmit)"
+    ]
+  }
+}
+```
+
+这样 Claude 跑测试和构建时不需要每次都问你确认。
+
+> 📖 详细配置见 [settings.json 指南](/zh/blog/claude-code-settings-guide)
+
+---
+
+## 二、核心功能开发：Prompt 驱动的实现
+
+### 2.1 分步开发策略
+
+开发多模块项目时，一个常见错误是一口气让 Claude 把所有代码都写出来。更好的策略是：**先给全局计划，再逐模块实现**。
+
+```text
+You: 我们按这个顺序开发：
+     1. 先做 scanner（文件扫描）— 最简单，没有外部依赖
+     2. 再做 extractor（链接提取）— 纯字符串处理
+     3. 然后 checker（链接检查）— 最复杂，涉及网络请求
+     4. 最后 reporter + CLI 入口 — 把前面的串起来
+
+     每个模块做完都跑一遍测试确认。现在先从 scanner 开始。
+```
+
+这个策略的好处：
+- Claude 知道全局架构，每个模块的接口设计会更一致
+- 逐步实现，每步都可验证，出问题容易定位
+- 上下文不会一次性爆炸
+
+> 📖 这就是 [Prompt 指南](/zh/blog/claude-code-prompt-guide)里讲的"缩放节奏"——先 zoom out 看全局，再 zoom in 做细节。
+
+### 2.2 文件扫描模块 scanFiles()
+
+```text
+You: 实现 src/scanner.ts：
+     - 接收一个目录路径和可选的 glob 模式（默认 **/*.md）
+     - 返回匹配的文件路径数组
+     - 处理目录不存在的情况
+```
+
+```typescript
+// src/scanner.ts
+import { glob } from "glob";
+import { access } from "fs/promises";
+
+export interface ScanOptions {
+  /** glob 模式，默认匹配所有 .md 文件 */
+  pattern?: string;
+  /** 要忽略的目录 */
+  ignore?: string[];
+}
+
+const DEFAULT_PATTERN = "**/*.md";
+const DEFAULT_IGNORE = ["node_modules/**", ".git/**"];
+
+/**
+ * 扫描目录中的 Markdown 文件
+ */
+export async function scanFiles(
+  dir: string,
+  options: ScanOptions = {}
+): Promise<string[]> {
+  const { pattern = DEFAULT_PATTERN, ignore = DEFAULT_IGNORE } = options;
+
+  try {
+    await access(dir);
+  } catch {
+    throw new Error("Directory not found: " + dir);
+  }
+
+  const files = await glob(pattern, {
+    cwd: dir,
+    absolute: true,
+    ignore,
+  });
+
+  return files.sort();
+}
+```
+
+简洁、类型安全、错误处理到位。这就是给 Claude 明确约束后的产出质量。
+
+### 2.3 链接提取模块 extractLinks()
+
+这个模块用到了"先看再改"模式——先让 Claude 读懂 Markdown 链接的各种格式，再写提取逻辑。
+
+```text
+You: 实现 src/extractor.ts。Markdown 里的链接有这些格式：
+     1. [text](url) — 标准链接
+     2. [text](url "title") — 带标题的链接
+     3. ![alt](url) — 图片
+     4. <https://example.com> — 自动链接
+     5. [text][ref] + [ref]: url — 引用式链接
+
+     先处理前 4 种，引用式链接后面再加。
+     每个链接要记录：url、行号、原始文本。
+```
+
+```typescript
+// src/extractor.ts
+import { readFile } from "fs/promises";
+
+export interface LinkInfo {
+  /** 链接 URL */
+  url: string;
+  /** 所在行号（从 1 开始） */
+  line: number;
+  /** 原始匹配文本 */
+  raw: string;
+  /** 来源文件路径 */
+  file: string;
+}
+
+// 匹配 [text](url) 和 ![alt](url)
+const INLINE_LINK = /!?\[([^\]]*)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+// 匹配 <https://...>
+const AUTO_LINK = /<(https?:\/\/[^>]+)>/g;
+
+/**
+ * 从 Markdown 文件中提取所有链接
+ */
+export async function extractLinks(filePath: string): Promise<LinkInfo[]> {
+  const content = await readFile(filePath, "utf-8");
+  const lines = content.split("\n");
+  const links: LinkInfo[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+
+    // 跳过代码块
+    if (line.trimStart().startsWith("```")) continue;
+
+    // 标准链接和图片
+    let match: RegExpExecArray | null;
+    INLINE_LINK.lastIndex = 0;
+    while ((match = INLINE_LINK.exec(line)) !== null) {
+      links.push({
+        url: match[2],
+        line: lineNum,
+        raw: match[0],
+        file: filePath,
+      });
+    }
+
+    // 自动链接
+    AUTO_LINK.lastIndex = 0;
+    while ((match = AUTO_LINK.exec(line)) !== null) {
+      links.push({
+        url: match[1],
+        line: lineNum,
+        raw: match[0],
+        file: filePath,
+      });
+    }
+  }
+
+  return links;
+}
+```
+
+> 注意代码块跳过逻辑还比较简陋（没处理多行代码块的状态追踪），这是后面重构阶段要改进的点。
+
+### 2.4 链接检查模块 checkLink()
+
+这是最复杂的模块，涉及网络请求和并发控制。
+
+```text
+You: 实现 src/checker.ts：
+     - HTTP/HTTPS 链接：发 HEAD 请求，超时 10 秒
+     - 相对链接：检查文件是否存在
+     - 跳过 mailto: 和 tel: 链接
+     - 返回检查结果（成功/失败/跳过 + 原因）
+     - 暂时不做并发控制，后面调试阶段再加
+```
+
+```typescript
+// src/checker.ts
+import { access } from "fs/promises";
+import { resolve, dirname } from "path";
+import { LinkInfo } from "./extractor.js";
+
+export type LinkStatus = "ok" | "broken" | "skipped";
+
+export interface CheckResult {
+  link: LinkInfo;
+  status: LinkStatus;
+  statusCode?: number;
+  error?: string;
+}
+
+const SKIP_PROTOCOLS = ["mailto:", "tel:", "javascript:"];
+const TIMEOUT_MS = 10_000;
+
+/**
+ * 检查单个链接的可访问性
+ */
+export async function checkLink(link: LinkInfo): Promise<CheckResult> {
+  const { url } = link;
+
+  // 跳过特殊协议
+  if (SKIP_PROTOCOLS.some((p) => url.startsWith(p))) {
+    return { link, status: "skipped", error: "Special protocol" };
+  }
+
+  // 锚点链接暂时跳过
+  if (url.startsWith("#")) {
+    return { link, status: "skipped", error: "Anchor link" };
+  }
+
+  // HTTP/HTTPS 链接
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return checkHttpLink(link);
+  }
+
+  // 相对链接
+  return checkRelativeLink(link);
+}
+
+async function checkHttpLink(link: LinkInfo): Promise<CheckResult> {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+    const response = await fetch(link.url, {
+      method: "HEAD",
+      signal: controller.signal,
+      headers: { "User-Agent": "mdcheck/0.1.0" },
+      redirect: "follow",
+    });
+
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      return { link, status: "ok", statusCode: response.status };
+    }
+
+    // 有些服务器不支持 HEAD，降级到 GET
+    if (response.status === 405) {
+      const getResponse = await fetch(link.url, {
+        method: "GET",
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { "User-Agent": "mdcheck/0.1.0" },
+        redirect: "follow",
+      });
+      return {
+        link,
+        status: getResponse.ok ? "ok" : "broken",
+        statusCode: getResponse.status,
+      };
+    }
+
+    return { link, status: "broken", statusCode: response.status };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return { link, status: "broken", error: message };
+  }
+}
+
+async function checkRelativeLink(link: LinkInfo): Promise<CheckResult> {
+  const targetPath = resolve(dirname(link.file), link.url.split("#")[0]);
+  try {
+    await access(targetPath);
+    return { link, status: "ok" };
+  } catch {
+    return { link, status: "broken", error: "File not found" };
+  }
+}
+```
+
+这段代码有几个值得注意的设计决策：
+- HEAD 请求失败时降级到 GET（有些服务器不支持 HEAD）
+- AbortController 做超时控制
+- 相对链接去掉锚点后再检查文件存在性
+
+但故意没做并发控制——这会在第四阶段"调试"中暴露问题。
+
+### 2.5 CLI 入口与报告输出
+
+```text
+You: 实现 CLI 入口 src/index.ts 和报告模块 src/reporter.ts：
+     - CLI 用 commander.js，支持 --pattern、--ignore、--json 参数
+     - 报告默认终端彩色输出，--json 输出 JSON 格式
+     - 退出码：0 = 全部正常，1 = 有死链
+```
+
+```typescript
+// src/reporter.ts
+import chalk from "chalk";
+import { CheckResult } from "./checker.js";
+
+export function reportToConsole(results: CheckResult[]): void {
+  const broken = results.filter((r) => r.status === "broken");
+  const ok = results.filter((r) => r.status === "ok");
+  const skipped = results.filter((r) => r.status === "skipped");
+
+  if (broken.length > 0) {
+    console.log(chalk.red.bold("\n✗ " + broken.length + " broken link(s) found:\n"));
+    for (const r of broken) {
+      console.log(chalk.red("  ✗ " + r.link.url));
+      console.log(chalk.gray("    " + r.link.file + ":" + r.link.line));
+      if (r.statusCode) console.log(chalk.gray("    HTTP " + r.statusCode));
+      if (r.error) console.log(chalk.gray("    " + r.error));
+      console.log();
+    }
+  }
+
+  console.log(chalk.bold("Summary:"));
+  console.log(chalk.green("  ✓ " + ok.length + " ok"));
+  console.log(chalk.red("  ✗ " + broken.length + " broken"));
+  console.log(chalk.yellow("  ⊘ " + skipped.length + " skipped"));
+}
+
+export function reportToJson(results: CheckResult[]): void {
+  const output = results.map((r) => ({
+    url: r.link.url,
+    file: r.link.file,
+    line: r.link.line,
+    status: r.status,
+    statusCode: r.statusCode,
+    error: r.error,
+  }));
+  console.log(JSON.stringify(output, null, 2));
+}
+```
+
+```typescript
+// src/index.ts
+#!/usr/bin/env node
+import { program } from "commander";
+import { scanFiles } from "./scanner.js";
+import { extractLinks } from "./extractor.js";
+import { checkLink } from "./checker.js";
+import { reportToConsole, reportToJson } from "./reporter.js";
+
+program
+  .name("mdcheck")
+  .description("Check Markdown files for broken links")
+  .version("0.1.0")
+  .argument("<dir>", "Directory to scan")
+  .option("-p, --pattern <glob>", "File glob pattern", "**/*.md")
+  .option("-i, --ignore <dirs...>", "Directories to ignore")
+  .option("--json", "Output results as JSON")
+  .action(async (dir, options) => {
+    try {
+      const files = await scanFiles(dir, {
+        pattern: options.pattern,
+        ignore: options.ignore?.map((d: string) => d + "/**"),
+      });
+
+      if (files.length === 0) {
+        console.log("No Markdown files found.");
+        process.exit(0);
+      }
+
+      console.log("Found " + files.length + " file(s), extracting links...");
+
+      const allLinks = (await Promise.all(files.map(extractLinks))).flat();
+      console.log("Found " + allLinks.length + " link(s), checking...");
+
+      // 注意：这里没有并发控制，所有链接同时检查
+      const results = await Promise.all(allLinks.map(checkLink));
+
+      if (options.json) {
+        reportToJson(results);
+      } else {
+        reportToConsole(results);
+      }
+
+      const hasBroken = results.some((r) => r.status === "broken");
+      process.exit(hasBroken ? 1 : 0);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : err);
+      process.exit(2);
+    }
+  });
+
+program.parse();
+```
+
+注意 `Promise.all(allLinks.map(checkLink))`——所有链接同时检查，没有并发控制。这在链接少的时候没问题，但链接多了就会出事。我们故意留下这个问题，在第四阶段解决。
+
+> 📖 Prompt 驱动开发的更多技巧见 [Prompt 指南](/zh/blog/claude-code-prompt-guide)和[上下文管理指南](/zh/blog/claude-code-context-guide)
+
+---
+
+## 三、测试驱动：给项目加上安全网
+
+### 3.1 TDD 简要回顾
+
+TDD 的核心循环很简单：
+
+1. **Red** — 先写一个会失败的测试
+2. **Green** — 写最少的代码让测试通过
+3. **Refactor** — 在测试保护下重构
+
+用 Claude Code 做 TDD 特别顺手：你写测试（或让 Claude 写），然后让 Claude 实现代码让测试通过。测试就是最精确的需求描述。
+
+> 📖 完整的 TDD 工作流见[测试工作流指南](/zh/blog/claude-code-testing-guide)
+
+### 3.2 为 extractLinks 写单元测试
+
+```text
+You: 为 extractLinks 写单元测试，覆盖以下场景：
+     1. 标准 Markdown 链接 [text](url)
+     2. 图片链接 ![alt](url)
+     3. 带标题的链接 [text](url "title")
+     4. 自动链接 <https://...>
+     5. 代码块内的链接应该被跳过
+     6. 空文件返回空数组
+
+     先写测试，不要写实现。
+```
+
+```typescript
+// tests/extractor.test.ts
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { extractLinks } from "../src/extractor.js";
+import { writeFile, mkdir, rm } from "fs/promises";
+import { join } from "path";
+
+const TEST_DIR = join(__dirname, ".tmp-test");
+
+beforeEach(async () => {
+  await mkdir(TEST_DIR, { recursive: true });
+});
+
+afterEach(async () => {
+  await rm(TEST_DIR, { recursive: true, force: true });
+});
+
+async function createTestFile(name: string, content: string): Promise<string> {
+  const filePath = join(TEST_DIR, name);
+  await writeFile(filePath, content);
+  return filePath;
+}
+
+describe("extractLinks", () => {
+  it("should extract standard markdown links", async () => {
+    const file = await createTestFile("test.md", "[Google](https://google.com)\n[GitHub](https://github.com)");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(2);
+    expect(links[0].url).toBe("https://google.com");
+    expect(links[1].url).toBe("https://github.com");
+  });
+
+  it("should extract image links", async () => {
+    const file = await createTestFile("test.md", "![logo](./images/logo.png)");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toBe("./images/logo.png");
+  });
+
+  it("should extract links with titles", async () => {
+    const file = await createTestFile("test.md", '[Google](https://google.com "Search Engine")');
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toBe("https://google.com");
+  });
+
+  it("should extract auto links", async () => {
+    const file = await createTestFile("test.md", "Visit <https://example.com> for more.");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(1);
+    expect(links[0].url).toBe("https://example.com");
+  });
+
+  it("should skip links inside code blocks", async () => {
+    const file = await createTestFile("test.md", "```\n[not a link](https://skip.me)\n```");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(0);
+  });
+
+  it("should return empty array for empty file", async () => {
+    const file = await createTestFile("test.md", "");
+    const links = await extractLinks(file);
+    expect(links).toHaveLength(0);
+  });
+
+  it("should record correct line numbers", async () => {
+    const file = await createTestFile("test.md", "line 1\n[link](https://example.com)\nline 3");
+    const links = await extractLinks(file);
+    expect(links[0].line).toBe(2);
+  });
+});
+```
+
+测试先行的好处：当你把这些测试给 Claude 看，它就知道 `extractLinks` 的精确行为规范。比任何自然语言描述都准确。
+
+### 3.3 为 checkLink 写测试
+
+网络请求的测试需要 Mock。这里用 `msw`（Mock Service Worker）来拦截 HTTP 请求：
+
+```text
+You: 为 checkLink 写测试。HTTP 请求需要 mock，不要发真实请求。
+     覆盖场景：
+     1. 正常 200 响应 → ok
+     2. 404 响应 → broken
+     3. 超时 → broken
+     4. mailto 链接 → skipped
+     5. 相对链接指向存在的文件 → ok
+     6. 相对链接指向不存在的文件 → broken
+```
+
+```typescript
+// tests/checker.test.ts
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
+import { http, HttpResponse } from "msw";
+import { setupServer } from "msw/node";
+import { checkLink, CheckResult } from "../src/checker.js";
+import { LinkInfo } from "../src/extractor.js";
+import { writeFile, mkdir, rm } from "fs/promises";
+import { join } from "path";
+
+const TEST_DIR = join(__dirname, ".tmp-checker-test");
+
+// Mock HTTP server
+const server = setupServer(
+  http.head("https://example.com/ok", () => {
+    return new HttpResponse(null, { status: 200 });
+  }),
+  http.head("https://example.com/not-found", () => {
+    return new HttpResponse(null, { status: 404 });
+  }),
+  http.head("https://example.com/slow", async () => {
+    await new Promise((r) => setTimeout(r, 15000));
+    return new HttpResponse(null, { status: 200 });
+  })
+);
+
+beforeAll(() => server.listen());
+afterAll(() => server.close());
+
+beforeEach(async () => {
+  await mkdir(TEST_DIR, { recursive: true });
+  server.resetHandlers();
+});
+
+afterEach(async () => {
+  await rm(TEST_DIR, { recursive: true, force: true });
+});
+
+function makeLink(url: string, file?: string): LinkInfo {
+  return { url, line: 1, raw: url, file: file || join(TEST_DIR, "test.md") };
+}
+
+describe("checkLink", () => {
+  it("should return ok for 200 response", async () => {
+    const result = await checkLink(makeLink("https://example.com/ok"));
+    expect(result.status).toBe("ok");
+    expect(result.statusCode).toBe(200);
+  });
+
+  it("should return broken for 404 response", async () => {
+    const result = await checkLink(makeLink("https://example.com/not-found"));
+    expect(result.status).toBe("broken");
+    expect(result.statusCode).toBe(404);
+  });
+
+  it("should return broken on timeout", async () => {
+    const result = await checkLink(makeLink("https://example.com/slow"));
+    expect(result.status).toBe("broken");
+    expect(result.error).toBeDefined();
+  });
+
+  it("should skip mailto links", async () => {
+    const result = await checkLink(makeLink("mailto:test@example.com"));
+    expect(result.status).toBe("skipped");
+  });
+
+  it("should return ok for existing relative file", async () => {
+    const targetFile = join(TEST_DIR, "readme.md");
+    await writeFile(targetFile, "hello");
+    const result = await checkLink(makeLink("readme.md"));
+    expect(result.status).toBe("ok");
+  });
+
+  it("should return broken for missing relative file", async () => {
+    const result = await checkLink(makeLink("nonexistent.md"));
+    expect(result.status).toBe("broken");
+  });
+});
+```
+
+### 3.4 Coverage 检查
+
+```text
+You: 跑一下测试覆盖率，看看哪里还需要补测试。
+```
+
+```bash
+$ npm run test:coverage
+
+ ✓ tests/extractor.test.ts (7 tests)
+ ✓ tests/checker.test.ts (6 tests)
+
+Coverage:
+  src/scanner.ts    | 85.7%  | Missing: error branch
+  src/extractor.ts  | 92.3%  | Missing: auto-link edge case
+  src/checker.ts    | 78.4%  | Missing: HEAD→GET fallback, anchor links
+  src/reporter.ts   | 0%     | No tests yet
+
+Overall: 64.1% (target: 80%)
+```
+
+```text
+You: reporter.ts 覆盖率是 0，但它主要是 console.log 输出，
+     写快照测试意义不大。帮我补上 checker.ts 缺失的分支测试，
+     再给 scanner.ts 补一个目录不存在的测试。
+```
+
+Claude 会精准地补上缺失的测试用例，而不是重写整个测试文件。这就是"先看覆盖率报告，再有针对性地补"的策略。
+
+> 📖 更多测试策略见[测试工作流指南](/zh/blog/claude-code-testing-guide)
+
+---
+
+## 四、调试实战：解决一个真实 Bug
+
+### 4.1 Bug 场景
+
+项目开发到这里，基本功能都有了。你兴冲冲地拿一个真实的文档目录来测试：
+
+```bash
+$ npx tsx src/index.ts ./docs
+
+Found 23 file(s), extracting links...
+Found 187 link(s), checking...
+Error: fetch failed
+    at Object.fetch (node:internal/deps/undici/undici:11576:11)
+    cause: Error: connect EMFILE 93.184.216.34:443
+        at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1595:16)
+```
+
+187 个链接同时发 HTTP 请求，操作系统的文件描述符（socket）直接耗尽了。
+
+这是一个经典的并发问题——在链接少的时候完全正常，链接一多就崩。
+
+### 4.2 用 Claude Code 定位根因
+
+```text
+You: 跑 mdcheck 检查一个有 187 个链接的目录时报错了：
+     Error: fetch failed
+     cause: Error: connect EMFILE 93.184.216.34:443
+
+     完整错误栈在上面。帮我分析一下原因。
+
+Claude: 这是一个典型的并发资源耗尽问题。
+
+     根因分析：
+     1. 在 src/index.ts 第 34 行，你用 Promise.all(allLinks.map(checkLink))
+        同时发起了 187 个 HTTP 请求
+     2. 每个 HTTP 请求需要一个 TCP socket（文件描述符）
+     3. 操作系统对单个进程的文件描述符数量有限制（通常 1024）
+     4. 187 个并发连接虽然没超过 1024，但加上 DNS 解析、
+        TLS 握手的排队，实际占用的描述符会更多
+     5. EMFILE 错误就是"打开的文件太多"
+
+     解决方案：
+     用 p-limit 库做并发控制，限制同时进行的 HTTP 请求数量。
+     建议并发数设为 10-20。
+```
+
+注意这里的 Prompt 策略：**直接贴错误信息**，让 Claude 分析。不需要你自己先猜原因。Claude 能从错误栈、错误码、上下文代码综合判断根因。
+
+> 📖 更多调试技巧见[调试工作流指南](/zh/blog/claude-code-debugging-guide)
+
+### 4.3 修复与验证
+
+```text
+You: 用 p-limit 修复这个并发问题。默认并发数 10，
+     通过 CLI 参数 --concurrency 可以调整。
+```
+
+先安装依赖：
+
+```bash
+$ npm install p-limit
+```
+
+然后修改 `src/checker.ts`：
+
+```typescript
+// src/checker.ts（新增并发控制）
+import pLimit from "p-limit";
+
+// ... 其他代码不变 ...
+
+/**
+ * 批量检查链接，带并发控制
+ */
+export async function checkLinks(
+  links: LinkInfo[],
+  concurrency = 10
+): Promise<CheckResult[]> {
+  const limit = pLimit(concurrency);
+  return Promise.all(links.map((link) => limit(() => checkLink(link))));
+}
+```
+
+更新 `src/index.ts`：
+
+```typescript
+// 把 Promise.all(allLinks.map(checkLink)) 替换为：
+import { checkLinks } from "./checker.js";
+
+const concurrency = parseInt(options.concurrency || "10");
+const results = await checkLinks(allLinks, concurrency);
+```
+
+写一个回归测试确认修复：
+
+```typescript
+// tests/checker.test.ts（新增）
+describe("checkLinks concurrency", () => {
+  it("should respect concurrency limit", async () => {
+    let concurrent = 0;
+    let maxConcurrent = 0;
+
+    server.use(
+      http.head("https://example.com/concurrent-test", async () => {
+        concurrent++;
+        maxConcurrent = Math.max(maxConcurrent, concurrent);
+        await new Promise((r) => setTimeout(r, 50));
+        concurrent--;
+        return new HttpResponse(null, { status: 200 });
+      })
+    );
+
+    const links = Array.from({ length: 20 }, (_, i) =>
+      makeLink("https://example.com/concurrent-test")
+    );
+
+    await checkLinks(links, 5);
+    expect(maxConcurrent).toBeLessThanOrEqual(5);
+  });
+});
+```
+
+```bash
+$ npm test
+
+ ✓ tests/extractor.test.ts (7 tests)
+ ✓ tests/checker.test.ts (7 tests)
+
+ All tests passed!
+```
+
+再用真实目录验证：
+
+```bash
+$ npx tsx src/index.ts ./docs --concurrency 10
+
+Found 23 file(s), extracting links...
+Found 187 link(s), checking...
+
+Summary:
+  ✓ 162 ok
+  ✗ 8 broken
+  ⊘ 17 skipped
+```
+
+问题解决。从发现 Bug 到修复验证，整个过程不到 5 分钟。
+
+> 📖 更多调试模式见[调试工作流指南](/zh/blog/claude-code-debugging-guide)
+
+---
+
+## 五、重构优化：让代码更好
+
+### 5.1 识别重构机会
+
+功能完成、Bug 修复后，是时候审视代码质量了。
+
+```text
+You: 帮我审查一下当前代码的质量，看看有哪些可以改进的地方。
+     重点关注：类型安全、模块职责、可测试性。
+
+Claude: 审查了所有源文件，发现几个改进点：
+
+     1. extractor.ts 的代码块跳过逻辑有 Bug
+        - 当前只检查行首是否有 ```，没有追踪多行代码块状态
+        - 多行代码块内部的链接会被错误提取
+
+     2. checker.ts 的 checkLink 函数职责过重
+        - 同时处理 HTTP、相对路径、特殊协议三种逻辑
+        - 建议拆分为 checkHttpLink、checkRelativeLink（已有）
+        - 主函数只做路由分发
+
+     3. 类型可以更精确
+        - CheckResult 的 status 是字符串联合类型，但没有用
+          discriminated union 来关联 status 和其他字段
+        - 比如 status: "ok" 时不应该有 error 字段
+
+     4. 代码块状态追踪需要修复（优先级最高）
+```
+
+### 5.2 提取与拆分
+
+先修复代码块跳过逻辑：
+
+```text
+You: 修复 extractor.ts 的代码块状态追踪。
+     需要正确处理多行代码块（``` 开始到 ``` 结束之间的内容都跳过）。
+```
+
+```typescript
+// src/extractor.ts（重构后）
+export async function extractLinks(filePath: string): Promise<LinkInfo[]> {
+  const content = await readFile(filePath, "utf-8");
+  const lines = content.split("\n");
+  const links: LinkInfo[] = [];
+  let inCodeBlock = false;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineNum = i + 1;
+
+    // 追踪代码块状态
+    if (line.trimStart().startsWith("```")) {
+      inCodeBlock = !inCodeBlock;
+      continue;
+    }
+
+    // 代码块内部跳过
+    if (inCodeBlock) continue;
+
+    // ... 链接提取逻辑不变 ...
+  }
+
+  return links;
+}
+```
+
+### 5.3 类型系统改进
+
+用 discriminated union 让类型更精确：
+
+```text
+You: 把 CheckResult 改成 discriminated union：
+     - ok 状态：有 statusCode，没有 error
+     - broken 状态：有 statusCode 或 error
+     - skipped 状态：有 reason，没有 statusCode
+```
+
+```typescript
+// src/checker.ts（类型重构）
+export type CheckResult =
+  | { link: LinkInfo; status: "ok"; statusCode: number }
+  | { link: LinkInfo; status: "broken"; statusCode?: number; error?: string }
+  | { link: LinkInfo; status: "skipped"; reason: string };
+```
+
+这样 TypeScript 编译器就能帮你检查：当 `status === "ok"` 时，`statusCode` 一定存在；当 `status === "skipped"` 时，不会有 `statusCode` 字段。
+
+相应地，`reporter.ts` 也需要更新：
+
+```typescript
+// src/reporter.ts（适配新类型）
+export function reportToConsole(results: CheckResult[]): void {
+  const broken = results.filter((r): r is Extract<CheckResult, { status: "broken" }> =>
+    r.status === "broken"
+  );
+  const ok = results.filter((r) => r.status === "ok");
+  const skipped = results.filter((r) => r.status === "skipped");
+
+  if (broken.length > 0) {
+    console.log(chalk.red.bold("\n✗ " + broken.length + " broken link(s) found:\n"));
+    for (const r of broken) {
+      console.log(chalk.red("  ✗ " + r.link.url));
+      console.log(chalk.gray("    " + r.link.file + ":" + r.link.line));
+      if (r.statusCode) console.log(chalk.gray("    HTTP " + r.statusCode));
+      if (r.error) console.log(chalk.gray("    " + r.error));
+      console.log();
+    }
+  }
+
+  console.log(chalk.bold("Summary:"));
+  console.log(chalk.green("  ✓ " + ok.length + " ok"));
+  console.log(chalk.red("  ✗ " + broken.length + " broken"));
+  console.log(chalk.yellow("  ⊘ " + skipped.length + " skipped"));
+}
+```
+
+### 5.4 重构后验证
+
+重构最重要的一步：**跑全部测试**。
+
+```text
+You: 重构完了，跑一下全部测试确认没有破坏任何东西。
+```
+
+```bash
+$ npm test
+
+ ✓ tests/extractor.test.ts (7 tests)
+ ✓ tests/checker.test.ts (7 tests)
+ ✓ tests/scanner.test.ts (3 tests)
+
+ 17 tests passed!
+```
+
+全部通过。这就是第三阶段写的测试在保护你——重构时可以大胆改，测试会告诉你有没有改坏。
+
+> 📖 更多重构模式见[重构工作流指南](/zh/blog/claude-code-refactoring-guide)
+
+---
+
+## 六、Git 工作流与 CI
+
+### 6.1 分支策略与提交
+
+开发过程中，每完成一个阶段就应该提交。用 Claude Code 的 `/commit` 命令可以自动生成高质量的提交信息：
+
+```text
+You: /commit
+
+Claude: 分析了暂存区的变更，生成提交信息：
+
+     feat: add concurrent link checking with p-limit
+
+     - Add p-limit dependency for concurrency control
+     - Extract checkLinks() function with configurable concurrency
+     - Add --concurrency CLI option (default: 10)
+     - Add regression test for concurrency limit
+     - Fix EMFILE error when checking 50+ links simultaneously
+```
+
+Claude 会根据 diff 内容自动判断提交类型（feat/fix/refactor）、总结变更内容、关联相关上下文。比手写提交信息准确得多。
+
+推荐的分支策略：
+
+```bash
+main                    # 稳定版本
+├── feat/scanner        # 第二阶段：文件扫描
+├── feat/extractor      # 第二阶段：链接提取
+├── feat/checker        # 第二阶段：链接检查
+├── fix/concurrency     # 第四阶段：并发修复
+└── refactor/types      # 第五阶段：类型重构
+```
+
+每个功能分支完成后合并到 main，保持提交历史清晰。
+
+### 6.2 创建 PR
+
+```text
+You: 帮我创建一个 PR，把 feat/checker 合并到 main。
+
+Claude: 我来创建 PR：
+
+     Title: feat: add link checker with HTTP validation
+
+     ## Summary
+     Implements the core link checking module with:
+     - HTTP HEAD requests with 10s timeout
+     - HEAD → GET fallback for 405 responses
+     - Relative link file existence check
+     - Special protocol (mailto, tel) skipping
+
+     ## Changes
+     - `src/checker.ts`: New module with checkLink() and checkLinks()
+     - `src/reporter.ts`: Console and JSON report output
+     - `src/index.ts`: CLI entry point with commander.js
+     - `tests/checker.test.ts`: 7 test cases with MSW mocking
+
+     ## Testing
+     All 17 tests passing. Coverage at 82%.
+```
+
+> 📖 Git 工作流的完整指南见 [Git 工作流指南](/zh/blog/claude-code-git-guide)
+
+### 6.3 配置 GitHub Actions
+
+```text
+You: 帮我配置 GitHub Actions，要求：
+     - push 和 PR 时触发
+     - 跑 lint + 测试
+     - Node.js 20
+```
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+```
+
+简洁明了。CI 配置不需要花哨，能跑 lint、测试、构建就够了。
+
+> 📖 更多 CI/CD 模式见 [CI/CD 集成指南](/zh/blog/claude-code-cicd-guide)
+
+### 6.4 Hooks 安全防护
+
+配置 Claude Code Hooks，在提交前自动跑测试：
+
+```json
+// .claude/settings.json（添加 hooks）
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm test)",
+      "Bash(npm run build)",
+      "Bash(npm run lint)"
+    ]
+  },
+  "hooks": {
+    "PreCommit": [
+      {
+        "matcher": "**/*.ts",
+        "command": "npm test"
+      }
+    ]
+  }
+}
+```
+
+这样每次 Claude 要提交代码时，会先跑测试。测试不过就不让提交——从源头防止坏代码进入仓库。
+
+> 📖 Hooks 的完整用法见 [Hooks 指南](/zh/blog/claude-code-hooks-guide)，安全实践见[安全实践指南](/zh/blog/claude-code-security-guide)
+
+---
+
+## 七、收尾与发布
+
+### 7.1 README 生成
+
+```text
+You: 根据项目代码生成 README.md，包含：
+     - 项目简介
+     - 安装方式
+     - 使用示例
+     - CLI 参数说明
+     - 贡献指南
+```
+
+Claude 会读取所有源文件，理解项目功能后生成完整的 README。比你从零写快得多，而且不会遗漏 CLI 参数。
+
+```markdown
+# mdcheck
+
+A fast CLI tool to check Markdown files for broken links.
+
+## Install
+
+npm install -g mdcheck
+
+## Usage
+
+mdcheck ./docs
+mdcheck ./docs --pattern "**/*.mdx" --concurrency 20
+mdcheck ./docs --json > report.json
+
+## Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| -p, --pattern | File glob pattern | **/*.md |
+| -i, --ignore | Directories to ignore | node_modules, .git |
+| --concurrency | Max concurrent HTTP requests | 10 |
+| --json | Output as JSON | false |
+
+## Exit Codes
+
+- 0: All links are valid
+- 1: Broken links found
+- 2: Runtime error
+```
+
+### 7.2 npm 发布准备
+
+确保 `package.json` 的 `bin` 字段正确配置：
+
+```json
+{
+  "name": "mdcheck",
+  "version": "1.0.0",
+  "bin": {
+    "mdcheck": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "engines": {
+    "node": ">=18"
+  }
+}
+```
+
+别忘了在 `src/index.ts` 顶部加上 shebang：
+
+```typescript
+#!/usr/bin/env node
+```
+
+构建并测试：
+
+```bash
+$ npm run build
+$ npm link
+$ mdcheck ./docs  # 本地测试全局命令
+```
+
+### 7.3 回顾表
+
+回顾一下，7 个阶段分别用到了哪些 Claude Code 技能：
+
+| 阶段 | 做了什么 | 用到的 Claude Code 技能 |
+|------|---------|----------------------|
+| 一、规划 | 需求分析、项目初始化、CLAUDE.md | 对话式需求分析、代码生成、配置文件编写 |
+| 二、开发 | 4 个核心模块 + CLI | 分步 Prompt、代码生成、"先看再改"模式 |
+| 三、测试 | 单元测试、Mock、覆盖率 | TDD 工作流、测试生成、覆盖率分析 |
+| 四、调试 | EMFILE 并发 Bug | 错误分析、根因定位、修复验证 |
+| 五、重构 | 类型改进、代码块修复 | 代码审查、重构建议、类型系统优化 |
+| 六、Git/CI | 提交、PR、CI、Hooks | /commit、PR 生成、CI 配置、Hooks |
+| 七、收尾 | README、发布准备 | 文档生成、配置检查 |
+
+---
+
+## 八、经验总结：AI 辅助开发的最佳实践
+
+### 8.1 项目级别的 Prompt 策略
+
+整个项目下来，Prompt 有一个明显的"缩放节奏"：
+
+- **规划阶段**：Zoom out — 描述全局需求，让 Claude 分析架构
+- **开发阶段**：Zoom in — 聚焦单个模块，给精确的接口约束
+- **审查阶段**：Zoom out — 让 Claude 审视整体代码质量
+
+这个节奏不是线性的，而是在每个阶段内部也会反复切换。比如开发 checker 模块时，先 zoom out 讨论并发策略，再 zoom in 写具体实现。
+
+### 8.2 会话管理策略
+
+一个完整项目不应该在一个会话里完成。推荐的策略：
+
+- **阶段间用 `/clear`**：每完成一个阶段，清理上下文，开始新会话
+- **CLAUDE.md 是跨会话的记忆**：项目规范写在 CLAUDE.md 里，每个新会话都能读到
+- **Git 提交是检查点**：每个阶段结束时提交，下个会话从干净的状态开始
+
+```text
+# 典型的会话节奏
+会话 1: 规划 + 初始化 + CLAUDE.md → git commit → /clear
+会话 2: scanner + extractor 模块 → git commit → /clear
+会话 3: checker + reporter + CLI → git commit → /clear
+会话 4: 写测试 + 跑覆盖率 → git commit → /clear
+会话 5: 调试 + 修复 → git commit → /clear
+会话 6: 重构 + CI + 收尾 → git commit
+```
+
+> 📖 上下文管理的详细策略见[上下文管理指南](/zh/blog/claude-code-context-guide)
+
+### 8.3 人机协作的边界
+
+经过这个项目，我对人机协作的边界有了更清晰的认识：
+
+| 职责 | 人 | Claude | 双方 |
+|------|---|--------|------|
+| 架构决策 | ✓ | | |
+| 需求分析 | | | ✓ |
+| 代码实现 | | ✓ | |
+| 测试编写 | | ✓ | |
+| 代码审查 | | | ✓ |
+| Bug 定位 | | ✓ | |
+| 修复方案选择 | ✓ | | |
+| 重构方向 | ✓ | | |
+| 重构执行 | | ✓ | |
+
+核心原则：**架构和方向由人决定，实现和执行交给 Claude，审查双方共同完成。**
+
+不要让 Claude 替你做架构决策——它会给你一个"看起来合理"的方案，但可能不适合你的具体场景。反过来，也不要自己手写每一行代码——让 Claude 处理重复性的实现工作，你把精力放在设计和审查上。
+
+### 8.4 成本意识
+
+这个项目从零到完成，大约消耗了多少 token？
+
+| 阶段 | 预估 Token 消耗 | 说明 |
+|------|----------------|------|
+| 规划 | ~15K | 需求讨论 + 项目初始化 |
+| 开发 | ~40K | 4 个模块的代码生成 |
+| 测试 | ~25K | 测试代码 + 覆盖率分析 |
+| 调试 | ~10K | 错误分析 + 修复 |
+| 重构 | ~20K | 代码审查 + 类型重构 |
+| Git/CI | ~10K | 提交 + PR + CI 配置 |
+| 收尾 | ~5K | README + 发布准备 |
+| **合计** | **~125K** | **约 $3-5（按 Sonnet 计费）** |
+
+几个省 token 的技巧：
+- 阶段间 `/clear` 避免上下文膨胀
+- CLAUDE.md 写好规范，减少重复解释
+- 用 `/compact` 压缩长对话
+- 简单任务用 Haiku，复杂任务用 Sonnet/Opus
+
+> 📖 详细的成本优化策略见[性能优化指南](/zh/blog/claude-code-performance-guide)，多 Agent 并行策略见[多 Agent 指南](/zh/blog/claude-code-multi-agent-guide)
+
+---
+
+## 总结
+
+这篇文章用一个完整的项目（mdcheck）串联了 Claude Code 系列的所有核心技能。回顾一下全景图：
+
+| 阶段 | 核心技能 | 对应指南 |
+|------|---------|---------|
+| 规划 | CLAUDE.md、settings.json | [CLAUDE.md 指南](/zh/blog/claude-md-guide)、[settings.json 指南](/zh/blog/claude-code-settings-guide) |
+| 开发 | Prompt 技巧、上下文管理 | [Prompt 指南](/zh/blog/claude-code-prompt-guide)、[上下文管理指南](/zh/blog/claude-code-context-guide) |
+| 测试 | TDD、Mock、Coverage | [测试工作流指南](/zh/blog/claude-code-testing-guide) |
+| 调试 | 错误分析、根因定位 | [调试工作流指南](/zh/blog/claude-code-debugging-guide) |
+| 重构 | 代码审查、类型优化 | [重构工作流指南](/zh/blog/claude-code-refactoring-guide) |
+| Git/CI | 提交、PR、CI、Hooks | [Git 指南](/zh/blog/claude-code-git-guide)、[CI/CD 指南](/zh/blog/claude-code-cicd-guide)、[Hooks 指南](/zh/blog/claude-code-hooks-guide) |
+| 安全 | 权限控制、Hooks 防护 | [安全实践指南](/zh/blog/claude-code-security-guide) |
+| 效率 | 成本控制、会话管理 | [性能优化指南](/zh/blog/claude-code-performance-guide)、[多 Agent 指南](/zh/blog/claude-code-multi-agent-guide) |
+
+AI 辅助开发不是让 AI 替你写代码，而是让你在更高的层次上工作——你负责思考"做什么"和"为什么"，Claude 负责"怎么做"。当你掌握了这套工作流，一个人就能拥有一个小团队的产出。
+
+---
+
+## 推荐阅读
+
+本系列全部文章：
+
+- [CLAUDE.md 编写指南](/zh/blog/claude-md-guide) — 项目记忆文件的编写规范
+- [Claude Code 进阶指南](/zh/blog/claude-code-advanced-guide) — 从入门到高效的进阶技巧
+- [上下文管理指南](/zh/blog/claude-code-context-guide) — 让每一个 Token 都物尽其用
+- [性能优化与成本控制指南](/zh/blog/claude-code-performance-guide) — 又快又省的优化策略
+- [多 Agent 并行指南](/zh/blog/claude-code-multi-agent-guide) — 一个人顶一个团队
+- [自定义 Slash Commands 指南](/zh/blog/claude-code-skills-guide) — 打造专属命令库
+- [MCP Server 指南](/zh/blog/claude-code-mcp-guide) — 把 AI 助手变成全栈平台
+- [Prompt 完全指南](/zh/blog/claude-code-prompt-guide) — 让 AI 精准理解你的意图
+- [settings.json 指南](/zh/blog/claude-code-settings-guide) — 从权限控制到团队协作
+- [Git 工作流指南](/zh/blog/claude-code-git-guide) — 从提交到合并的 AI 协作
+- [测试工作流指南](/zh/blog/claude-code-testing-guide) — 从 TDD 到 CI/CD 的测试之道
+- [重构工作流指南](/zh/blog/claude-code-refactoring-guide) — 从小步重构到大规模改造
+- [调试工作流指南](/zh/blog/claude-code-debugging-guide) — 从报错到根因的排错之道
+- [CI/CD 集成指南](/zh/blog/claude-code-cicd-guide) — 从本地到自动化流水线
+- [Hooks 指南](/zh/blog/claude-code-hooks-guide) — 让自动化确定性执行
+- [安全实践指南](/zh/blog/claude-code-security-guide) — 从权限模型到多层防线
