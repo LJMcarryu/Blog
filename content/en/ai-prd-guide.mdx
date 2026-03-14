@@ -1,0 +1,647 @@
+---
+title: "How to Use LLMs to Convert Product Requirements into PRD Documents: 5 Approaches"
+date: "2026-03-14"
+description: "A practical guide on using ChatGPT, Claude, and other LLMs to turn vague text requirements into structured PRDs — five approaches, prompt templates, a full walkthrough, and pitfalls to avoid."
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+A product manager writes a paragraph in Slack: "We need an internal ticket system where employees can submit IT issues and admins can assign and track them."
+
+Then engineering asks 20 questions: What are the ticket statuses? Who can assign? Do we need notifications? What happens on timeout? How do we define priority? Do we need mobile support?
+
+The PM goes back to write a PRD. Three days later, it is still missing edge cases.
+
+Sound familiar? Traditional PRD writing has a core tension: **requirements are fuzzy in your head, but documents need to be precise**. The journey from fuzzy to precise is slow, painful, and error-prone.
+
+The good news: LLMs can dramatically shorten this process. Give it a vague requirement description, and it can generate a structured PRD draft in minutes — not a perfect final version, but enough to skip the blank page stage and jump straight into review and discussion.
+
+This article covers:
+
+- **5 mainstream approaches** compared with use cases
+- **Copy-paste-ready prompt templates**
+- **A complete end-to-end walkthrough** (from one paragraph to PRD)
+- **Best practices and common pitfalls**
+
+Whether you are a product manager, tech lead, or indie developer, you can start using these techniques today.
+
+## 1. Why You Need AI-Assisted PRD Writing
+
+### 1.1 Traditional Pain Points
+
+If you have written PRDs before, you know the pain:
+
+**Time-consuming**: A moderately complex PRD typically takes 3-5 days. Most of that time goes into structuring, thinking through edge cases, and formatting — not actual product thinking.
+
+**Inconsistent format**: Every PM on the team writes PRDs differently. Some prefer tables, others prefer lists, some do not even include version numbers. Onboarding new team members becomes a nightmare.
+
+**Missing edge cases**: Human brains are great at happy paths but terrible at exceptions. "What if a user submits two tickets simultaneously?" "What happens to assigned tickets when an admin leaves the company?" These questions often surface during development, not during planning.
+
+**The blank page problem**: Staring at an empty document, not knowing where to start. This is the biggest psychological barrier — many PRD delays are caused by this alone.
+
+### 1.2 What LLMs Bring to the Table
+
+LLMs will not make product decisions for you, but they excel at several things:
+
+**Structure**: Give it a messy requirement description, and it organizes it into a standard PRD structure (background, goals, user stories, functional requirements, non-functional requirements, etc.).
+
+**Completeness checks**: It automatically fills in edge cases, error flows, and permission controls you did not think of. Not always correct, but it prompts you to think about them.
+
+**Speed**: Draft in minutes, not days. Your time goes into reviewing and deciding, not structuring and formatting.
+
+**Consistency**: With the same template and prompt, every team member generates PRDs with identical structure.
+
+**Multilingual**: If your team works across countries, LLMs can generate both Chinese and English versions simultaneously.
+
+## 2. Five Mainstream Approaches — Overview
+
+Here is a comparison overview before we dive into each:
+
+| Approach | Representative Tools | Learning Curve | Best For | Cost | Quality Stability |
+|----------|---------------------|----------------|----------|------|-------------------|
+| Direct Conversation | ChatGPT, Claude | Low | Quick exploration, small features | Low | Medium |
+| SaaS Tools | Notion AI, Jira AI, Linear AI | Low-Med | Team collaboration, existing toolchain | Medium | Medium-High |
+| Template Injection | ChatGPT/Claude + System Prompt | Low-Med | Standardized team workflows | Low | High |
+| Agent Workflows | Dify, Coze, LangChain | High | Complex products, multi-round generation | Medium-High | High |
+| IDE Integration | Cursor, Claude Code | Medium | Technical PRDs, API design | Medium | Medium-High |
+
+### 2.1 Direct Conversation (ChatGPT / Claude)
+
+The simplest approach: open ChatGPT or Claude and paste your requirements.
+
+Basic prompt example:
+
+```text
+I am building an internal IT ticket system. Key requirements:
+- Employees can submit IT issues (hardware failures, software installs,
+  permission requests, etc.)
+- Admins can view, assign, and handle tickets
+- Need priority levels and status tracking
+
+Please write a PRD document including: Background and Goals, User Roles,
+Core Features, Non-functional Requirements, and Data Model Overview.
+```
+
+The upside is zero setup — just open a browser. The downside is equally obvious: output structure varies each time, quality depends on your prompt skills, and there is no team collaboration capability.
+
+**Best for**: Personal exploration, small feature scoping, brainstorming phase.
+
+### 2.2 SaaS Tools (Notion AI, Jira AI, Linear AI)
+
+If your team already uses Notion, Jira, or Linear, their built-in AI features can generate PRDs directly within your documents.
+
+**Pros**:
+- No tool switching — works within your existing workflow
+- Generated content lives in collaborative docs, team can edit and comment in real-time
+- Some tools support custom templates
+
+**Cons**:
+- AI capabilities are limited by the platform — no custom System Prompts
+- Generation quality is usually lower than direct ChatGPT/Claude use (model constraints)
+- Paid feature, per-seat pricing
+
+**Best for**: Teams with existing toolchains, those who do not want to learn new tools, need collaborative editing.
+
+### 2.3 Template Injection Method (Recommended)
+
+This is my top recommendation. The core idea: **define the PRD template and rules in a System Prompt, so the user only needs to input raw requirements and the model outputs according to the template**.
+
+This approach produces the most stable quality because the template locks down the structure — every generated PRD has a consistent format.
+
+Complete System Prompt template:
+
+```text
+# Role
+You are a senior product manager with 10 years of experience, skilled at
+transforming vague business requirements into well-structured,
+developer-ready PRD documents.
+
+# Task
+Generate a complete PRD document based on the user requirement description.
+
+# PRD Document Structure (output strictly in this order)
+
+## 1. Document Info
+- Document title, version, author, date, status (Draft/In Review/Confirmed)
+
+## 2. Background and Goals
+- Business context: why we are building this
+- Core objective: 1-2 sentences describing the problem to solve
+- Success metrics: quantifiable KPIs (mark as [TBD] if not mentioned)
+
+## 3. User Roles and Scenarios
+- List all user roles
+- Core use cases per role (User Story format: As a ___, I want ___,
+  so that ___)
+
+## 4. Functional Requirements
+- Organized by module, each feature includes:
+  - Feature description
+  - Input/Output
+  - Business rules
+  - Edge cases and error handling
+- Priority labels: P0 (must-have), P1 (should-have), P2 (nice-to-have)
+
+## 5. Non-functional Requirements
+- Performance requirements
+- Security requirements
+- Compatibility requirements
+- Usability requirements
+
+## 6. Data Model Overview
+- Core entities and fields
+- Entity relationships
+
+## 7. Open Questions
+- List all items marked as [TBD]
+- Decision points requiring stakeholder confirmation
+
+# Rules
+1. For information not explicitly stated, mark as [TBD] — do not assume
+2. Every feature must address exception scenarios
+3. Priority must be labeled
+4. Use concise language, avoid redundant descriptions
+5. Present data models in table format
+```
+
+Set this as your System Prompt (or in ChatGPT custom instructions), then just input your requirements.
+
+**Best for**: Teams needing standardized PRD formats, those prioritizing quality stability, willing to spend 10 minutes on one-time setup.
+
+### 2.4 Agent Workflows (Dify / Coze / LangChain)
+
+When requirements are complex, a single conversation may not be enough. Agent workflows break PRD generation into multiple steps, each handled by a different prompt.
+
+A typical workflow pipeline:
+
+```text
++-------------------+     +-------------------+     +-------------------+
+|  Requirement      |---->|  PRD Generation   |---->|  Quality Review   |
+|  Analysis Agent   |     |  Agent            |     |  Agent            |
+|                   |     |                   |     |                   |
+| - Extract key     |     | - Generate full   |     | - Check           |
+|   entities        |     |   PRD from        |     |   completeness    |
+| - Identify user   |     |   template        |     | - Flag gaps       |
+|   roles           |     | - Fill in edge    |     | - Suggest         |
+| - Generate        |     |   cases           |     |   improvements    |
+|   clarifying      |     |                   |     |                   |
+|   questions       |     |                   |     |                   |
++-------------------+     +-------------------+     +-------------------+
+       |                                                |
+       v                                                v
+  If clarifying questions                        Output final PRD
+  -> Return to user for                         + open questions list
+     confirmation
+```
+
+**Pros**:
+- Highest quality — multi-round review reduces gaps
+- Can integrate external data sources (competitor analysis, historical PRDs)
+- Reusable and iterable workflows
+
+**Cons**:
+- High setup cost, requires technical background
+- Complex debugging — each node can fail
+- Higher API call costs
+
+**Best for**: Large product teams, complex product lines, teams with technical resources to build and maintain.
+
+### 2.5 IDE Integration (Cursor / Claude Code)
+
+If you are writing technical PRDs (API design docs, system architecture docs, database design), generating them directly in your IDE is more efficient.
+
+Cursor and Claude Code can read your codebase context, so the generated PRD can directly reference existing data models, API endpoints, and code structure.
+
+```text
+@codebase Based on the existing User model and permission system, write a
+technical PRD for a ticket system, including:
+1. New data models (relationship with existing User model)
+2. API endpoint design (RESTful)
+3. Permission matrix
+4. Integration plan with existing notification service
+```
+
+**Best for**: Technical PRDs, API design docs, scenarios requiring codebase context.
+
+## 3. Prompt Engineering Tips
+
+Regardless of which approach you use, prompt quality directly determines output quality. Here are the key techniques.
+
+### 3.1 Role Setting
+
+Giving the model a specific role works much better than a generic "help me write a PRD."
+
+```text
+You are a senior product manager with 10 years of experience in the
+SaaS B2B space. You have led products from 0 to 1 including CRM systems,
+ticket management tools, and project management platforms.
+You are especially skilled at identifying edge cases and exception flows.
+```
+
+The key to role setting is **specificity**: not "product manager" but "SaaS B2B senior product manager"; not "experienced" but "led CRM and ticket systems."
+
+### 3.2 Structure Locking (Template Injection)
+
+Include the PRD structure template directly in your prompt, and the model will strictly follow it. This is the most effective method for ensuring consistency.
+
+The System Prompt in section 2.3 is a complete example. Key points:
+
+- Use Markdown headings to define hierarchy
+- Specify what each section should contain
+- Provide format requirements (tables, lists, User Story format, etc.)
+
+### 3.3 Few-shot Examples
+
+If you have specific format requirements, providing an example is more effective than describing rules.
+
+```text
+Format example for functional requirements:
+
+### F-001: Create Ticket
+- **Description**: Employees can create new IT tickets via a form
+- **Input**: Title (required, max 50 chars), Description (required),
+  Category (dropdown), Priority (dropdown)
+- **Output**: Ticket created successfully, return ticket number,
+  send confirmation email
+- **Business Rules**:
+  1. Same employee can have at most 10 open tickets simultaneously
+  2. When priority is "Urgent", auto-notify on-call admin
+- **Exception Handling**:
+  1. Title too long -> frontend truncation + warning
+  2. Network interruption -> local cache, auto-submit on recovery
+- **Priority**: P0
+
+Please output all functional requirements in this format.
+```
+
+### 3.4 Iterative Follow-up
+
+A single generation is rarely perfect. A better approach is multi-round iteration:
+
+**Round 1**: Generate PRD draft
+**Round 2**: Review and fill edge cases
+
+```text
+Please review the PRD above from the perspective of a senior QA engineer.
+Find:
+1. Missing edge cases
+2. Ambiguous business rules
+3. Potential concurrency issues
+4. Missing error handling
+
+For each issue, provide specific suggestions for improvement.
+```
+
+**Round 3**: Technical review
+
+```text
+Please review this PRD from the perspective of a backend architect.
+Focus on:
+1. Whether the data model is reasonable
+2. Whether the API design is RESTful
+3. Potential performance bottlenecks
+4. Security risk points
+```
+
+### 3.5 Constraints and Markers
+
+Two of the most useful constraints:
+
+**[TBD] markers**: Tell the model that when it encounters uncertain information, it should not make things up — instead mark it as `[TBD]`. These markers become your discussion checklist with stakeholders.
+
+**Priority labels**: Require the model to label each feature with priority (P0/P1/P2), helping the team make trade-offs.
+
+```text
+Rules:
+- Information not explicitly mentioned in requirements MUST be marked
+  as [TBD] — do not assume
+- Every feature MUST have a priority label: P0 (MVP must-have),
+  P1 (phase two), P2 (future consideration)
+- Logic involving money, permissions, or notifications MUST list
+  all edge cases
+```
+
+## 4. Full Walkthrough: From One Paragraph to PRD
+
+This is the core chapter. We will use a real scenario to demonstrate how to go from a vague requirement description, through three rounds of iteration, to a usable PRD.
+
+### 4.1 The Raw Requirement
+
+Imagine you received this from your boss or a business stakeholder:
+
+> Our company currently handles IT issues by shouting in a WeChat group, and things get lost all the time. We need an internal ticket system where employees can submit tickets for computer problems, software installs, permission requests, etc. IT should be able to see all tickets and assign them to specific people. It would be great to see progress so tickets do not just disappear into a black hole. Urgent issues should be handled first.
+
+That is it. No user role definitions, no state machine, no notification logic, no permission controls. This is the kind of real input PMs deal with every day.
+
+### 4.2 Round 1: Generate PRD Draft
+
+We use the Template Injection method from section 2.3, with the System Prompt configured, and input:
+
+```text
+Please generate a PRD document based on the following requirement:
+
+Our company currently handles IT issues by shouting in a WeChat group,
+and things get lost all the time. We need an internal ticket system where
+employees can submit tickets for computer problems, software installs,
+permission requests, etc. IT should be able to see all tickets and assign
+them to specific people. It would be great to see progress so tickets
+do not just disappear into a black hole. Urgent issues should be handled
+first.
+```
+
+The model generates a PRD draft (key excerpts):
+
+```markdown
+## 1. Document Info
+- Document Title: Internal IT Ticket Management System PRD
+- Version: v0.1 (AI-generated draft)
+- Date: 2026-03-14
+- Status: Draft
+
+## 2. Background and Goals
+
+### Business Context
+The company currently relies on WeChat group messages for IT support,
+leading to several problems:
+- Issues easily get buried in message flow, causing them to be missed
+- No way to track resolution progress
+- No priority mechanism — urgent issues cannot get expedited response
+- No historical records — same issues require repeated communication
+
+### Core Objective
+Establish a structured IT ticket management system to enable submission,
+assignment, tracking, and closure of IT issues.
+
+### Success Metrics
+- IT issue response time reduced from [TBD] to [TBD]
+- Ticket miss rate below 5%
+- Employee satisfaction score reaches [TBD]
+
+## 3. User Roles and Scenarios
+
+### Regular Employee
+- As a regular employee, I want to submit an IT ticket so that my issue
+  is recorded and tracked
+- As a regular employee, I want to check my ticket progress so that I
+  know when my issue will be resolved
+
+### IT Admin
+- As an IT admin, I want to view all pending tickets so that I can
+  allocate resources effectively
+- As an IT admin, I want to assign tickets to specific IT staff so that
+  responsibility is clear
+
+### IT Technician
+- As an IT technician, I want to see tickets assigned to me so that I
+  know what needs to be done
+- As an IT technician, I want to update ticket status and add notes so
+  that the submitter knows the progress
+
+## 4. Functional Requirements (excerpts)
+
+### F-001: Create Ticket [P0]
+- **Description**: Employees submit IT tickets via a form
+- **Input**: Title (required), Description (required), Category (dropdown),
+  Priority (dropdown), Attachments (optional)
+- **Business Rules**:
+  1. Category options: Hardware Failure, Software Install, Permission
+     Request, Network Issue, Other
+  2. Priority levels: Urgent, High, Medium, Low
+  3. Status auto-set to Pending Assignment on creation
+- **Exception Handling**:
+  1. Attachment exceeds size limit -> block submission with warning
+     [TBD: max attachment size]
+  2. Required fields empty -> frontend validation prompt
+
+### F-005: Ticket State Machine [P0]
+- **States**: Pending Assignment -> Assigned -> In Progress -> Pending
+  Verification -> Closed
+- **Business Rules**:
+  1. Only IT Admin can perform Assign action
+  2. Only the assigned technician can update to In Progress
+  3. After resolution, submitter verifies and confirms closure
+  4. [TBD] Whether to allow reopening closed tickets
+```
+
+Notice several key points:
+- The model automatically added IT Technician as a role (not in the original requirement)
+- Success metrics are marked `[TBD]` because the original requirement gave no numbers
+- The state machine is more complete than what was described
+- Every feature has exception handling
+### 4.3 Round 2: Fill in Edge Cases and Notification Logic
+
+The draft is decent, but many details are missing. We follow up:
+
+```text
+Please supplement the following aspects:
+
+1. Notification logic: What events trigger notifications? Who gets
+   notified? Through what channels?
+2. Timeout handling: What happens when a ticket is not handled within
+   a certain time?
+3. Concurrency scenarios: What if two admins try to assign the same
+   ticket simultaneously?
+4. Data permissions: Can regular employees see other people's tickets?
+5. Post-closure handling: Can closed tickets be reopened? Is there a
+   rating mechanism?
+```
+
+The model supplements (excerpts):
+
+```markdown
+## Notification Logic
+
+| Trigger Event | Notify | Channel | Content |
+|---------------|--------|---------|---------|
+| New ticket created | IT Admin | Email + In-app | Title, priority, submitter |
+| Ticket assigned | Technician | Email + In-app | Ticket details, expected completion |
+| Ticket assigned | Submitter | In-app | Technician info |
+| Status change | Submitter | In-app | New status, resolution notes |
+| Urgent ticket created | IT Admin | Email + SMS [TBD] | Ticket details |
+| Ticket timeout | Technician + Admin | Email | Timeout reminder |
+
+## Timeout Mechanism
+- Urgent tickets: 30 min unassigned -> notify admin; 2 hours unstarted
+  -> escalate
+- High priority: 2 hours unassigned -> notify; 8 hours unstarted
+  -> escalate
+- Medium/Low priority: 24 hours unassigned -> notify
+- [TBD] Who receives escalation notifications? IT Director?
+
+## Concurrency Control
+- Ticket assignment uses optimistic locking
+- If Admin A is assigning Ticket X and Admin B tries to assign the same
+  ticket, show: "This ticket has been assigned by [Admin A] to
+  [Technician]. Please refresh the page."
+```
+
+### 4.4 Round 3: Technical Review from Backend Engineer Perspective
+
+Final round — we switch perspectives:
+
+```text
+Please review this PRD from the perspective of a backend engineer.
+Focus on:
+1. Whether the data model design is reasonable
+2. API design suggestions
+3. Potential performance issues
+4. Security risks
+
+Please provide specific technical recommendations, not generic comments.
+```
+
+The model's technical review (excerpts):
+
+```markdown
+## Technical Review
+
+### Data Model Suggestions
+1. Ticket table should add a deleted_at field for soft deletion
+2. Ticket operation logs should be a separate table (ticket_logs),
+   recording all state changes. Fields: id, ticket_id, operator_id,
+   action, old_value, new_value, created_at
+3. Attachments table should be separate (ticket_attachments) to support
+   multiple attachments
+4. [Suggestion] Use enum tables for categories and priorities instead
+   of hardcoding, for easier future extension
+
+### API Design Suggestions
+- POST   /api/tickets              — Create ticket
+- GET    /api/tickets              — Ticket list (pagination + filters)
+- GET    /api/tickets/:id          — Ticket details
+- PATCH  /api/tickets/:id          — Update ticket (status, assignment)
+- POST   /api/tickets/:id/comments — Add resolution notes
+- GET    /api/tickets/stats        — Statistics (admin dashboard)
+
+### Performance Concerns
+1. Ticket list page needs pagination, suggest 20 items/page default
+2. Filter queries need indexes on status, priority, assignee_id,
+   created_at
+3. Notification sending should be async (message queue) to avoid
+   blocking main flow
+4. Attachment uploads should go direct to object storage, not through
+   the application server
+
+### Security Risks
+1. Permission checks must be server-side, not just frontend controls
+2. Ticket detail endpoint must verify current user has access
+3. Attachment downloads need authentication — no guessable URLs
+4. XSS prevention: if ticket descriptions support rich text, content
+   must be sanitized
+```
+
+### 4.5 The [TBD] Checklist from the Final PRD
+
+After three rounds of iteration, here is a summary of all `[TBD]` markers:
+
+```markdown
+## Open Questions
+
+1. [TBD] Specific values for success metrics (current response time,
+   target response time)
+2. [TBD] Maximum attachment size (suggest 10MB)
+3. [TBD] Whether to allow reopening closed tickets
+4. [TBD] Whether urgent tickets need SMS notifications
+5. [TBD] Who receives escalation notifications
+6. [TBD] Whether to add a ticket rating mechanism
+7. [TBD] Whether mobile support is needed (phase one)
+8. [TBD] Whether integration with existing OA system is needed
+9. [TBD] Data retention policy (how long to keep ticket data)
+```
+
+This checklist becomes the agenda for your next stakeholder meeting. Much more efficient than trying to think from scratch about what else might be missing.
+## 5. Method Comparison and Selection Guide
+
+### Detailed Comparison
+
+| Dimension | Direct Conversation | SaaS Tools | Template Injection | Agent Workflows | IDE Integration |
+|-----------|-------------------|------------|-------------------|----------------|----------------|
+| Setup Time | 0 minutes | Depends on tool | 10 minutes | Hours to days | 30 minutes |
+| Generation Time | 1-2 min | 1-2 min | 2-3 min | 5-10 min | 3-5 min |
+| Output Consistency | Low | Medium | High | High | Medium |
+| Customizability | High | Low | High | Very High | High |
+| Team Collaboration | Poor | Good | Medium | Medium | Poor |
+| Cost per Use | ~$0.05 | Included in subscription | ~$0.05 | ~$0.20-0.50 | Included in subscription |
+| Recommended For | Personal exploration | Existing toolchain | Team standardization | Complex products | Technical PRDs |
+
+### Decision Flowchart
+
+```text
+What is your need?
+|
++-- Quick exploration of an idea
+|   +-->  Direct Conversation (ChatGPT/Claude)
+|
++-- Team already uses Notion/Jira/Linear
+|   +-->  Try built-in SaaS AI first
+|      +-- Quality not enough? -> Template Injection
+|
++-- Need to standardize team PRD workflow
+|   +-->  Template Injection (best value)
+|
++-- Complex product, need multi-round generation and review
+|   +-->  Agent Workflows
+|
++-- Technical PRD (API design, data models)
+    +-->  IDE Integration
+```
+
+For most teams, **Template Injection is the best starting point**. It requires no extra tools, configure once and reuse forever, and output quality is stable. Once the team is comfortable, upgrade to Agent Workflows as needed.
+
+## 6. Best Practices and Common Pitfalls
+
+### 6.1 Best Practices
+
+**Always human-review**: AI-generated PRDs are drafts, not final documents. Every feature requirement and business rule needs human confirmation. Especially anything involving money, permissions, or compliance.
+
+**Use [TBD] as a discussion checklist**: This is the most practical technique. Have the model mark uncertain items as `[TBD]`, then compile these markers into a discussion checklist for your review meeting.
+
+**Feed context**: The more the model knows, the better the output. Context you can provide includes:
+- Existing system architecture docs
+- Competitor feature lists
+- Historical PRDs as reference
+- Team tech stack information
+
+**Version-control your prompts**: Treat your System Prompt like code. Put it in a Git repo, commit changes, share the same template across the team.
+
+**Start with Template Injection**: Do not jump straight to Agent Workflows. First validate the process with Template Injection, confirm it adds value, then upgrade.
+
+### 6.2 Common Pitfalls
+
+**Blind trust in output**: LLMs can confidently produce nonsense. They might fabricate non-existent APIs, invent industry standards, or suggest solutions that look reasonable but are impractical. Verify everything.
+
+**Over-specifying UI**: PRDs should describe "what to build," not "what it looks like." Having the model generate UI details (button positions, colors, layouts) is wasteful — leave that to designers.
+
+**Skipping stakeholder alignment**: No matter how perfect an AI-generated PRD is, it is useless without stakeholder alignment. The core value of a PRD is consensus alignment, not the document itself.
+
+**One-shot complex products**: Do not try to generate an entire product PRD with a single prompt. Break it into modules, generate each separately — the results will be much better.
+
+**Missing domain context**: If you are building products in healthcare, finance, education, or other verticals, general-purpose LLMs lack domain knowledge. You need to supplement industry background, compliance requirements, and specialized terminology in your prompt.
+
+## 7. Limitations of AI-Generated PRDs
+
+After covering all the benefits, let us be honest about the limitations:
+
+**No deep domain knowledge**: LLM knowledge is general-purpose. It knows the general patterns of a "ticket system" but not your company's IT processes, org structure, or legacy systems. You need to provide that context.
+
+**No stakeholder context**: It does not know what your boss cares about, what your dev team's tech stack is, or what your designer prefers. A PRD is not just a feature list — it is a communication document, and AI cannot help with that part.
+
+**Hallucination risk**: The model may generate content that looks professional but is factually wrong. For example, citing non-existent industry standards, fabricating performance data, or suggesting technically infeasible solutions.
+
+**No visual design capability**: Text-based LLMs cannot draw wireframes or do interaction design. The visual parts of a PRD still need a designer.
+
+**Compliance blind spots**: GDPR, SOC 2, HIPAA, and other compliance requirements — LLMs may know some general provisions, but they cannot replace professional compliance review.
+
+The core takeaway: **AI is your drafting partner, not a replacement for product thinking**. It helps you skip the blank page, fill in gaps, and accelerate iteration. But product decisions, stakeholder alignment, and priority judgment — these remain the core value of a PM.
+
+## Conclusion
+
+Using LLMs to write PRDs is not a future thing — you can start today. Begin with the Template Injection method: spend 10 minutes configuring a System Prompt, and use it next time you receive a requirement. You will find that a PRD draft that used to take three days now has a solid starting point in 30 minutes.
+
+Remember: the goal is not to eliminate PMs, but to eliminate the blank page. AI handles structure and drafts; you handle judgment and decisions.
+
+## Further Reading
+
+- [The Complete History of LLMs: From RNN to GPT](/en/blog/llm-complete-guide) — If you want to systematically understand the technical principles behind LLMs
+- [Claude Code Prompt Engineering Guide](/en/blog/claude-code-prompt-guide) — More prompt engineering techniques and practical examples
