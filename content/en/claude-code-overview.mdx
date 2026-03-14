@@ -1,0 +1,441 @@
+---
+title: "Claude Code Advanced Guide: From Beginner to Power User"
+date: "2026-03-02"
+description: Advanced tips after using Claude Code for a while, covering CLAUDE.md configuration, Hooks automation, multi-agent parallelism, MCP integration, context management, and more.
+tags: ["AI", "Engineering"]
+---
+
+## Introduction
+
+After using Claude Code for a while, you'll realize it's far more than "ChatGPT in a terminal." It's a programmable agent runtime — configured properly, it can multiply your productivity several times over.
+
+This post distills the advanced techniques I've picked up from daily use, from configuration optimization to workflow design, to help you get the most out of Claude Code.
+
+---
+
+## 1. CLAUDE.md — Your First Productivity Lever
+
+### 1.1 Three-Layer Configuration System
+
+Claude Code's CLAUDE.md has three levels, from highest to lowest priority:
+
+```
+~/.claude/CLAUDE.md              # Global config (applies to all projects)
+project-root/CLAUDE.md           # Project-level config (shared with team)
+subdirectory/CLAUDE.md           # Directory-level config (module-specific)
+```
+
+**Best practices:**
+
+- Global CLAUDE.md: general preferences (language, code style, commit conventions)
+- Project CLAUDE.md: tech stack, architecture conventions, key paths
+- Subdirectory CLAUDE.md: module-specific rules (e.g., `components/CLAUDE.md` for component guidelines)
+
+### 1.2 Writing an Effective CLAUDE.md
+
+Don't write CLAUDE.md like documentation — treat it as a "work manual" for the AI:
+
+```markdown
+# Project: My Blog
+
+## Tech Stack
+- Next.js 16 (App Router) + TypeScript
+- Tailwind CSS v4 (no tailwind.config.js, uses CSS @import)
+- next-intl for i18n, supports zh/en
+
+## Code Conventions
+- Components use PascalCase, utility functions use camelCase
+- Prefer server components; only use 'use client' when interactivity is needed
+- Commit messages in English, format: type: description
+
+## Key Paths
+- Blog content: content/zh/*.mdx and content/en/*.mdx
+- Route structure: app/[locale]/blog/[slug]/page.tsx
+- i18n config: i18n/routing.ts
+
+## Do Not
+- Do not modify proxy.ts (middleware config)
+- Do not use useState/useEffect in server components
+```
+
+**Core principle:** Be specific, actionable, and constrained. Vague instructions ("write good code") are less effective than explicit rules ("functions should not exceed 30 lines").
+
+---
+
+## 2. Hooks — Automate Your Workflow
+
+Hooks are Claude Code's "event hooks" — they automatically execute commands before or after specific operations.
+
+### 2.1 Configuration Location
+
+```
+~/.claude/settings.json              # Global hooks
+project-root/.claude/settings.json   # Project-level hooks
+```
+
+### 2.2 Practical Hook Examples
+
+**Auto-format after saving a file:**
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "command": "npx prettier --write \"$CLAUDE_FILE_PATH\""
+      }
+    ]
+  }
+}
+```
+
+**Auto-lint before committing:**
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -q 'git commit'; then npx eslint . --quiet; fi"
+      }
+    ]
+  }
+}
+```
+
+**Block dangerous operations:**
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE 'rm -rf|git push --force|git reset --hard'; then echo 'BLOCKED: Dangerous operation intercepted' >&2; exit 1; fi"
+      }
+    ]
+  }
+}
+```
+
+### 2.3 Hook Event Types
+
+| Event | Trigger | Typical Use |
+|-------|---------|-------------|
+| `PreToolUse` | Before a tool call | Block dangerous ops, validate params |
+| `PostToolUse` | After a tool call | Auto-format, lint, logging |
+| `Notification` | On task completion | Send alerts to Slack/Discord |
+| `Stop` | When conversation ends | Clean up temp files |
+
+---
+
+## 3. Context Management — The Most Underrated Skill
+
+Claude Code's context window is finite. Managing it well directly determines output quality.
+
+### 3.1 Core Commands
+
+```bash
+/clear          # Clear current conversation context (most used)
+/compact        # Compress context, keeping key information
+/context        # View current context usage
+/resume         # Resume a previous session
+```
+
+### 3.2 When to /clear
+
+- Switching to a completely different task
+- Context is nearly full (slower responses are a signal)
+- Previous conversation led you down the wrong path
+
+### 3.3 When to /compact
+
+- Current task isn't done yet, but context is nearly full
+- You want to keep key decisions and progress, but discard intermediate steps
+
+### 3.4 Tips for Feeding Context
+
+```bash
+# Feed file contents directly to Claude Code
+cat src/lib/api.ts | claude "analyze the error handling in this file"
+
+# Feed git diff for code review
+git diff main | claude "review these changes"
+
+# Feed error logs for debugging
+npm run build 2>&1 | claude "help me analyze these build errors"
+```
+
+---
+
+## 4. Multi-Agent Parallelism — The Real Productivity Multiplier
+
+### 4.1 Plan Mode
+
+Press `Shift+Tab` twice to enter Plan Mode — Claude will analyze before acting:
+
+- Great for complex refactors and new feature design
+- Review the plan first, then confirm execution
+- Avoids the "write a bunch then start over" trap
+
+### 4.2 Parallel Agents
+
+Claude Code can spin up multiple sub-agents to handle independent tasks simultaneously:
+
+```
+You: Do these three things in parallel:
+1. Add skeleton loading to the PostCard component
+2. Optimize getPostsByLocale performance
+3. Write an RSS feed generator
+```
+
+Claude Code will automatically determine these tasks are independent and process them in parallel.
+
+### 4.3 Multi-Terminal Parallelism
+
+How Boris, the creator of Claude Code, works:
+
+- Run 2-3 Claude Code terminals locally, each handling different modules
+- Open 5-10 web sessions on claude.ai/code simultaneously
+- Use `--resume` to switch context between local and web
+
+```bash
+# Terminal 1: Frontend work
+claude "refactor the Navigation component"
+
+# Terminal 2: Backend work
+claude "optimize MDX parsing performance"
+
+# Terminal 3: Testing
+claude "write unit tests for posts.ts"
+```
+
+---
+
+## 5. Custom Slash Commands (Skills)
+
+### 5.1 Creating Custom Commands
+
+Create a `.claude/commands/` directory in your project root. Each `.md` file becomes a command:
+
+```
+.claude/commands/
+  review.md       # /review
+  test.md         # /test
+  deploy.md       # /deploy
+```
+
+**Example: `/review` command**
+
+```markdown
+<!-- .claude/commands/review.md -->
+Please code review the changes in the current git diff:
+
+1. Check for security vulnerabilities (XSS, injection, etc.)
+2. Check for performance issues
+3. Check compliance with project code conventions
+4. Provide improvement suggestions
+
+Use git diff --staged to get the staged changes.
+```
+
+**Example: `/test` command**
+
+```markdown
+<!-- .claude/commands/test.md -->
+Write unit tests for $ARGUMENTS:
+
+- Use the vitest framework
+- Cover happy paths and edge cases
+- Mock external dependencies
+- Place test files in __tests__ under the same directory
+```
+
+Usage: `/test src/lib/posts.ts` — `$ARGUMENTS` gets replaced with whatever follows the command.
+
+### 5.2 Team-Shared Commands
+
+Commit `.claude/commands/` to Git, and everyone on the team can use the same commands for a unified workflow.
+
+---
+
+## 6. MCP Servers — Extending Claude Code's Capabilities
+
+MCP (Model Context Protocol) lets Claude Code connect to external tools and data sources.
+
+### 6.1 Configuration
+
+Add to `.claude/settings.json`:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "your-token"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/docs"]
+    }
+  }
+}
+```
+
+### 6.2 Popular MCP Servers
+
+| Server | Purpose |
+|--------|---------|
+| `server-github` | Manage GitHub Issues/PRs/Repos |
+| `server-filesystem` | Access files outside the project directory |
+| `server-postgres` | Query PostgreSQL directly |
+| `server-brave-search` | Web search |
+| `server-memory` | Persistent memory storage |
+
+### 6.3 Real-World Scenarios
+
+```
+You: Check the 5 most recent GitHub issues, filter for bugs, and analyze priority
+
+You: Query the database for user registration data from the past 7 days and generate a trend analysis
+```
+
+With MCP, Claude Code is no longer limited to the local filesystem.
+
+---
+
+## 7. Effective Prompting Techniques
+
+### 7.1 Task Decomposition
+
+Bad prompt:
+```
+Build me a blog search feature
+```
+
+Good prompt:
+```
+Add full-text search to the blog:
+1. Use Pagefind for static search indexing
+2. Integrate search UI into the SearchBar component
+3. Highlight matching keywords in search results
+4. Support both Chinese and English search
+
+First, look at the existing SearchBar.tsx and build process, then give me an implementation plan.
+```
+
+### 7.2 Provide Constraints
+
+```
+Refactor the Navigation component with these requirements:
+- Keep the existing API unchanged
+- Don't introduce new dependencies
+- Use a hamburger menu on mobile
+- All changes must be type-safe
+```
+
+### 7.3 Leverage Pipe Input
+
+```bash
+# Have Claude write new code matching existing style
+cat src/components/PostCard.tsx | claude "write a TagBadge component in the same style"
+
+# Have Claude explain complex errors
+npm run build 2>&1 | claude "explain these errors and suggest fixes"
+
+# Have Claude review a PR
+gh pr diff 42 | claude "review this PR"
+```
+
+### 7.4 Iterative Development
+
+Don't try to do everything in one shot:
+
+```
+Round 1: Implement core functionality, get the happy path working
+Round 2: Add error handling and edge cases
+Round 3: Optimize performance and UX
+Round 4: Write tests
+```
+
+Use `/compact` between rounds to compress context and keep Claude focused.
+
+---
+
+## 8. Keyboard Shortcuts Cheat Sheet
+
+| Shortcut | Function |
+|----------|----------|
+| `Tab` | Accept suggestion |
+| `Shift+Tab` x1 | Toggle auto-accept mode |
+| `Shift+Tab` x2 | Toggle Plan mode |
+| `Ctrl+C` | Interrupt current operation |
+| `Ctrl+L` | Clear screen (keeps context) |
+| `Esc` | Cancel current input / interrupt |
+
+---
+
+## 9. Real-World Workflow Templates
+
+### 9.1 Bug Fix Workflow
+
+```
+1. Feed the error message to Claude
+2. Claude locates the problem file and root cause
+3. Enter Plan Mode to confirm the fix approach
+4. Execute the fix
+5. /test to run tests and verify
+6. /review to self-check changes
+7. /commit to commit
+```
+
+### 9.2 New Feature Workflow
+
+```
+1. Describe requirements and constraints in natural language
+2. Plan Mode to design the approach
+3. Confirm, then execute implementation
+4. Iterate by module (core → edge cases → optimization → tests)
+5. /review + /commit
+```
+
+### 9.3 Code Refactoring Workflow
+
+```
+1. Have Claude analyze the existing code structure
+2. Plan Mode to outline refactoring steps
+3. Run tests after each step to ensure nothing breaks
+4. /compact to keep context clean
+5. Final /review for a full check
+```
+
+---
+
+## 10. Common Pitfalls
+
+1. **Cramming too many tasks at once** — Claude works best with one clear task at a time
+2. **Not clearing context** — Context pollution degrades output quality; use `/clear` when needed
+3. **Skipping CLAUDE.md** — Repeating project background every time wastes tokens and time
+4. **Not using Plan Mode** — Diving straight into complex tasks often leads to dead ends
+5. **Ignoring Hooks** — Manually running lint/format/test is less efficient than automation
+6. **Not breaking down tasks** — "Build me a complete e-commerce site" is far less effective than 20 small, focused tasks
+
+---
+
+## Further Reading
+
+- [The Complete History of LLMs: From RNN to GPT](/en/blog/llm-guide) — Understand the AI foundations behind Claude
+- [Claude Code Performance & Cost Optimization Guide](/en/blog/claude-code-performance) — Get the most out of Claude Code while controlling costs
+- [Claude Code Security Best Practices](/en/blog/claude-code-security) — Use Claude Code safely
+- [Claude Code Official Hooks Guide](https://docs.anthropic.com/en/docs/claude-code/hooks-guide)
+- [How the Creator of Claude Code Actually Uses It](https://open.substack.com/pub/getpushtoprod/p/how-the-creator-of-claude-code-actually)
+- [Claude Code Context Management Manual](https://www.cometapi.com/en/managing-claude-codes-context/)
+- [50 Claude Code Tips](https://www.geeky-gadgets.com/claude-code-tips-2/)
+- [Claude Code Best Practices Checklist](https://notes.muthu.co/2026/02/claude-code-cli-best-practices-checklist/)
+- [CLAUDE.md Optimization Tips](https://developertoolkit.ai/en/claude-code/tips-tricks/claude-md-optimization)
+- [Claude Code Complete Command Reference](https://gradually.ai/en/claude-code-commands)

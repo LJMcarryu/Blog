@@ -1,0 +1,894 @@
+---
+title: "The Complete Claude Code Testing Workflow Guide: From TDD to CI/CD"
+date: "2026-03-10"
+description: A systematic guide to Claude Code's testing workflow capabilities, covering TDD-driven development, mock strategies, coverage analysis, debugging failing tests, integration and E2E testing, CLAUDE.md test conventions, and CI/CD integration with a complete hands-on TDD walkthrough.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+Throughout this series, testing has come up repeatedly — the [Advanced Guide](/en/blog/claude-code-overview) covered vitest basics, the [Slash Commands Guide](/en/blog/claude-code-skills) showed `/test` command templates, and the [Git Guide](/en/blog/claude-code-git) included testing as part of the PR workflow. But we've never systematically covered: **how to build a complete testing workflow with Claude Code**.
+
+How do you run TDD? When should you mock? How do you analyze coverage reports? How do you debug failing tests? These topics have been scattered across articles — today we bring them together.
+
+## 1. Why Testing Workflows Matter
+
+### Manual Testing vs Claude Code Testing
+
+| Dimension | Manual Testing | Claude Code Testing |
+|-----------|---------------|-------------------|
+| Speed | 10-30 min per function | 1-2 min per function |
+| Coverage | Easy to miss edge cases | Systematic edge case enumeration |
+| Consistency | Style varies by developer | Follows CLAUDE.md conventions |
+| Mock quality | Experience-dependent | Auto-identifies external deps |
+| Maintenance | Manually update tests after code changes | "Update the tests for this function" |
+| Learning curve | Must know the test framework | Natural language descriptions |
+
+### The Testing Pyramid
+
+```
+        /  E2E   \          ← Few, verify critical user flows
+       /----------\
+      / Integration \       ← Moderate, verify module interactions
+     /----------------\
+    /   Unit Tests     \     ← Many, verify individual functions
+   /--------------------\
+```
+
+Claude Code helps at every level:
+- **Unit tests**: Its sweet spot — give it a function, get complete tests
+- **Integration tests**: Needs you to describe module interactions
+- **E2E tests**: Needs you to describe user flows, generates Playwright scripts
+
+## 2. TDD-Driven Development
+
+### The Red-Green-Refactor Cycle
+
+The core of TDD is a three-step loop:
+
+```
+Red (write failing test) → Green (minimal code to pass) → Refactor (improve, keep tests green)
+```
+
+In Claude Code, this becomes a conversation:
+
+```bash
+# Step 1: Red — Have Claude Code write tests first
+> I want to implement a parseMarkdown function that converts markdown to HTML.
+> Don't write the implementation yet, only write tests. Cover these scenarios:
+> - Headings (h1-h3)
+> - Bold and italic
+> - Code blocks
+> - Empty string input
+> - Plain text (no markdown syntax)
+
+# Step 2: Green — Have Claude Code write the implementation
+> Now write the parseMarkdown implementation to make all tests pass. Keep it simple.
+
+# Step 3: Refactor — Have Claude Code refactor
+> All tests pass. Now refactor parseMarkdown:
+> - Extract regexes into constants
+> - Split each syntax parser into its own function
+> - Run tests to confirm nothing breaks
+```
+
+### Complete TDD Session Example
+
+Let's implement a `parseMarkdown` utility function:
+
+**Step 1: Red — Write Tests**
+
+```typescript
+// lib/__tests__/parse-markdown.test.ts
+import { describe, it, expect } from 'vitest'
+import { parseMarkdown } from '../parse-markdown'
+
+describe('parseMarkdown', () => {
+  describe('headings', () => {
+    it('should parse h1', () => {
+      expect(parseMarkdown('# Hello')).toBe('<h1>Hello</h1>')
+    })
+
+    it('should parse h2', () => {
+      expect(parseMarkdown('## World')).toBe('<h2>World</h2>')
+    })
+
+    it('should parse h3', () => {
+      expect(parseMarkdown('### Test')).toBe('<h3>Test</h3>')
+    })
+  })
+
+  describe('inline styles', () => {
+    it('should parse bold', () => {
+      expect(parseMarkdown('**bold**')).toBe('<p><strong>bold</strong></p>')
+    })
+
+    it('should parse italic', () => {
+      expect(parseMarkdown('*italic*')).toBe('<p><em>italic</em></p>')
+    })
+  })
+
+  describe('code', () => {
+    it('should parse inline code', () => {
+      expect(parseMarkdown('`code`')).toBe('<p><code>code</code></p>')
+    })
+  })
+
+  describe('edge cases', () => {
+    it('returns empty string for empty input', () => {
+      expect(parseMarkdown('')).toBe('')
+    })
+
+    it('wraps plain text in p tags', () => {
+      expect(parseMarkdown('hello world')).toBe('<p>hello world</p>')
+    })
+  })
+})
+```
+
+Run tests — all fail (Red).
+
+**Step 2: Green — Write Implementation**
+
+```typescript
+// lib/parse-markdown.ts
+export function parseMarkdown(input: string): string {
+  if (!input) return ''
+
+  const lines = input.split('\n')
+  const result: string[] = []
+
+  for (const line of lines) {
+    // Headings
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/)
+    if (headingMatch) {
+      const level = headingMatch[1].length
+      result.push(`<h${level}>${headingMatch[2]}</h${level}>`)
+      continue
+    }
+
+    // Inline styles
+    let processed = line
+    processed = processed.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    processed = processed.replace(/\*(.+?)\*/g, '<em>$1</em>')
+    processed = processed.replace(/`(.+?)`/g, '<code>$1</code>')
+
+    if (processed) {
+      result.push(`<p>${processed}</p>`)
+    }
+  }
+
+  return result.join('\n')
+}
+```
+
+Run tests — all pass (Green).
+
+**Step 3: Refactor**
+
+```bash
+> Refactor parseMarkdown: extract regexes into constants, split each syntax
+> parser into its own function. Run tests to confirm.
+```
+
+### TDD Prompt Template
+
+Turn this workflow into a Slash Command:
+
+```markdown
+<!-- .claude/commands/tdd.md -->
+Implement $ARGUMENTS using TDD:
+
+1. Write the test file first (tests only, no implementation)
+2. Confirm all tests fail
+3. Write the minimal implementation to make tests pass
+4. Refactor the code while keeping tests green
+5. Check for missing edge cases and add tests
+
+Test framework: vitest
+Test files go in __tests__/ next to the source file
+After each step, tell me the current state (Red/Green/Refactor)
+```
+
+Usage: `/tdd "a reading time estimator function estimateReadingTime"`
+
+## 3. Getting Claude Code to Write Tests
+
+### Adding Tests to Existing Code
+
+In the [Slash Commands Guide](/en/blog/claude-code-skills), we already built a `/test` command template. Rather than repeating it here, let's cover advanced techniques.
+
+**Technique 1: Analyze before writing**
+
+```bash
+# Bad — jump straight in
+> Write tests for src/lib/posts.ts
+
+# Good — analyze first
+> Read src/lib/posts.ts and list all public functions with:
+> 1. Parameter types and return types
+> 2. External dependencies (filesystem, network, database)
+> 3. Possible edge cases
+> Then write the tests
+```
+
+**Technique 2: Batch generation by module**
+
+```bash
+> Write tests for all utility functions in src/lib/. Process file by file:
+> 1. List all .ts files in src/lib/
+> 2. Skip files that already have tests (check __tests__ directory)
+> 3. Generate tests one by one
+> 4. Run tests after each file to confirm they pass
+```
+
+**Technique 3: Test quality review**
+
+"Tests pass" doesn't mean "tests are good." Have Claude Code self-review:
+
+```bash
+> Review the test quality of src/lib/__tests__/posts.test.ts:
+> 1. Does it only test the happy path?
+> 2. Are error handling paths tested?
+> 3. Are boundary values tested (empty array, null, very long strings)?
+> 4. Are assertions specific enough (not just toBeTruthy)?
+> 5. Do tests have implicit dependencies (shared state)?
+> List issues and fix them
+```
+
+### Test Quality Checklist
+
+| Check | Good Test | Bad Test |
+|-------|-----------|----------|
+| Assertions | `toBe('expected')` | `toBeTruthy()` |
+| Naming | "returns 0 for empty array" | "test case 1" |
+| Independence | Each test runs in isolation | Depends on previous test state |
+| Boundaries | Tests empty, extreme, error values | Only tests normal input |
+| Mocking | Only mocks external deps | Mocks internal logic |
+| Readability | Arrange-Act-Assert structure | Logic mixed together |
+
+## 4. Mock Strategies
+
+### When to Mock
+
+| Scenario | Mock | Don't Mock |
+|----------|------|-----------|
+| External API calls | ✅ Network is unreliable, slow | |
+| Filesystem reads/writes | ✅ Avoid real file operations | |
+| Database queries | ✅ Avoid depending on DB state | |
+| Current time | ✅ Ensure repeatable tests | |
+| Random numbers | ✅ Ensure predictable tests | |
+| Pure utility functions | | ❌ Direct calls are more reliable |
+| Internal functions of the module under test | | ❌ Tests implementation details |
+| Simple data transformations | | ❌ No side effects |
+
+### Common Mock Scenarios
+
+**Scenario 1: Mocking API Calls**
+
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { fetchUserProfile } from '../api'
+
+vi.stubGlobal('fetch', vi.fn())
+
+describe('fetchUserProfile', () => {
+  it('successfully fetches user info', async () => {
+    const mockUser = { id: 1, name: 'Alice' }
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify(mockUser), { status: 200 })
+    )
+
+    const result = await fetchUserProfile(1)
+    expect(result).toEqual(mockUser)
+    expect(fetch).toHaveBeenCalledWith('/api/users/1')
+  })
+
+  it('handles 404 errors', async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(null, { status: 404 })
+    )
+
+    await expect(fetchUserProfile(999)).rejects.toThrow('User not found')
+  })
+})
+```
+
+**Scenario 2: Mocking the Filesystem**
+
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import fs from 'fs'
+import { getPostSlugs } from '../posts'
+
+vi.mock('fs', () => ({
+  default: {
+    readdirSync: vi.fn(),
+    readFileSync: vi.fn(),
+  },
+}))
+
+describe('getPostSlugs', () => {
+  it('returns slugs for all mdx files', () => {
+    vi.mocked(fs.readdirSync).mockReturnValue(
+      ['hello.mdx', 'world.mdx', 'readme.txt'] as any
+    )
+
+    const slugs = getPostSlugs('content/en')
+    expect(slugs).toEqual(['hello', 'world'])
+  })
+
+  it('returns empty array for empty directory', () => {
+    vi.mocked(fs.readdirSync).mockReturnValue([] as any)
+
+    const slugs = getPostSlugs('content/en')
+    expect(slugs).toEqual([])
+  })
+})
+```
+
+**Scenario 3: Mocking Time**
+
+```typescript
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { isNewPost } from '../utils'
+
+describe('isNewPost', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-03-20'))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('marks posts within 7 days as new', () => {
+    expect(isNewPost('2026-03-15')).toBe(true)
+  })
+
+  it('does not mark posts older than 7 days', () => {
+    expect(isNewPost('2026-03-01')).toBe(false)
+  })
+})
+```
+
+**Scenario 4: Mocking Random Numbers**
+
+```typescript
+import { describe, it, expect, vi } from 'vitest'
+import { getRandomPost } from '../posts'
+
+describe('getRandomPost', () => {
+  it('returns the post at the random index', () => {
+    const posts = [{ slug: 'a' }, { slug: 'b' }, { slug: 'c' }]
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+
+    const result = getRandomPost(posts)
+    // Math.floor(0.5 * 3) = 1, returns second post
+    expect(result.slug).toBe('b')
+
+    vi.restoreAllMocks()
+  })
+})
+```
+
+### Letting Claude Code Decide the Mock Strategy
+
+```bash
+> Read src/services/notification.ts, analyze its dependencies,
+> tell me what needs to be mocked and what doesn't, and why.
+> Then write the tests based on your analysis.
+```
+
+## 5. Coverage Analysis
+
+### Configuring Coverage Tools
+
+In `vitest.config.ts`:
+
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    coverage: {
+      provider: 'v8', // or 'istanbul'
+      reporter: ['text', 'html', 'json-summary'],
+      include: ['src/lib/**', 'src/utils/**'],
+      exclude: [
+        'src/**/*.test.ts',
+        'src/**/*.d.ts',
+        'src/**/types.ts',
+      ],
+      thresholds: {
+        statements: 80,
+        branches: 75,
+        functions: 80,
+        lines: 80,
+      },
+    },
+  },
+})
+```
+
+Run:
+
+```bash
+npx vitest run --coverage
+```
+
+### Having Claude Code Analyze Coverage Reports
+
+```bash
+> Run npx vitest run --coverage and analyze the report:
+> 1. Which files are below 80% coverage?
+> 2. Which specific branches/functions are uncovered?
+> 3. Prioritize — cover the most critical ones first
+> 4. Generate the supplementary tests
+```
+
+### Setting Reasonable Coverage Targets
+
+| Code Type | Suggested Coverage | Reason |
+|-----------|-------------------|--------|
+| Core business logic | 90%+ | High impact if broken |
+| Utility functions | 85%+ | Widely reused |
+| API route handlers | 80%+ | Involves data flow |
+| UI components | 70%+ | Visual testing is more effective |
+| Config/constants | Not needed | No logic |
+| Type definitions | Not needed | TypeScript already guarantees |
+
+> **Note**: 100% coverage is not the goal. Chasing 100% leads to low-value tests with maintenance costs that far exceed their benefits. Focus on covering critical paths rather than hitting a number.
+
+## 6. Debugging Failing Tests
+
+### Common Failure Patterns
+
+| Pattern | Typical Error | Root Cause | Fix |
+|---------|--------------|-----------|-----|
+| Unawaited async | `received undefined` | Missing `await` | Check async/await chain |
+| Mock leakage | Passes alone, fails together | Mock not cleaned up | `afterEach` with `vi.restoreAllMocks()` |
+| Stale snapshot | `Snapshot mismatch` | Code changed, snapshot didn't | `vitest -u` to update |
+| Environment diff | Passes in CI, fails locally | Timezone/path/env vars | Use `vi.useFakeTimers()` to fix env |
+| Import error | `Cannot find module` | Path alias not configured | Check `vitest.config.ts` `resolve.alias` |
+| Type mismatch | `toEqual` fails | Date object vs string | Normalize types before comparing |
+
+### Having Claude Code Diagnose Failures
+
+```bash
+> Run npx vitest run — 3 tests are failing.
+> Analyze the failures following these steps:
+> 1. Read the error messages, identify the failure pattern
+> 2. Check if the test code has issues (uncleaned mocks, unawaited async)
+> 3. Check if the code under test has bugs
+> 4. Fix the issues and re-run tests to confirm
+```
+
+### Debugging Workflow in Practice
+
+```bash
+# Scenario: Test passes alone, fails when run together
+> tests/lib/posts.test.ts passes when run alone but fails in the full suite.
+> This is usually a mock leakage issue. Help me investigate:
+> 1. Check beforeEach/afterEach in all test files
+> 2. Find which test file's mock is affecting posts.test.ts
+> 3. Add proper cleanup logic
+```
+
+```bash
+# Scenario: Passes in CI but fails locally
+> This test passes on GitHub Actions but fails locally.
+> Possible causes:
+> - Timezone difference (CI is UTC)
+> - File path separators (CI is Linux)
+> - Missing environment variables
+> Help me find the specific cause and fix it
+```
+
+## 7. Integration Tests and E2E Tests
+
+### Integration Test Strategy
+
+Unit tests verify individual functions; integration tests verify how modules work together.
+
+**API Route Test Example**:
+
+```typescript
+// app/api/posts/__tests__/route.test.ts
+import { describe, it, expect } from 'vitest'
+import { GET } from '../route'
+import { NextRequest } from 'next/server'
+
+describe('GET /api/posts', () => {
+  it('returns the post list', async () => {
+    const request = new NextRequest('http://localhost/api/posts?locale=en')
+    const response = await GET(request)
+    const data = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(Array.isArray(data.posts)).toBe(true)
+    expect(data.posts[0]).toHaveProperty('title')
+    expect(data.posts[0]).toHaveProperty('slug')
+  })
+
+  it('returns 400 for invalid locale', async () => {
+    const request = new NextRequest('http://localhost/api/posts?locale=fr')
+    const response = await GET(request)
+
+    expect(response.status).toBe(400)
+  })
+})
+```
+
+### E2E Testing with Playwright
+
+```bash
+> Write a Playwright E2E test:
+> 1. Open the blog homepage
+> 2. Click the first article
+> 3. Verify the article title displays correctly
+> 4. Verify the table of contents exists
+> 5. Scroll to the bottom, verify the comments section loads
+```
+
+Claude Code generates:
+
+```typescript
+// e2e/blog-flow.spec.ts
+import { test, expect } from '@playwright/test'
+
+test('blog article reading flow', async ({ page }) => {
+  // 1. Open blog homepage
+  await page.goto('/en/blog')
+  await expect(page).toHaveTitle(/Blog/)
+
+  // 2. Click the first article
+  const firstPost = page.locator('article a').first()
+  const postTitle = await firstPost.textContent()
+  await firstPost.click()
+
+  // 3. Verify article title
+  await expect(page.locator('h1')).toHaveText(postTitle!)
+
+  // 4. Verify table of contents
+  await expect(page.locator('nav[aria-label="Table of contents"]')).toBeVisible()
+
+  // 5. Scroll to bottom, verify comments
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+  await expect(page.locator('.giscus')).toBeVisible({ timeout: 10000 })
+})
+```
+
+### Unit vs Integration vs E2E Selection Guide
+
+| What You Want to Verify | Choose | Example |
+|------------------------|--------|---------|
+| A function's input/output | Unit test | `parseMarkdown('# Hi')` → `<h1>Hi</h1>` |
+| Two modules working together | Integration test | API route + data layer |
+| A user operation flow | E2E test | Open page → search → click result |
+| Data transformation logic | Unit test | Date formatting, string processing |
+| Middleware behavior | Integration test | Auth middleware + routes |
+| Cross-page navigation | E2E test | Home → article → back |
+
+## 8. CLAUDE.md Test Conventions
+
+Encode your test conventions in CLAUDE.md so Claude Code follows a consistent standard every time.
+
+```markdown
+# Test Conventions
+
+## Framework & Tools
+- Test framework: vitest
+- Assertions: vitest built-in expect
+- Mocking: vi.mock() / vi.spyOn()
+- Coverage: v8 provider
+
+## File Organization
+- Test files go in __tests__/ next to the source file
+- Naming: [source-file].test.ts
+- Example: src/lib/posts.ts → src/lib/__tests__/posts.test.ts
+
+## Naming Conventions
+- describe blocks use module/function names
+- it blocks describe behavior: "returns empty array for no matches"
+- Never use meaningless names like "test case 1"
+
+## Structure
+- Every test follows Arrange-Act-Assert pattern
+- Group related tests with describe
+- Edge cases get their own describe block
+
+## Mock Rules
+- Only mock external dependencies (network, filesystem, database, time)
+- Never mock internal functions of the module under test
+- Clean up mocks after each test: afterEach(() => vi.restoreAllMocks())
+- Prefer vi.spyOn() over fully replacing modules
+
+## Coverage Requirements
+- Core business logic: >= 90%
+- Utility functions: >= 85%
+- API routes: >= 80%
+- Don't require 100% — don't write meaningless tests to pad coverage
+
+## Prohibited
+- Don't test implementation details (private functions, internal state)
+- Don't write tests that depend on execution order
+- Don't hardcode environment-specific values (paths, timezones)
+- Don't use snapshot tests for logic (snapshots are for UI structure only)
+```
+
+> For more CLAUDE.md configuration tips, see the [Complete CLAUDE.md Guide](/en/blog/claude-code-claude-md).
+
+## 9. CI/CD Test Integration
+
+### GitHub Actions Test Workflow
+
+```yaml
+# .github/workflows/test.yml
+name: Test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Run tests with coverage
+        run: npx vitest run --coverage
+
+      - name: Check coverage thresholds
+        run: npx vitest run --coverage --coverage.thresholds.100=false
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+```
+
+### Coverage Gates
+
+With thresholds set in `vitest.config.ts`, CI automatically fails when coverage drops below the bar:
+
+```typescript
+// thresholds in vitest.config.ts
+thresholds: {
+  statements: 80,
+  branches: 75,
+  functions: 80,
+  lines: 80,
+}
+```
+
+If a PR drops coverage below these thresholds, CI fails and the PR can't merge.
+
+### Auto-Commenting Test Reports on PRs
+
+Combine with GitHub Actions to post test results directly on PRs:
+
+```yaml
+# Append to .github/workflows/test.yml
+      - name: Test Report
+        if: github.event_name == 'pull_request'
+        uses: dorny/test-reporter@v1
+        with:
+          name: Vitest Results
+          path: 'test-results/junit.xml'
+          reporter: jest-junit
+
+      - name: Coverage Comment
+        if: github.event_name == 'pull_request'
+        uses: MishaKav/jest-coverage-comment@main
+        with:
+          coverage-summary-path: coverage/coverage-summary.json
+          title: 'Test Coverage Report'
+```
+
+Add the junit reporter to your vitest config:
+
+```typescript
+// vitest.config.ts
+export default defineConfig({
+  test: {
+    reporters: ['default', 'junit'],
+    outputFile: {
+      junit: 'test-results/junit.xml',
+    },
+    // ... coverage config
+  },
+})
+```
+
+> For more on CI/CD integration with Claude Code, see the CI/CD section in the [Git Workflow Guide](/en/blog/claude-code-git).
+
+## 10. Complete Walkthrough: TDD for a "Reading Time Estimator"
+
+Let's add a "reading time estimate" feature to a Next.js blog, walking through the full TDD cycle.
+
+### Step 1: Red — Write Tests
+
+```bash
+> I want to add an estimateReadingTime function to the blog.
+> Rules:
+> - Chinese: 300 characters/minute
+> - English: 200 words/minute
+> - Code blocks are excluded from reading time
+> - Return format: "X min"
+> - Minimum 1 minute
+>
+> Write tests first, no implementation.
+```
+
+Claude Code generates:
+
+```typescript
+// lib/__tests__/reading-time.test.ts
+import { describe, it, expect } from 'vitest'
+import { estimateReadingTime } from '../reading-time'
+
+describe('estimateReadingTime', () => {
+  describe('Chinese content', () => {
+    it('300 Chinese characters should be 1 minute', () => {
+      const content = '测'.repeat(300)
+      expect(estimateReadingTime(content, 'zh')).toBe('1 分钟')
+    })
+
+    it('900 Chinese characters should be 3 minutes', () => {
+      const content = '测'.repeat(900)
+      expect(estimateReadingTime(content, 'zh')).toBe('3 分钟')
+    })
+  })
+
+  describe('English content', () => {
+    it('200 English words should be 1 minute', () => {
+      const content = Array(200).fill('word').join(' ')
+      expect(estimateReadingTime(content, 'en')).toBe('1 min')
+    })
+
+    it('600 English words should be 3 minutes', () => {
+      const content = Array(600).fill('word').join(' ')
+      expect(estimateReadingTime(content, 'en')).toBe('3 min')
+    })
+  })
+
+  describe('code block filtering', () => {
+    it('excludes code block content from reading time', () => {
+      const content = '测'.repeat(300) + '\n```js\nconsole.log("hello")\n```\n'
+      expect(estimateReadingTime(content, 'zh')).toBe('1 分钟')
+    })
+  })
+
+  describe('edge cases', () => {
+    it('returns minimum 1 minute for empty content', () => {
+      expect(estimateReadingTime('', 'zh')).toBe('1 分钟')
+    })
+
+    it('returns minimum 1 minute for very short content', () => {
+      expect(estimateReadingTime('Hi', 'en')).toBe('1 min')
+    })
+  })
+})
+```
+
+Run tests — all fail (Red phase complete).
+
+### Step 2: Green — Write Implementation
+
+```bash
+> Tests are ready. Now write the estimateReadingTime implementation to pass all tests.
+```
+
+```typescript
+// lib/reading-time.ts
+import type { Locale } from '@/i18n/routing'
+
+const READING_SPEED = {
+  zh: 300, // characters per minute
+  en: 200, // words per minute
+}
+
+export function estimateReadingTime(content: string, locale: Locale): string {
+  // Remove code blocks
+  const cleaned = content.replace(/```[\s\S]*?```/g, '')
+
+  let count: number
+  if (locale === 'zh') {
+    // Chinese: count characters (excluding whitespace and punctuation)
+    count = cleaned.replace(/[\s\p{P}]/gu, '').length
+  } else {
+    // English: count words
+    count = cleaned.split(/\s+/).filter(Boolean).length
+  }
+
+  const minutes = Math.max(1, Math.round(count / READING_SPEED[locale]))
+  return locale === 'zh' ? `${minutes} 分钟` : `${minutes} min`
+}
+```
+
+Run tests — all pass (Green phase complete).
+
+### Step 3: Refactor
+
+```bash
+> All tests pass. Review the code quality and suggest improvements.
+> Run tests after any changes to confirm nothing breaks.
+```
+
+### Step 4: Coverage
+
+```bash
+> Run coverage and check reading-time.ts.
+> If any branches are uncovered, add tests.
+```
+
+### Step 5: Integrate into the Blog
+
+```bash
+> Integrate estimateReadingTime into the blog post page:
+> 1. Call it in blog/[slug]/page.tsx
+> 2. Display next to the date below the title
+> 3. Use i18n for the "min"/"分钟" label
+```
+
+### Step 6: CI Verification
+
+```bash
+> Check the GitHub Actions config to make sure the new tests run in CI.
+> Let me know if coverage thresholds need adjusting.
+```
+
+### Full Workflow Recap
+
+```
+Write tests (Red) → Write implementation (Green) → Refactor
+    ↓                                                  ↓
+Check Coverage → Add edge case tests → Integrate → CI verification
+```
+
+Throughout this process, Claude Code is your testing partner: you define the requirements and rules, it generates test code, implementation code, analyzes coverage, and debugs failures. You stay in control of direction; it accelerates execution.
+
+## Summary
+
+| Chapter | Key Takeaway |
+|---------|-------------|
+| Testing pyramid | Unit tests as the base, moderate integration, few E2E |
+| TDD | Red-Green-Refactor — tests before implementation |
+| Writing tests | Analyze first, batch generate, self-review quality |
+| Mock strategy | Only mock external deps, never internal logic |
+| Coverage | Focus on critical paths, don't chase 100% |
+| Debugging | Classify failures by pattern, then investigate |
+| Integration/E2E | Choose test type based on what you're verifying |
+| CLAUDE.md | Encode test conventions as project config |
+| CI/CD | Automated testing + coverage gates |
+| Walkthrough | Full TDD cycle: test → implement → refactor → coverage → CI |
+
+Testing isn't an afterthought bolted on after development — it's part of the development process itself. Claude Code turns it from a "painful obligation" into a "natural rhythm."
+
+## Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-overview) — Complete getting-started guide
+- [CLAUDE.md Guide](/en/blog/claude-code-claude-md) — Encode test conventions into project memory
+- [Claude Code Hooks Guide](/en/blog/claude-code-hooks) — Automate testing workflows with Hooks
+- [Context Management Guide](/en/blog/claude-code-context) — Better context for more precise test generation
+- [Multi-Agent Parallelism Guide](/en/blog/claude-code-multi-agent) — Run tests in parallel with multiple agents
+- [Custom Slash Commands Guide](/en/blog/claude-code-skills) — The /test command template in detail
+- [MCP Server Guide](/en/blog/claude-code-mcp) — Extend testing capabilities with MCP
+- [Prompt Techniques Guide](/en/blog/claude-code-prompt) — Write better testing-related prompts
+- [settings.json Guide](/en/blog/claude-code-settings) — Configure permissions for test operations
+- [Git Workflow Guide](/en/blog/claude-code-git) — Testing as part of the PR workflow

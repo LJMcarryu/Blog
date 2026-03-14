@@ -1,0 +1,817 @@
+---
+title: "Claude Code Git 工作流完全指南：从提交到合并的 AI 协作之道"
+date: "2026-03-09"
+description: 深入解析 Claude Code 的 Git 工作流能力，涵盖智能提交、PR 创建、Worktree 隔离、代码审查、冲突解决、Hooks 安全防护与 CI/CD 集成，附带完整实战流程。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+在之前的系列文章里，我们从 [CLAUDE.md](/zh/blog/claude-code-claude-md) 讲到 [Hooks](/zh/blog/claude-code-hooks)，从 [MCP](/zh/blog/claude-code-mcp) 讲到 [Prompt 技巧](/zh/blog/claude-code-prompt)，但有一个贯穿所有开发流程的核心话题一直没有专门展开——**Git 工作流**。
+
+Claude Code 从骨子里就是 Git-native 的。它启动时自动读取 `git status`，理解你的分支结构，分析 `git diff`，甚至能基于 `git log` 生成符合项目风格的 commit message。但大多数人只用到了 `/commit` 这一个命令，远没有发挥它的全部能力。
+
+这篇文章把 Claude Code 的 Git 能力讲透——从日常提交到 PR 创建，从 Worktree 隔离到代码审查，从冲突解决到 CI/CD 集成，最后用一个完整实战串起全部流程。
+
+---
+
+## 一、为什么 Git 工作流很重要
+
+### 1.1 Claude Code 是 Git-native 的 Agent
+
+Claude Code 不是一个"碰巧能执行 git 命令"的聊天机器人。它的整个工作模式都围绕 Git 构建：
+
+- **启动时**自动运行 `git status`，了解当前分支、未提交的变更
+- **对话中**持续感知 Git 状态，知道哪些文件被修改了
+- **提交时**分析 `git diff` 和 `git log`，生成符合项目风格的 commit message
+- **安全机制**内置对危险 Git 操作的确认提示（force push、reset --hard 等）
+
+这意味着，你越好地利用 Git 工作流，Claude Code 就越能理解你的项目状态，给出更精准的帮助。
+
+### 1.2 手动 Git vs Claude Code Git
+
+| 操作 | 手动 Git | Claude Code |
+|------|---------|-------------|
+| 查看变更 | `git diff` 然后人工阅读 | 自动分析 diff，总结变更内容 |
+| 写 commit message | 手动编写，风格不一致 | 分析 diff + log，自动匹配项目风格 |
+| 创建 PR | 手动写标题和描述 | 分析所有 commit，生成结构化 PR 描述 |
+| 代码审查 | 逐文件人工审查 | 自动分析变更，指出潜在问题 |
+| 解决冲突 | 手动编辑冲突标记 | 理解双方意图，智能合并 |
+| 分支管理 | 手动创建、切换、清理 | 根据任务自动建议分支操作 |
+
+---
+
+## 二、核心 Git 操作
+
+### 2.1 /commit：智能提交
+
+`/commit` 是 Claude Code 最常用的 Git 技能。它不是简单地执行 `git commit`，而是一个完整的提交工作流：
+
+```
+> /commit
+```
+
+Claude Code 会自动执行以下步骤：
+
+1. 运行 `git status` 查看所有变更
+2. 运行 `git diff` 分析具体改动
+3. 运行 `git log` 查看最近的 commit message 风格
+4. 生成符合项目风格的 commit message
+5. 暂存相关文件（优先 `git add` 具体文件，而非 `git add .`）
+6. 执行提交
+
+关键细节：
+
+- Claude Code **不会自动 push**，提交后你需要明确要求推送
+- 如果 pre-commit hook 失败，Claude Code 会修复问题后**创建新提交**，而不是 `--amend`
+- 敏感文件（`.env`、`credentials.json`）会被自动跳过并警告
+
+### 2.2 常用 Git Prompt 对照表
+
+| 你想做的事 | Prompt 示例 |
+|-----------|------------|
+| 提交所有变更 | `/commit` 或 `提交当前的改动` |
+| 提交部分文件 | `只提交 src/components/ 下的改动` |
+| 查看变更摘要 | `总结一下当前的 git diff` |
+| 创建功能分支 | `创建一个 feature/add-search 分支` |
+| 查看提交历史 | `最近 10 次提交都改了什么` |
+| 比较分支差异 | `当前分支和 main 有什么区别` |
+| 撤销最近提交 | `撤销最近一次提交，保留文件改动` |
+| 暂存当前工作 | `把当前改动 stash 起来` |
+
+### 2.3 PR 创建流程
+
+创建 Pull Request 是 Claude Code 的强项。它会分析整个分支的所有 commit，而不只是最后一次提交：
+
+```
+> 创建一个 PR 到 main 分支
+```
+
+Claude Code 的 PR 创建流程：
+
+1. 检查当前分支状态和远程同步情况
+2. 运行 `git diff main...HEAD` 分析所有变更
+3. 查看所有 commit 历史
+4. 生成简洁的 PR 标题（70 字符以内）
+5. 生成结构化的 PR 描述（变更内容、动机、测试情况）
+6. 使用 `gh pr create` 创建 PR
+
+```bash
+# Claude Code 实际执行的命令类似于：
+git status
+git diff --staged
+git diff
+git log main..HEAD --oneline
+git diff main...HEAD
+gh pr create --title "Add search functionality" --body "..."
+```
+
+### 2.4 Diff 分析
+
+让 Claude Code 分析 diff 是代码审查的利器：
+
+```
+> 分析一下当前的 diff，有没有潜在问题
+
+> git diff main...HEAD 里有没有安全隐患
+
+> 这次改动会不会影响性能
+```
+
+Claude Code 会从多个维度分析：安全性、性能、代码风格、潜在 bug、边界情况。
+
+---
+
+## 三、Worktree 隔离开发
+
+### 3.1 什么是 Git Worktree
+
+Git worktree 允许你在同一个仓库中同时检出多个分支到不同目录。这意味着你可以在不切换分支的情况下，同时处理多个任务：
+
+```bash
+# 传统方式：切换分支会丢失当前工作状态
+git stash
+git checkout feature-b
+# 做一些工作...
+git checkout feature-a
+git stash pop
+
+# Worktree 方式：每个分支有独立的工作目录
+git worktree add ../feature-b feature-b
+# 两个分支同时存在，互不干扰
+```
+
+### 3.2 Claude Code 内置 Worktree 支持
+
+Claude Code 原生支持 worktree 操作，不需要你手动执行 git 命令：
+
+```
+> 开始一个 worktree 来修复 bug
+
+> start a worktree for the login fix
+```
+
+Claude Code 会：
+
+1. 在 `.claude/worktrees/` 目录下创建新的 worktree
+2. 基于当前 HEAD 创建新分支
+3. 将工作目录切换到新的 worktree
+4. 完成后可以选择保留或删除 worktree
+
+```
+> 退出 worktree，保留改动
+# 保留 worktree 和分支，稍后可以继续
+
+> 退出 worktree，删除它
+# 清理 worktree 和分支（如果有未提交的改动会警告）
+```
+
+### 3.3 多 Agent + Worktree 组合
+
+这是 Claude Code 最强大的工作模式之一。在[多 Agent 并行指南](/zh/blog/claude-code-multi-agent)中我们介绍了 Agent 工具的 `isolation: "worktree"` 参数：
+
+```
+> 同时做两件事：
+> 1. 在 worktree 里重构 auth 模块
+> 2. 在 worktree 里添加单元测试
+```
+
+Claude Code 会启动两个子 Agent，每个都在独立的 worktree 中工作，互不干扰。完成后你可以分别审查和合并。
+
+关键优势：
+
+- **零冲突**：每个 Agent 在独立的文件系统中工作
+- **并行加速**：多个任务同时进行
+- **安全回滚**：不满意可以直接删除 worktree，不影响主分支
+
+注意事项：
+
+- 每个 worktree 有独立的 `node_modules`，首次可能需要 `npm install`
+- Worktree 是会话级的，Claude Code 退出后会提示你处理
+- 大型仓库的 worktree 创建可能需要一些时间
+
+---
+
+## 四、代码审查工作流
+
+### 4.1 审查自己的变更
+
+提交前让 Claude Code 审查你的代码是一个好习惯：
+
+```
+> 审查一下我当前的改动，重点看安全性和性能
+
+> review my staged changes, focus on edge cases
+```
+
+Claude Code 会：
+
+1. 读取 `git diff`（或 `git diff --staged`）
+2. 逐文件分析变更
+3. 指出潜在问题：安全漏洞、性能瓶颈、逻辑错误、边界情况
+4. 给���改进建议
+
+### 4.2 审查 Pull Request
+
+Claude Code 可以直接审查 GitHub PR：
+
+```
+> 审查 PR #42
+
+> review https://github.com/user/repo/pull/42
+```
+
+它会使用 `gh` CLI 获取 PR 信息，分析所有变更文件，然后给出结构化的审查意见。
+
+### 4.3 自定义 /review 命令
+
+在[自定义 Slash Commands 指南](/zh/blog/claude-code-skills)中我们介绍了如何创建自定义命令。这里是一个实用的代码审查命令：
+
+```markdown
+<!-- .claude/commands/review.md -->
+审查当前分支相对于 $ARGUMENTS（默认 main）的所有变更。
+
+审查要点：
+1. 安全性：是否有注入、XSS、敏感信息泄露
+2. 性能：是否有 N+1 查询、不必要的重渲染、内存泄漏
+3. 正确性：边界情况、错误处理、类型安全
+4. 风格：是否符合项目现有的代码风格
+
+输出格式：
+- 🔴 必须修复（安全/正确性问题）
+- 🟡 建议修改（性能/可维护性）
+- 🟢 可选优化（风格/最佳实践）
+
+先运行 git diff $ARGUMENTS...HEAD 获取完整变更。
+```
+
+使用方式：
+
+```
+> /review main
+> /review develop
+```
+
+### 4.4 审查对照表
+
+| 审查场景 | Prompt |
+|---------|--------|
+| 提交前自查 | `审查 staged changes` |
+| 审查整个分支 | `审查当前分支相对于 main 的所有改动` |
+| 审查特定文件 | `审查 src/auth.ts 的改动` |
+| 审查 PR | `审查 PR #42` |
+| 安全专项审查 | `从安全角度审查当前 diff` |
+| 性能专项审查 | `这次改动有没有性能问题` |
+
+---
+
+## 五、冲突解决
+
+### 5.1 Claude Code 如何处理冲突
+
+当你执行 `git merge` 或 `git rebase` 遇到冲突时，Claude Code 能理解冲突标记并智能合并：
+
+```
+> 我 rebase main 的时候有冲突了，帮我解决
+```
+
+Claude Code 的处理流程：
+
+1. 读取冲突文件，理解 `<<<<<<<`、`=======`、`>>>>>>>` 标记
+2. 分析双方的修改意图（不只是文本差异，而是语义理解）
+3. 生成合并后的代码
+4. 标记冲突为已解决
+
+### 5.2 实战示例
+
+假设你在 `feature` 分支修改了一个函数，同时 `main` 分支也修改了同一个函数：
+
+```typescript
+// 冲突文件 src/utils.ts
+<<<<<<< HEAD
+export function formatDate(date: Date): string {
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+=======
+export function formatDate(date: Date, locale: string = 'en'): string {
+  return new Intl.DateTimeFormat(locale).format(date)
+}
+>>>>>>> main
+```
+
+```
+> 解决这个冲突，保留两边的功能：支持 locale 参数，同时保留中文的默认格式
+```
+
+Claude Code 会生成：
+
+```typescript
+export function formatDate(date: Date, locale: string = 'zh-CN'): string {
+  return date.toLocaleDateString(locale, {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
+}
+```
+
+### 5.3 Rebase vs Merge 对比
+
+| 维度 | Rebase | Merge |
+|------|--------|-------|
+| 历史记录 | 线性，干净 | 保留分支拓扑 |
+| 冲突处理 | 逐 commit 解决，可能多次 | 一次性解决所有冲突 |
+| 适用场景 | 个人分支同步主分支 | 合并功能分支到主分支 |
+| Claude Code 支持 | ✅ 逐步引导解决 | ✅ 一次性分析所有冲突 |
+| 风险 | 改写历史，不要对已推送的 commit 使用 | 产生 merge commit |
+
+提示：Claude Code 默认不会执行 `git rebase -i`（交互式 rebase），因为它需要交互式输入。如果你需要 squash commit，可以让 Claude Code 用 `git rebase -i` 以外的方式实现：
+
+```
+> 把最近 3 次提交合并成一个
+# Claude Code 会使用 git reset --soft 和重新提交的方式
+```
+
+---
+
+## 六、CLAUDE.md 中的 Git 规范
+
+在 [CLAUDE.md 完全指南](/zh/blog/claude-code-claude-md)中我们讲了如何用 CLAUDE.md 管理项目规范。Git 相关的规范是其中最重要的部分之一。
+
+### 6.1 Commit Message 格式
+
+```markdown
+<!-- CLAUDE.md -->
+## Git 规范
+
+### Commit Message
+- 格式：`<type>(<scope>): <description>`
+- type: feat, fix, refactor, docs, test, chore, perf, ci
+- scope: 可选，表示影响范围（auth, ui, api 等）
+- description: 祈使句，首字母小写，不加句号
+- 示例：`feat(auth): add OAuth2 login flow`
+- 中文项目可用中文：`feat(认证): 添加 OAuth2 登录流程`
+```
+
+Claude Code 读取这些规范后，`/commit` 生成的 message 会自动遵循格式。
+
+### 6.2 分支命名规范
+
+```markdown
+### 分支命名
+- 功能分支：feature/<description>
+- 修复分支：fix/<description>
+- 重构分支：refactor/<description>
+- 使用 kebab-case：feature/add-user-search
+- 禁止直接在 main/develop 上提交
+```
+
+### 6.3 PR 规范
+
+```markdown
+### Pull Request
+- 标题遵循 commit message 格式
+- 描述必须包含：变更内容、动机、测试方式
+- 单个 PR 不超过 500 行改动
+- 必须通过 CI 检查后才能合并
+```
+
+### 6.4 安全规则
+
+```markdown
+### Git 安全
+- 禁止 force push 到 main 和 develop
+- 禁止提交 .env、密钥文件、credentials
+- 禁止使用 --no-verify 跳过 hooks
+- 删除分支前必须确认已合并
+```
+
+这些规则写在 CLAUDE.md 里，Claude Code 会严格遵守。比如你说"force push 到 main"，Claude Code 会拒绝并解释原因。
+
+---
+
+## 七、Hooks 与 Git 集成
+
+在 [Hooks 指南](/zh/blog/claude-code-hooks)中我们详细介绍了 Claude Code 的 Hook 系统。这里聚焦 Git 相关的 Hook 用法。
+
+### 7.1 PreToolUse：拦截危险 Git 操作
+
+```json
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -qE \"git\\s+(push\\s+--force|reset\\s+--hard|clean\\s+-fd)\"; then echo \"BLOCK: 危险 Git 操作被拦截\"; exit 1; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 7.2 PostToolUse：提交后自动化
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash -c 'if echo \"$CLAUDE_TOOL_INPUT\" | grep -q \"git commit\"; then echo \"提交成功，运行 lint 检查...\"; npm run lint; fi'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+### 7.3 危险操作对照表
+
+| 操作 | 风险等级 | Claude Code 默认行为 | 建议的 Hook 策略 |
+|------|---------|---------------------|-----------------|
+| `git push --force` | 🔴 高 | 请求确认 | PreToolUse 拦截 |
+| `git reset --hard` | 🔴 高 | 请求确认 | PreToolUse 拦截 |
+| `git clean -fd` | 🔴 高 | 请求确认 | PreToolUse 拦截 |
+| `git branch -D` | 🟡 中 | 请求确认 | 允许但记录日志 |
+| `git checkout .` | 🟡 中 | 请求确认 | PreToolUse 警告 |
+| `git stash drop` | 🟡 中 | 直接执行 | 建议添加确认 |
+| `git push` | 🟢 低 | 请求确认 | 允许 |
+| `git commit` | 🟢 低 | 直接执行 | PostToolUse 触发 lint |
+
+### 7.4 Git Hook（非 Claude Hook）集成
+
+Claude Code 也尊重项目的 Git hooks（`.git/hooks/` 或 husky）：
+
+```bash
+# 如果项目使用 husky
+# .husky/pre-commit
+npm run lint-staged
+
+# .husky/commit-msg
+npx commitlint --edit $1
+```
+
+当 Claude Code 执行 `/commit` 时：
+
+1. 如果 pre-commit hook 失败 → Claude Code 修复问题，**创建新提交**
+2. 如果 commit-msg hook 失败 → Claude Code 调整 message 格式，重新提交
+3. Claude Code **不会**使用 `--no-verify` 跳过 hooks
+
+---
+
+## 八、CI/CD 集成
+
+Claude Code 不仅能在本地使用，还能集成到 CI/CD 流水线中，实现自动化的代码审查和质量保障。
+
+### 8.1 GitHub Actions：自动 PR 审查
+
+```yaml
+# .github/workflows/claude-review.yml
+name: Claude Code Review
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      - name: Review PR
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          claude -p "审查这个 PR 的所有变更，重点关注安全性和性能。
+          运行 git diff origin/main...HEAD 获取变更。
+          以 GitHub PR comment 的格式输出审查结果。" \
+          --output-format text > review.md
+
+      - name: Post Review Comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const review = fs.readFileSync('review.md', 'utf8');
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: review
+            });
+```
+
+### 8.2 Commit Message 校验
+
+```yaml
+# .github/workflows/commit-lint.yml
+name: Commit Message Lint
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check Commit Messages
+        run: |
+          # 检查所有 PR 中的 commit message 是否符合 conventional commits
+          git log origin/main..HEAD --pretty=format:"%s" | while read msg; do
+            if ! echo "$msg" | grep -qE "^(feat|fix|refactor|docs|test|chore|perf|ci)(\(.+\))?: .+"; then
+              echo "❌ 不符合规范: $msg"
+              exit 1
+            fi
+          done
+          echo "✅ 所有 commit message 符合规范"
+```
+
+### 8.3 自动 Changelog 生成
+
+```
+> 基于 v1.0.0 到 HEAD 的所有 commit，生成 CHANGELOG
+
+> 按照 Keep a Changelog 格式，分类整理最近一个月的提交
+```
+
+Claude Code 会分析 commit 历史，按类型分组（Features、Bug Fixes、Refactoring 等），生成结构化的 changelog。
+
+你也可以把这个流程自动化：
+
+```yaml
+# 在 release workflow 中
+- name: Generate Changelog
+  env:
+    ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+  run: |
+    claude -p "基于 git log ${{ github.event.release.tag_name }}..HEAD 生成 changelog，
+    格式遵循 Keep a Changelog。" --output-format text > CHANGELOG_NEW.md
+```
+
+---
+
+## 九、完整实战：从建分支到合并 PR
+
+以一个真实场景为例：为 Next.js 博客添加"相关文章"功能，完整走一遍 Git 工作流。
+
+### Step 1：创建功能分支
+
+```
+> 创建一个 feature/related-posts 分支
+```
+
+```bash
+# Claude Code 执行：
+git checkout -b feature/related-posts
+```
+
+### Step 2：实现功能
+
+```
+> 在博客文章页面底部添加"相关文章"组件，基于相同 tag 推荐最多 3 篇文章
+```
+
+Claude Code 会：
+- 读取现有的 `blog/[slug]/page.tsx` 了解页面结构
+- 读取 `lib/posts.ts` 了解文章数据获取方式
+- 创建 `components/RelatedPosts.tsx` 组件
+- 修改页面文件引入组件
+
+### Step 3：中途自查
+
+```
+> 审查一下当前的改动
+```
+
+Claude Code 分析 `git diff`，可能指出：
+- "RelatedPosts 组件没有处理文章不足 3 篇的情况"
+- "建议添加 `aria-label` 提升可访问性"
+
+### Step 4：修复问题并提交
+
+```
+> 修复这些问题，然后提交
+```
+
+Claude Code 修复后执行 `/commit`，生成：
+
+```
+feat(blog): add related posts component based on shared tags
+```
+
+### Step 5：添加测试
+
+```
+> 为 RelatedPosts 组件添加单元测试
+```
+
+```
+> /commit
+```
+
+```
+test(blog): add unit tests for RelatedPosts component
+```
+
+### Step 6：同步主分支
+
+```
+> 把 main 分支的最新改动 rebase 过来
+```
+
+```bash
+# Claude Code 执行：
+git fetch origin
+git rebase origin/main
+# 如果有冲突，Claude Code 会引导解决
+```
+
+### Step 7：创建 PR
+
+```
+> 创建 PR 到 main
+```
+
+Claude Code 分析所有 commit，生成 PR：
+
+```markdown
+## Add Related Posts Feature
+
+### Changes
+- New `RelatedPosts` component that recommends up to 3 articles based on shared tags
+- Integrated into blog post page layout
+- Added unit tests with full coverage
+
+### Motivation
+Improve content discovery by showing readers related articles at the end of each post.
+
+### Testing
+- Unit tests added and passing
+- Manually verified with posts sharing 0, 1, 2, and 3+ tags
+```
+
+### Step 8：根据审查意见修改
+
+```
+> PR 审查说要加上 loading 状态，帮我改一下然后更新 PR
+```
+
+```bash
+# Claude Code 修改代码，提交，推送
+git add components/RelatedPosts.tsx
+git commit -m "feat(blog): add loading state to RelatedPosts"
+git push
+```
+
+整个流程中，你只需要用自然语言描述意图，Claude Code 处理所有 Git 操作细节。
+
+---
+
+## 十、常见问题 FAQ
+
+### Q1：Claude Code 误提交了怎么办？
+
+```
+> 撤销最近一次提交，保留文件改动
+```
+
+Claude Code 会执行 `git reset --soft HEAD~1`，撤销提交但保留所有改动在暂存区。如果已经推送了，Claude Code 会警告你需要 force push，并请求确认。
+
+### Q2：如何让 Claude Code 遵循我的 commit message 格式？
+
+两种方式：
+
+1. **CLAUDE.md**：写明格式规范，Claude Code 每次都会读取
+2. **项目历史**：Claude Code 会分析 `git log` 自动匹配风格
+
+推荐两者结合——CLAUDE.md 定义规范，`git log` 提供示例。
+
+### Q3：Claude Code 能做 interactive rebase 吗？
+
+不能直接做 `git rebase -i`，因为它需要交互式编辑器。但 Claude Code 可以用替代方式实现相同效果：
+
+```
+> ���最近 5 次提交合并成 2 个：前 3 个合并为"重构 auth 模块"，后 2 个合并为"添加测试"
+```
+
+Claude Code 会使用 `git reset --soft` + 重新提交的方式实现。
+
+### Q4：如何让 Claude Code 自动审批 Git 操作？
+
+在 [settings.json](/zh/blog/claude-code-settings) 中配置权限：
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git add*)",
+      "Bash(git commit*)"
+    ],
+    "deny": [
+      "Bash(git push --force*)",
+      "Bash(git reset --hard*)"
+    ]
+  }
+}
+```
+
+这样常规 Git 操作自动执行，危险操作被禁止，其他操作需要确认。
+
+### Q5：Worktree 里的 node_modules 怎么处理？
+
+每个 worktree 是独立的工作目录，需要单独安装依赖：
+
+```
+> 在 worktree 里运行 npm install
+```
+
+如果你的项目使用 pnpm 或 yarn，worktree 可以共享缓存，安装速度会很快。对于大型项目，建议在 CLAUDE.md 中注明：
+
+```markdown
+## Worktree 注意事项
+- 新建 worktree 后先运行 pnpm install
+- 不要在 worktree 中修改 pnpm-lock.yaml
+```
+
+### Q6：Claude Code 解决冲突的能力如何？
+
+对于大多数常见冲突（同一文件的不同区域修改、import 语句冲突、配置文件冲突），Claude Code 处理得很好。它的优势在于能理解代码语义，而不只是做文本合并。
+
+但对于复杂的逻辑冲突（两个分支对同一函数做了不同的架构改动），建议：
+
+1. 让 Claude Code 先分析冲突，解释双方的意图
+2. 你决定保留哪种方案
+3. 让 Claude Code 执行合并
+
+### Q7：Claude Code 会不会误推送代码？
+
+不会。Claude Code 的安全机制：
+
+- `git push` 默认需要用户确认
+- `git push --force` 会被额外警告
+- 推送到 `main`/`master` 的 force push 会被拒绝
+- 你可以通过 Hooks 添加额外的推送前检查
+
+如果你想完全禁止推送，在 settings.json 中：
+
+```json
+{
+  "permissions": {
+    "deny": ["Bash(git push*)"]
+  }
+}
+```
+
+---
+
+## 总结
+
+Claude Code 的 Git 工作流能力远不止 `/commit` 一个命令。从日常提交到 PR 创建，从 Worktree 隔离到代码审查，从冲突解决到 CI/CD 集成，它覆盖了开发者 Git 工作流的方方面面。
+
+核心要点：
+
+1. **让 Claude Code 了解你的 Git 规范**——写在 CLAUDE.md 里
+2. **善用 Worktree**——并行开发、零冲突、安全回滚
+3. **建立安全防线**——Hooks 拦截危险操作，settings.json 控制权限
+4. **自动化审查**——提交前自查，CI/CD 中集成 Claude Code 审查
+
+把这些实践组合起来，你的 Git 工作流会变得既高效又安全。
+
+---
+
+## 推荐阅读
+
+- [Claude Code 进阶指南](/zh/blog/claude-code-overview) — 从零开始的完整入门
+- [CLAUDE.md 完全指南](/zh/blog/claude-code-claude-md) — 把 Git 规范写进项目记忆
+- [Claude Code Hooks 指南](/zh/blog/claude-code-hooks) — 用 Hooks 拦截危险 Git 操作
+- [上下文管理指南](/zh/blog/claude-code-context) — 管好上下文，让 Git 操作更精准
+- [多 Agent 并行指南](/zh/blog/claude-code-multi-agent) — Worktree + 多 Agent 的并行开发
+- [自定义 Slash Commands 指南](/zh/blog/claude-code-skills) — 创建自定义 /review 命令
+- [MCP Server 深度指南](/zh/blog/claude-code-mcp) — 用 MCP 扩展 Git 集成能力
+- [高效 Prompt 指南](/zh/blog/claude-code-prompt) — 写好 Git 相关的 Prompt
+- [settings.json 指南](/zh/blog/claude-code-settings) — 配置 Git 操作的权限控制

@@ -1,0 +1,729 @@
+---
+title: "Claude Code 多 Agent 并行完全指南：一个人顶一个团队"
+date: "2026-03-13"
+description: 深入解析 Claude Code 的多 Agent 并行机制，涵盖 Plan Mode、子 Agent、多终端并行、Headless 模式，附带通用 Web 开发和 Flutter 开发两套完整实战示例。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+在[进阶指南](/zh/blog/claude-code-overview)的第四节里，我用大约 40 行介绍了多 Agent 并行的基本概念。但实际用下来，这个能力远比我当时写的要深。
+
+配好了 [CLAUDE.md](/zh/blog/claude-code-claude-md)，配好了 [Hooks](/zh/blog/claude-code-hooks)，管好了[上下文](/zh/blog/claude-code-context)——接下来的问题是：**怎么让 Claude 同时干多件事？**
+
+一个人操作多个 Claude 实例并行工作，效率可以接近一个小团队。这篇文章把多 Agent 并行讲透。
+
+---
+
+## 一、什么是多 Agent 并行
+
+### 1.1 核心概念
+
+多 Agent 并行的本质很简单：**把一个大任务拆成多个独立子任务，让多个 Claude 实例同时处理。**
+
+这不是什么新概念——软件团队天天在做。区别在于，你的"团队成员"是 Claude，启动成本几乎为零。
+
+### 1.2 三种模式
+
+Claude Code 提供三种并行方式，适用场景各不相同：
+
+| 模式 | 启动方式 | 上下文隔离 | 适用场景 |
+|------|---------|-----------|---------|
+| 子 Agent | Claude 自动创建 | 完全隔离 | 单会话内的独立子任务 |
+| 多终端并行 | 手动开多个终端 | 完全隔离 | 跨模块的大型任务 |
+| Headless 模式 | `claude -p` 命令 | 完全隔离 | 批量处理、CI/CD |
+
+### 1.3 为什么上下文隔离很重要
+
+每个 Claude 实例有独立的上下文窗口。这意味着：
+
+- **互不干扰** — 终端 A 读了 50 个文件不会影响终端 B 的上下文
+- **各自专注** — 每个实例只关注自己的任务，不会被无关信息分散注意力
+- **独立失败** — 一个实例出错不会污染其他实例的上下文
+
+这和人类团队协作的道理一样：每个人专注自己的模块，最后合并成果。
+
+---
+
+## 二、Plan Mode 深度解析
+
+### 2.1 基本用法
+
+按两次 `Shift+Tab` 进入 Plan Mode。在这个模式下，Claude 只分析、不动手：
+
+```
+[Plan Mode] 我要给博客添加书签功能，用户可以收藏文章
+
+Claude 会输出：
+1. 需要创建的文件和组件
+2. 数据存储方案（localStorage vs 数据库）
+3. UI 交互设计
+4. 需要修改的现有文件
+5. 建议的实现顺序
+```
+
+再按一次 `Shift+Tab` 切回 Act Mode，Claude 开始执行计划。
+
+### 2.2 什么时候该用 Plan Mode
+
+不是所有任务都需要 Plan Mode。这张表帮你判断：
+
+| 场景 | 是否需要 Plan Mode | 原因 |
+|------|-------------------|------|
+| 修一个明确的 bug | ❌ 不需要 | 目标清晰，直接修 |
+| 添加一个新功能 | ✅ 需要 | 涉及多文件，先规划再动手 |
+| 重构现有模块 | ✅ 需要 | 需要理解依赖关系 |
+| 改一行配置 | ❌ 不需要 | 太简单了 |
+| 跨模块的大改动 | ✅ 强烈建议 | 不规划容易遗漏 |
+| 性能优化 | ✅ 需要 | 需要先分析瓶颈 |
+
+### 2.3 Plan Mode 的高级技巧
+
+**技巧一：用 Plan 输出作为并行任务清单**
+
+Plan Mode 最大的价值不只是"想清楚再做"，而是它的输出可以直接作为多终端并行的任务分配方案：
+
+```
+[Plan Mode] 我要给 Flutter 应用添加每日签到功能
+
+Claude 输出的计划：
+├── 数据层：CheckIn model + Repository
+├── 业务层：CheckInCubit + 状态管理
+├── 展示层：CheckInPage + 日历组件 + 动画
+└── 测试：单元测试 + Widget 测试
+
+→ 这四个部分可以分配给四个终端并行处理
+```
+
+**技巧二：在 Plan Mode 中指定约束**
+
+```
+[Plan Mode] 添加用户认证功能
+约束：
+- 使用 JWT，不用 session
+- 密码用 bcrypt 加密
+- 需要支持 OAuth（Google、GitHub）
+- 不要引入新的数据库，用现有的 PostgreSQL
+```
+
+约束越明确，计划越靠谱。
+
+**技巧三：Plan Mode + CLAUDE.md 联动**
+
+如果你的 CLAUDE.md 里定义了架构规范，Plan Mode 会自动遵守。比如：
+
+```markdown
+# CLAUDE.md
+## 架构规范
+- 使用 Clean Architecture（data/domain/presentation）
+- 状态管理统一用 Bloc/Cubit
+- 所有 Repository 必须有接口定义
+```
+
+这样 Plan Mode 生成的计划会自动符合你的架构。
+
+---
+
+## 三、子 Agent 系统
+
+### 3.1 子 Agent 是什么
+
+当你给 Claude 一个包含多个独立子任务的指令时，Claude Code 会自动创建子 Agent（sub-agent）来并行处理：
+
+```
+你：帮我同时做这三件事：
+1. 给所有 API 路由添加错误处理
+2. 把 CSS 变量从 px 改成 rem
+3. 更新 README 的 API 文档
+
+Claude Code 内部：
+├── 主 Agent：协调和汇总
+├── 子 Agent 1：处理 API 错误处理
+├── 子 Agent 2：处理 CSS 单位转换
+└── 子 Agent 3：处理 README 更新
+```
+
+### 3.2 子 Agent 的能力与限制
+
+| 能力 | 限制 |
+|------|------|
+| 读取文件 | 不能与用户交互（不能问问题） |
+| 编辑文件 | 上下文窗口独立且较小 |
+| 执行命令 | 不能创建自己的子 Agent |
+| 搜索代码 | 不能访问主 Agent 的完整上下文 |
+| 使用 Glob/Grep | 不能使用 MCP 工具 |
+
+### 3.3 上下文共享机制
+
+子 Agent 和主 Agent 之间的上下文关系：
+
+- **主 → 子**：主 Agent 会把任务描述和必要上下文传给子 Agent
+- **子 → 主**：子 Agent 完成后，结果会返回给主 Agent
+- **子 ↔ 子**：子 Agent 之间**完全隔离**，互不可见
+
+这意味着：如果两个子任务有依赖关系，不适合用子 Agent 并行处理。
+
+### 3.4 触发子 Agent 的技巧
+
+Claude 不一定总会自动创建子 Agent。你可以用这些方式引导：
+
+```
+# 明确要求并行
+"请并行处理以下任务：..."
+
+# 强调独立性
+"这三个任务互不依赖，可以同时进行：..."
+
+# 使用编号列表
+"同时做这些事：
+1. ...
+2. ...
+3. ..."
+```
+
+### 3.5 SubagentStop Hook
+
+如果你担心子 Agent 执行了不该执行的操作，可以用 Hook 来控制：
+
+```json
+// .claude/settings.json
+{
+  "hooks": {
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo 'Sub-agent completed: $CLAUDE_AGENT_ID'"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+这个 Hook 在每个子 Agent 完成时触发，你可以用它来记录日志或做后续检查。
+
+---
+
+## 四、多终端并行
+
+### 4.1 基本设置
+
+多终端并行是最灵活也最强大的方式。基本思路：
+
+```bash
+# 终端 1
+cd my-project && claude
+
+# 终端 2
+cd my-project && claude
+
+# 终端 3
+cd my-project && claude
+```
+
+每个终端是一个完全独立的 Claude Code 会话，有自己的上下文窗口。
+
+### 4.2 任务拆分策略：按模块，不按步骤
+
+这是最重要的原则。
+
+**错误的拆分方式（按步骤）：**
+
+```
+终端 1：先创建数据库表
+终端 2：等终端 1 完成后，写 API
+终端 3：等终端 2 完成后，写前端
+```
+
+这不是并行，这是串行。
+
+**正确的拆分方式（按模块）：**
+
+```
+终端 1：数据层（model + repository + 数据库迁移）
+终端 2：业务层（service/cubit + 业务逻辑）
+终端 3：展示层（UI 组件 + 页面）
+终端 4：测试（单元测试 + 集成测试）
+```
+
+关键在于：**先定义好模块之间的接口（数据结构、函数签名），然后各自独立开发。**
+
+### 4.3 --resume 协调
+
+`--resume` 让你可以恢复之前的会话：
+
+```bash
+# 查看所有会话
+claude --resume
+
+# 恢复特定会话继续工作
+claude --resume <session-id>
+
+# 给会话起个名字方便识别
+claude --resume "frontend-refactor"
+```
+
+实际工作流：
+
+```
+1. 终端 1 完成数据层 → 提交到 feature 分支
+2. 终端 2 需要数据层的类型定义 → git pull 获取最新代码
+3. 终端 2 继续业务层开发
+```
+
+### 4.4 Boris 的工作流（扩展版）
+
+Claude Code 创始人 Boris Cherny 的实际工作方式：
+
+```
+本地终端（2-3 个）：
+├── 终端 1：核心功能开发
+├── 终端 2：测试和修复
+└── 终端 3：文档和配置
+
+Web 会话（claude.ai/code，5-10 个）：
+├── 会话 1-3：独立功能模块
+├── 会话 4-5：代码审查
+└── 会话 6+：探索性任务（调研、原型）
+```
+
+关键点：
+- 本地终端处理需要文件系统访问的任务
+- Web 会话处理分析、审查、规划类任务
+- 用 `--resume` 在本地和 Web 之间无缝切换
+
+---
+
+## 五、Headless 模式（claude -p）
+
+### 5.1 基本用法
+
+`claude -p` 是非交互式模式，适合脚本和自动化：
+
+```bash
+# 直接传入提示词
+claude -p "分析 src/lib/posts.ts 的性能瓶颈并给出优化建议"
+
+# 通过管道传入
+cat error.log | claude -p "分析这些错误日志，找出根本原因"
+
+# 指定输出格式
+claude -p "列出所有未使用的依赖" --output-format json
+```
+
+### 5.2 批量并行处理
+
+Headless 模式的真正威力在于批量并行：
+
+```bash
+# 并行审查多个文件
+for file in src/components/*.tsx; do
+  claude -p "审查 $file 的代码质量，检查：
+  1. 是否有性能问题
+  2. 是否有可访问性问题
+  3. 是否符合项目规范" &
+done
+wait
+echo "所有审查完成"
+```
+
+```bash
+# 并行生成多个模块的测试
+modules=("auth" "posts" "comments" "search")
+for module in "${modules[@]}"; do
+  claude -p "给 src/lib/$module.ts 写单元测试，
+  使用 vitest，覆盖所有导出函数" \
+  > "tests/$module.test.ts" &
+done
+wait
+```
+
+### 5.3 CI/CD 集成
+
+```yaml
+# GitHub Actions 示例
+- name: AI Code Review
+  run: |
+    claude -p "审查这个 PR 的改动：
+    $(gh pr diff ${{ github.event.pull_request.number }})
+
+    重点检查：安全漏洞、性能问题、代码规范"
+```
+
+### 5.4 限制
+
+- 没有交互能力，不能问你问题
+- 不能使用 Plan Mode
+- 每次调用都是全新上下文（没有历史）
+- 适合明确的、一次性的任务
+
+---
+
+## 六、实战示例一：通用 Web 开发
+
+### 场景：给 Next.js 博客添加"书签"功能
+
+用户可以收藏文章，收藏列表保存在 localStorage。
+
+### 第一步：Plan Mode 规划
+
+```
+[Plan Mode] 给博客添加书签功能：
+- 用户可以在文章页点击收藏按钮
+- 收藏数据存 localStorage
+- 博客列表页显示收藏标记
+- 新增 /bookmarks 页面展示所有收藏
+- 需要支持 i18n（中英文）
+
+Claude 输出计划：
+├── 1. 数据层：hooks/useBookmarks.ts（localStorage CRUD）
+├── 2. 组件层：BookmarkButton.tsx + BookmarkList.tsx
+├── 3. 页面层：app/[locale]/bookmarks/page.tsx
+├── 4. 集成：修改 blog/[slug]/page.tsx 和 blog/page.tsx
+├── 5. i18n：更新 messages/zh.json 和 en.json
+└── 6. 测试：useBookmarks hook 的单元测试
+```
+
+### 第二步：拆分到三个终端
+
+```bash
+# 终端 1：数据层 + Hook
+claude "实现书签功能的数据层：
+1. 创建 hooks/useBookmarks.ts
+   - addBookmark(slug: string)
+   - removeBookmark(slug: string)
+   - isBookmarked(slug: string): boolean
+   - getBookmarks(): string[]
+2. 数据存储在 localStorage，key 为 'blog-bookmarks'
+3. 写对应的单元测试"
+
+# 终端 2：组件 + 页面
+claude "实现书签功能的 UI 层：
+1. 创建 components/BookmarkButton.tsx
+   - 接收 slug prop
+   - 点击切换收藏状态
+   - 收藏时显示实心星，未收藏显示空心星
+   - 需要有 aria-label
+2. 创建 app/[locale]/bookmarks/page.tsx
+   - 展示所有收藏的文章列表
+   - 空状态提示
+   - 支持 i18n
+注意：useBookmarks hook 的接口是：
+{ addBookmark, removeBookmark, isBookmarked, getBookmarks }"
+
+# 终端 3：集成 + i18n
+claude "集成书签功能到现有页面：
+1. 在 blog/[slug]/page.tsx 的文章标题旁添加 BookmarkButton
+2. 在 blog/page.tsx 的文章卡片上添加收藏标记
+3. 在 Navigation.tsx 添加书签页面的导航链接
+4. 更新 messages/zh.json 和 en.json，添加：
+   - bookmarks.title: '我的收藏' / 'My Bookmarks'
+   - bookmarks.empty: '还没有收藏的文章' / 'No bookmarked posts yet'
+   - bookmarks.remove: '取消收藏' / 'Remove bookmark'
+   - blog.bookmark: '收藏' / 'Bookmark'
+   - blog.bookmarked: '已收藏' / 'Bookmarked'"
+```
+
+### 第三步：合并与验证
+
+```bash
+# 所有终端完成后
+npm run build    # 确保编译通过
+npm run test     # 确保测试通过
+```
+
+关键点：终端 2 和终端 3 都依赖终端 1 定义的 hook 接口，所以我们在任务描述中**明确写出了接口定义**。这样即使终端 1 还没完成，终端 2 和 3 也能基于约定的接口开发。
+
+---
+
+## 七、实战示例二：Flutter 开发
+
+### 场景：给 Flutter 应用添加"每日签到"功能
+
+用户每天可以签到一次，连续签到有奖励，日历视图展示签到记录。
+
+### 项目结构（Clean Architecture）
+
+```
+lib/
+├── data/
+│   ├── models/check_in_model.dart
+│   └── repositories/check_in_repository_impl.dart
+├── domain/
+│   ├── entities/check_in.dart
+│   ├── repositories/check_in_repository.dart
+│   └── usecases/
+│       ├── perform_check_in.dart
+│       └── get_check_in_history.dart
+├── presentation/
+│   ├── cubits/check_in_cubit.dart
+│   ├── pages/check_in_page.dart
+│   └── widgets/
+│       ├── check_in_calendar.dart
+│       ├── check_in_button.dart
+│       └── streak_badge.dart
+└── test/
+    ├── data/check_in_repository_test.dart
+    ├── domain/perform_check_in_test.dart
+    └── presentation/check_in_cubit_test.dart
+```
+
+### 第一步：Plan Mode 定义接口
+
+```
+[Plan Mode] 实现每日签到功能（Clean Architecture）：
+- 用户每天签到一次，重复签到提示已签到
+- 连续签到天数计算和展示
+- 日历视图展示本月签到记录
+- 签到数据存本地（Hive/SharedPreferences）
+- 使用 Bloc/Cubit 状态管理
+
+请先定义所有层之间的接口，不要写实现。
+```
+
+Plan Mode 输出的接口定义就是各终端的"合同"。
+
+### 第二步：四终端并行
+
+```bash
+# 终端 1：数据层
+claude "实现签到功能的数据层（Flutter，Clean Architecture）：
+
+接口定义：
+- CheckIn entity: { id, userId, date, streakCount }
+- CheckInRepository 接口:
+  - Future<void> checkIn(String userId)
+  - Future<List<CheckIn>> getHistory(String userId, DateTime month)
+  - Future<int> getCurrentStreak(String userId)
+  - Future<bool> hasCheckedInToday(String userId)
+
+实现：
+1. data/models/check_in_model.dart（Hive TypeAdapter）
+2. data/repositories/check_in_repository_impl.dart
+3. 使用 Hive 做本地存储
+
+项目使用 Clean Architecture，参考现有 Repository 实现风格。"
+
+# 终端 2：业务层
+claude "实现签到功能的业务层（Flutter，Clean Architecture）：
+
+接口定义（已确定）：
+- CheckInRepository 接口同上
+
+实现：
+1. domain/entities/check_in.dart
+2. domain/repositories/check_in_repository.dart（抽象类）
+3. domain/usecases/perform_check_in.dart
+4. domain/usecases/get_check_in_history.dart
+
+UseCase 规则：
+- performCheckIn：检查今日是否已签到，已签到则抛出异常
+- getCheckInHistory：返回指定月份的签到记录
+- getCurrentStreak：计算连续签到天数（断签归零）"
+
+# 终端 3：展示层
+claude "实现签到功能的展示层（Flutter，Clean Architecture）：
+
+依赖接口：
+- CheckInCubit states: Initial, Loading, Loaded(history, streak, checkedInToday), Error
+- CheckInCubit methods: checkIn(), loadHistory(month), loadStreak()
+
+实现：
+1. presentation/cubits/check_in_cubit.dart + check_in_state.dart
+2. presentation/pages/check_in_page.dart
+3. presentation/widgets/check_in_calendar.dart（月历视图，已签到日期高亮）
+4. presentation/widgets/check_in_button.dart（签到按钮，已签到显示灰色）
+5. presentation/widgets/streak_badge.dart（连续签到天数徽章）
+
+UI 要求：
+- 日历使用 TableCalendar 或自定义 GridView
+- 签到按钮要有动画反馈
+- 连续签到徽章显示火焰图标 + 天数"
+
+# 终端 4：测试
+claude "给签到功能写测试（Flutter，Clean Architecture）：
+
+1. test/data/check_in_repository_test.dart
+   - 测试 Hive 存储的 CRUD
+   - 测试连续签到计算
+   - 测试重复签到拒绝
+
+2. test/domain/perform_check_in_test.dart
+   - 用 Mockito mock Repository
+   - 测试正常签到流程
+   - 测试已签到时抛出异常
+
+3. test/presentation/check_in_cubit_test.dart
+   - 用 bloc_test 测试状态变化
+   - 测试 checkIn 成功/失败
+   - 测试 loadHistory 返回正确数据
+
+使用 mocktail 做 mock，bloc_test 做 Cubit 测试。"
+```
+
+### 第三步：集成
+
+```bash
+# 所有终端完成后
+flutter analyze    # 静态分析
+flutter test       # 跑测试
+flutter run        # 运行验证
+```
+
+### Flutter 特有的并行技巧
+
+1. **先定义 Entity 和 Repository 接口** — 这是所有层的"合同"，必须在并行之前确定
+2. **Cubit/Bloc 的 State 类先定义** — 展示层和测试层都依赖它
+3. **依赖注入用 get_it** — 各层独立开发，最后在 injection_container.dart 里组装
+4. **Widget 测试可以 mock Cubit** — 不需要等真实业务层完成
+
+---
+
+## 八、协调策略
+
+### 8.1 结果合并
+
+多终端并行最大的挑战是合并。推荐的 Git 工作流：
+
+```bash
+# 主分支
+git checkout -b feature/check-in
+
+# 每个终端在子分支工作
+# 终端 1
+git checkout -b feature/check-in-data
+
+# 终端 2
+git checkout -b feature/check-in-domain
+
+# 终端 3
+git checkout -b feature/check-in-ui
+
+# 终端 4
+git checkout -b feature/check-in-tests
+
+# 合并
+git checkout feature/check-in
+git merge feature/check-in-data
+git merge feature/check-in-domain
+git merge feature/check-in-ui
+git merge feature/check-in-tests
+```
+
+### 8.2 冲突预防
+
+冲突的根源是多个终端修改同一个文件。预防策略：
+
+1. **先定义接口** — 在 Plan Mode 中确定所有模块的接口，写入共享文件
+2. **按文件分配** — 每个终端负责不同的文件，避免交叉
+3. **共享文件最后改** — 像 `pubspec.yaml`、`injection_container.dart` 这种多人都要改的文件，留到最后由一个终端统一处理
+4. **类型定义先行** — 先提交类型/接口文件，其他终端 pull 后再开始
+
+### 8.3 通信协议
+
+终端之间不能直接通信，但可以通过文件系统间接协调：
+
+```bash
+# 终端 1 完成后，创建一个信号文件
+echo "data layer done" > .claude/signals/data-ready
+
+# 终端 2 可以检查
+cat .claude/signals/data-ready
+```
+
+不过实际操作中，最简单的方式还是：**用 Git 提交 + pull。**
+
+---
+
+## 九、最佳实践与反模式
+
+### 9.1 最佳实践
+
+1. **Plan Mode 先行** — 任何多终端任务，先用 Plan Mode 规划
+2. **接口先于实现** — 先定义模块间的接口，再并行开发
+3. **按模块拆分，不按步骤** — 横向切分，不是纵向切分
+4. **每个终端给明确的上下文** — 把接口定义、约束条件写在提示词里
+5. **CLAUDE.md 统一规范** — 所有终端共享同一份 CLAUDE.md，保证代码风格一致
+6. **小步提交** — 每个终端完成一个小功能就提交，方便其他终端 pull
+7. **用 --resume 保持连续性** — 中断后恢复，不要重新开始
+8. **Headless 处理批量任务** — 代码审查、测试生成等重复性任务用 `claude -p`
+
+### 9.2 反模式
+
+| 反模式 | 问题 | 正确做法 |
+|--------|------|---------|
+| 不规划就开多终端 | 任务重叠，冲突频繁 | 先 Plan Mode，再分配 |
+| 按步骤拆分任务 | 变成串行，失去并行优势 | 按模块拆分 |
+| 不定义接口就并行 | 合并时接口不匹配 | 先定义接口，再并行 |
+| 所有终端改同一个文件 | 合并冲突地狱 | 按文件分配职责 |
+| 一个终端塞太多任务 | 上下文爆炸，质量下降 | 每个终端 1-2 个聚焦任务 |
+| 不用 CLAUDE.md | 各终端代码风格不一致 | 统一 CLAUDE.md |
+| 忽略 Hooks | 每个终端都要手动跑 lint | 配置 Hooks 自动化 |
+| 不提交就切终端 | 其他终端看不到最新代码 | 小步提交，频繁 pull |
+
+---
+
+## 十、常见问题
+
+**Q1：子 Agent 和多终端有什么区别？**
+
+子 Agent 是 Claude 在单个会话内自动创建的，你不需要手动管理。多终端是你手动开多个 Claude Code 实例。子 Agent 适合小型并行任务，多终端适合大型跨模块任务。
+
+**Q2：多终端并行会不会互相干扰？**
+
+不会。每个终端有完全独立的上下文窗口，互不可见。唯一的"交叉点"是文件系统——如果两个终端同时修改同一个文件，会产生冲突。所以要按模块分配。
+
+**Q3：Headless 模式能用 MCP 工具吗？**
+
+可以。`claude -p` 支持 MCP 工具，但需要在配置中提前设置好。
+
+**Q4：Plan Mode 的计划会消耗上下文吗？**
+
+会。Plan Mode 的输出和普通对话一样占用上下文。如果计划很长，可以在确认后用 `/compact` 压缩。
+
+**Q5：多终端并行最多开几个？**
+
+没有硬性限制，取决于你的机器性能和 API 配额。实际经验：3-5 个终端是比较舒适的范围。超过 5 个，协调成本开始上升。
+
+**Q6：子 Agent 失败了怎么办？**
+
+主 Agent 会收到子 Agent 的错误信息，通常会自动重试或调整策略。如果反复失败，主 Agent 会把任务收回自己处理。
+
+**Q7：能不能在 CI/CD 中用多终端并行？**
+
+可以，用 Headless 模式配合 shell 的后台任务：
+
+```bash
+# CI 中并行执行多个 Claude 任务
+claude -p "审查安全漏洞" > security-review.md &
+claude -p "检查性能问题" > perf-review.md &
+claude -p "验证 API 兼容性" > api-review.md &
+wait
+```
+
+---
+
+## 总结
+
+多 Agent 并行是 Claude Code 最强大的能力之一。核心思路：
+
+1. **Plan Mode 规划** → 明确任务和接口
+2. **按模块拆分** → 分配到多个终端
+3. **并行开发** → 各自独立工作
+4. **合并验证** → Git merge + 测试
+
+掌握这个工作流，一个人真的可以顶一个小团队。
+
+---
+
+## 推荐阅读
+
+- [Claude Code 进阶指南](/zh/blog/claude-code-overview) — 全面了解 Claude Code 的核心能力
+- [CLAUDE.md 编写指南](/zh/blog/claude-code-claude-md) — 让所有终端共享统一规范
+- [Claude Code Hooks 指南](/zh/blog/claude-code-hooks) — 自动化你的多终端工作流
+- [上下文管理指南](/zh/blog/claude-code-context) — 管好每个终端的上下文
+- [Claude Code 官方文档](https://docs.anthropic.com/en/docs/claude-code) — 最新功能和 API 参考

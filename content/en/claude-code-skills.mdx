@@ -1,0 +1,972 @@
+---
+title: "The Complete Guide to Claude Code Custom Slash Commands: Build Your Own Command Library"
+date: "2026-03-08"
+description: A deep dive into Claude Code's custom Slash Commands (Skills) system — command writing techniques, the argument system, a ready-to-use command library, and team collaboration, with complete practical examples for general web development and Flutter projects.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In [section five of the advanced guide](/en/blog/claude-code-overview), I covered custom Slash Commands in about 40 lines: create a `.claude/commands/` directory, write some `.md` files, use `$ARGUMENTS` for parameters.
+
+But in practice, this feature goes much deeper than those 40 lines could cover. A well-designed command library can compress your daily workflow into a few slash commands — code review, test generation, feature scaffolding, commit messages, all triggered with a single command.
+
+This post covers Slash Commands thoroughly.
+
+---
+
+## 1. What Are Slash Commands (Skills)
+
+### 1.1 Core Concept
+
+The idea is simple: **save prompts you type repeatedly as files, and invoke them with a slash command.**
+
+Each `.md` file becomes a command. The filename is the command name:
+
+```
+.claude/commands/review.md  →  /review
+.claude/commands/test.md    →  /test
+.claude/commands/gen-api.md →  /gen-api
+```
+
+Type `/review` in Claude Code, and Claude reads the contents of `review.md` as its prompt. That's it.
+
+### 1.2 Project-Level vs User-Level
+
+Commands can live in two locations:
+
+| Location | Path | Scope | Commit to Git? |
+|----------|------|-------|----------------|
+| Project-level | `.claude/commands/*.md` | Current project | ✅ Team-shared |
+| User-level | `~/.claude/commands/*.md` | All projects | ❌ Personal |
+
+**Rule of thumb:**
+
+- Commands tied to the project's tech stack (e.g., `/flutter-test`, `/next-component`) go project-level
+- Generic personal commands (e.g., `/commit-msg`, `/explain`) go user-level
+
+### 1.3 Naming Conventions
+
+The command name is the filename (minus `.md`). Recommendations:
+
+- Use lowercase with hyphens: `review-security.md` → `/review-security`
+- Start with a verb: `gen-component`, `check-a11y`, `fix-lint`
+- Add category prefixes: `test-unit.md`, `test-e2e.md`, `doc-api.md`
+- Keep it short: 2-3 words is ideal
+
+---
+
+## 2. Command File Writing Techniques
+
+### 2.1 Basic Structure
+
+A good command file should have a clear structure. Here's a recommended template:
+
+```markdown
+<!-- .claude/commands/your-command.md -->
+
+## Context
+[Tell Claude about the project background and tech stack]
+
+## Task
+[Define exactly what to do]
+
+## Constraints
+[List rules that must be followed]
+
+## Output Format
+[Describe the expected output]
+```
+
+### 2.2 Good Commands vs Bad Commands
+
+Compare these:
+
+**❌ Bad command:**
+
+```markdown
+Help me write tests
+```
+
+**✅ Good command:**
+
+```markdown
+Write unit tests for $ARGUMENTS.
+
+Tech stack:
+- Test framework: vitest
+- Assertions: vitest built-in
+- Mocking: vi.mock()
+
+Requirements:
+1. Cover happy paths, edge cases, and error paths
+2. Organize with describe/it blocks, use descriptive names
+3. Mock all external dependencies (API calls, filesystem, database)
+4. Place test files in __tests__/ under the same directory, named [filename].test.ts
+5. Don't test implementation details — only test public interface behavior
+
+Read the target file first to understand its public interface, then write tests.
+```
+
+The difference: a good command provides enough context and constraints that Claude doesn't have to guess.
+
+### 2.3 Referencing Project Files
+
+Commands can reference project files, telling Claude to read them first:
+
+```markdown
+Read the following files to understand project conventions:
+- CLAUDE.md
+- src/types/index.ts
+- src/lib/constants.ts
+
+Then generate code for $ARGUMENTS that follows project conventions.
+```
+
+This is better than duplicating conventions in the command — when conventions change, the command doesn't need updating.
+
+### 2.4 Multi-Step Instructions
+
+Complex tasks can be broken into steps:
+
+```markdown
+Perform a security audit on $ARGUMENTS, following these steps:
+
+### Step 1: Static Analysis
+Read the code and check for:
+- SQL injection
+- XSS (Cross-Site Scripting)
+- Command injection
+- Path traversal
+- Insecure deserialization
+
+### Step 2: Dependency Check
+Check package.json dependencies for known vulnerabilities.
+
+### Step 3: Output Report
+Use this format:
+
+| Severity | Issue | Location | Suggested Fix |
+|----------|-------|----------|---------------|
+| High/Med/Low | Description | file:line | Fix approach |
+
+If no issues are found, explicitly state "No security issues found."
+```
+
+---
+
+## 3. The Argument System
+
+### 3.1 Basic Usage
+
+`$ARGUMENTS` is the only parameter placeholder. It gets replaced with everything after the command name:
+
+```
+/test src/lib/posts.ts
+```
+
+`$ARGUMENTS` → `src/lib/posts.ts`
+
+```
+/review --focus security
+```
+
+`$ARGUMENTS` → `--focus security`
+
+### 3.2 Multiple Arguments
+
+`$ARGUMENTS` is a string, not an array. If you need multiple arguments, define a format in the command:
+
+```markdown
+<!-- .claude/commands/compare.md -->
+Compare two files and provide optimization suggestions.
+
+Argument format: `fileA fileB`
+
+Example usage: `/compare src/old-api.ts src/new-api.ts`
+
+Read both files from $ARGUMENTS, then:
+1. List the major differences
+2. Analyze the pros and cons of each
+3. Suggest how to merge or optimize
+```
+
+### 3.3 Arguments as File Paths
+
+A common pattern is treating the argument as a file path:
+
+```markdown
+<!-- .claude/commands/doc.md -->
+Generate JSDoc documentation for $ARGUMENTS.
+
+Requirements:
+- Add JSDoc to all exported functions, classes, and interfaces
+- Include @param, @returns, @throws, @example
+- Example code should be runnable
+- Don't modify function implementations — only add comments
+
+Read the file first to understand each export's purpose, then add documentation.
+```
+
+Usage: `/doc src/lib/utils.ts`
+
+### 3.4 Optional Arguments
+
+Sometimes arguments are optional:
+
+```markdown
+<!-- .claude/commands/commit-msg.md -->
+Generate a commit message based on the current git diff --staged.
+
+Format:
+- type: short description (under 50 characters)
+- Types: feat, fix, refactor, docs, test, chore
+- Description in English
+
+$ARGUMENTS
+
+If additional context is provided above, incorporate it. Otherwise, infer from the diff content.
+```
+
+This way both `/commit-msg` and `/commit-msg this is a hotfix` work.
+
+---
+
+## 4. Ready-to-Use Command Library
+
+Here's a collection of commands organized by category. Copy them directly into your project.
+
+### 4.1 Code Quality
+
+**`/review` — Code Review**
+
+```markdown
+<!-- .claude/commands/review.md -->
+Code review the changes in git diff --staged.
+
+Review dimensions:
+1. **Security** — XSS, injection, sensitive data exposure, insecure dependencies
+2. **Performance** — unnecessary re-renders, memory leaks, N+1 queries, expensive loops
+3. **Maintainability** — naming clarity, function length, single responsibility
+4. **Edge cases** — null handling, error handling, concurrency safety
+
+Output format:
+- Tag each issue with severity (🔴 High / 🟡 Medium / 🟢 Low)
+- Provide specific fix suggestions with code examples
+- End with an overall assessment
+
+If the code quality is good, say so explicitly.
+```
+
+**`/refactor` — Refactoring Suggestions**
+
+```markdown
+<!-- .claude/commands/refactor.md -->
+Analyze $ARGUMENTS and suggest refactoring improvements.
+
+Analysis dimensions:
+1. Is there duplicate code that can be extracted?
+2. Are functions too long and need splitting?
+3. Are there better design patterns to apply?
+4. Can type definitions be improved?
+
+Requirements:
+- Only suggest refactoring with real value — don't refactor for the sake of it
+- Show before/after code comparisons for each suggestion
+- Assess the risk and benefit of each refactoring
+```
+
+### 4.2 Testing
+
+**`/test` — Unit Test Generation**
+
+```markdown
+<!-- .claude/commands/test.md -->
+Write unit tests for $ARGUMENTS.
+
+Framework: vitest
+Rules:
+1. Cover happy paths, edge cases, error paths
+2. Use describe/it structure with descriptive names
+3. Mock external dependencies
+4. Test file: __tests__/[filename].test.ts in the same directory
+5. Only test public interfaces, not implementation details
+
+Read the target file to understand its interface first, then write tests.
+```
+
+**`/test-edge` — Edge Case Test Supplement**
+
+```markdown
+<!-- .claude/commands/test-edge.md -->
+Read the existing tests for $ARGUMENTS and add missing edge case coverage.
+
+Focus on:
+- null / undefined / empty values
+- Empty arrays / empty strings
+- Very large inputs
+- Concurrent calls
+- Type boundaries (e.g., Number.MAX_SAFE_INTEGER)
+- Special characters and Unicode
+
+Don't duplicate existing test cases.
+```
+
+### 4.3 Documentation
+
+**`/doc` — Code Documentation**
+
+```markdown
+<!-- .claude/commands/doc.md -->
+Add documentation comments to all exports in $ARGUMENTS.
+
+Format: JSDoc / TSDoc
+Include: @param, @returns, @throws, @example
+Requirements:
+- Example code should be runnable
+- Don't modify implementation code
+- Add @remarks for complex logic to explain design intent
+```
+
+**`/changelog` — Changelog Generation**
+
+```markdown
+<!-- .claude/commands/changelog.md -->
+Generate CHANGELOG entries based on recent git log.
+
+$ARGUMENTS
+
+If a version number is specified, use it; otherwise use the date.
+
+Format:
+## [version/date]
+
+### New Features
+- description
+
+### Fixes
+- description
+
+### Changes
+- description
+
+Only include user-facing changes. Ignore internal refactoring and style changes.
+```
+
+### 4.4 Git Workflow
+
+**`/commit-msg` — Commit Message Generation**
+
+```markdown
+<!-- .claude/commands/commit-msg.md -->
+Generate a commit message based on git diff --staged.
+
+Format: type: description
+Types: feat / fix / refactor / docs / test / chore / perf
+Description: English, under 50 characters
+For larger changes, add a blank line followed by detailed explanation.
+
+$ARGUMENTS
+```
+
+**`/pr-desc` — PR Description Generation**
+
+```markdown
+<!-- .claude/commands/pr-desc.md -->
+Generate a Pull Request description based on the diff between the current branch and main.
+
+Run git log main..HEAD and git diff main...HEAD to get the changes.
+
+Format:
+## Summary
+One sentence describing what this PR does.
+
+## Changes
+- List the major changes
+
+## Testing
+- Describe how to test these changes
+
+## Screenshots (if applicable)
+Note whether screenshots are needed.
+```
+
+### 4.5 Debugging
+
+**`/debug` — Problem Diagnosis**
+
+```markdown
+<!-- .claude/commands/debug.md -->
+Diagnose the following issue:
+
+$ARGUMENTS
+
+Steps:
+1. Understand the problem description
+2. Locate potentially related code
+3. Analyze possible causes (list at least 3)
+4. Provide the most likely cause and fix
+5. If more information is needed, specify what
+
+Don't modify code directly — provide analysis first.
+```
+
+**`/explain` — Code Explanation**
+
+```markdown
+<!-- .claude/commands/explain.md -->
+Explain the code logic in $ARGUMENTS.
+
+Requirements:
+- Start with a one-sentence summary of the file/function's purpose
+- Then explain key logic section by section
+- Flag complex or non-obvious parts
+- Point out potential issues if any
+- Use analogies to help explain complex concepts
+```
+
+---
+
+## 5. Command Composition and Workflows
+
+### 5.1 Chaining Commands
+
+Individual commands solve individual problems, but real efficiency comes from composition. A typical development workflow:
+
+```bash
+# 1. Build the feature
+> Implement a user favorites feature, store data in localStorage
+
+# 2. Review the code
+> /review
+
+# 3. Generate tests
+> /test src/lib/favorites.ts
+
+# 4. Generate documentation
+> /doc src/lib/favorites.ts
+
+# 5. Generate commit message
+> /commit-msg
+```
+
+Each step is a command. Claude maintains context within the same session, so later commands can leverage earlier results.
+
+### 5.2 Compound Commands
+
+You can also combine multiple steps into a single command:
+
+```markdown
+<!-- .claude/commands/ship.md -->
+Run the following pre-commit checklist:
+
+1. Run git diff --staged to see pending changes
+2. Code review the changes (check security, performance, maintainability)
+3. If issues are found, list them but don't auto-fix
+4. If no issues, generate a commit message (format: type: description)
+5. Output the final git commit command for my confirmation
+
+Do NOT execute git commit automatically — only output the command.
+```
+
+`/ship` — one command covers the entire review + commit flow.
+
+### 5.3 Commands + Hooks
+
+Slash Commands and [Hooks](/en/blog/claude-code-hooks) are complementary:
+
+| | Slash Commands | Hooks |
+|---|---------------|-------|
+| Trigger | Manual input | Automatic |
+| Executor | Claude (AI) | Shell (deterministic) |
+| Best for | Tasks requiring AI judgment | Mechanical automation |
+
+A typical pairing:
+
+- **Slash Command** `/review` has Claude do code review (requires AI to understand code)
+- **Hook** `PostToolUse` auto-runs `prettier` after every file write (no AI needed, deterministic)
+
+Together: AI handles thinking, Hooks handle execution.
+
+---
+
+## 6. Team Collaboration
+
+### 6.1 Git Sharing
+
+Commit `.claude/commands/` to Git so the whole team can use them:
+
+```bash
+git add .claude/commands/
+git commit -m "feat: add team-shared Claude commands"
+```
+
+Recommended directory structure:
+
+```
+.claude/
+  commands/
+    review.md           # Code review
+    test.md             # Test generation
+    gen-component.md    # Component scaffolding
+    commit-msg.md       # Commit messages
+    pr-desc.md          # PR descriptions
+  settings.json         # Hooks configuration
+```
+
+### 6.2 Naming Conventions
+
+Teams should agree on naming conventions to avoid confusion:
+
+```
+# Recommended: category prefixes
+review.md
+review-security.md
+test.md
+test-edge.md
+gen-component.md
+gen-api.md
+
+# Not recommended: no pattern
+check.md
+make-test.md
+component.md
+new-endpoint.md
+```
+
+### 6.3 Onboarding
+
+List available commands in the project README or CLAUDE.md:
+
+```markdown
+## Available Claude Commands
+
+| Command | Purpose | Example |
+|---------|---------|---------|
+| `/review` | Code review | `/review` |
+| `/test` | Generate tests | `/test src/lib/posts.ts` |
+| `/gen-component` | Generate component | `/gen-component UserProfile` |
+| `/commit-msg` | Generate commit message | `/commit-msg` |
+| `/pr-desc` | Generate PR description | `/pr-desc` |
+```
+
+New team members can see at a glance what commands are available.
+
+### 6.4 Versioning
+
+Commands need maintenance too. Recommendations:
+
+1. **Regular review** — Check once per sprint, remove unused commands
+2. **Keep it simple** — One command, one job. Don't let commands become giant prompts
+3. **Add comments** — Use HTML comments at the top for purpose and author
+
+```markdown
+<!--
+  Author: @jimmy
+  Purpose: Generate React components following project conventions
+  Updated: 2026-03-15
+-->
+Generate a React component for $ARGUMENTS...
+```
+
+---
+
+## 7. Practical Example: General Web Development
+
+Using this Next.js blog project as an example, here's how to build a complete command library.
+
+### 7.1 `/gen-component` — Component Generator
+
+```markdown
+<!-- .claude/commands/gen-component.md -->
+Generate a React component named $ARGUMENTS.
+
+Project tech stack:
+- Next.js 16 (App Router) + TypeScript
+- Tailwind CSS v4
+- next-intl for i18n
+
+Rules:
+1. Default to Server Component unless the name contains "Client" or it needs interactivity
+2. Place in the components/ directory
+3. Use Tailwind CSS for styling, not CSS Modules
+4. If the component needs text, use next-intl's useTranslations
+5. Add necessary aria attributes for accessibility
+6. Define Props with an interface named [ComponentName]Props
+
+Check if a component with the same name already exists in components/ first.
+```
+
+### 7.2 `/i18n-check` — Internationalization Check
+
+```markdown
+<!-- .claude/commands/i18n-check.md -->
+Check the project's internationalization completeness.
+
+Steps:
+1. Read messages/zh.json and messages/en.json
+2. Compare key structures and find:
+   - Keys in zh but missing from en
+   - Keys in en but missing from zh
+   - Keys with empty string values
+3. Scan components/ and app/ for hardcoded Chinese or English text
+4. Check for i18n keys used in code but not defined in message files
+
+Output format:
+- Missing keys list (note which file is missing them)
+- Hardcoded text list (with file and line number)
+- Undefined keys list
+```
+
+### 7.3 `/gen-post` — Blog Post Scaffolding
+
+```markdown
+<!-- .claude/commands/gen-post.md -->
+Create a new blog post scaffold.
+
+Argument format: slug title
+Example: /gen-post my-new-post My New Post
+
+Based on $ARGUMENTS, create:
+1. content/zh/[slug].mdx — Chinese version with frontmatter
+2. content/en/[slug].mdx — English version with frontmatter
+
+Frontmatter template:
+---
+title: "Title"
+date: "current date YYYY-MM-DD"
+description: TBD
+tags: ["Uncategorized"]
+---
+
+## Introduction
+
+[Start writing here]
+
+After creating both files, remind me to fill in description and tags.
+```
+
+### 7.4 `/a11y-audit` — Accessibility Audit
+
+```markdown
+<!-- .claude/commands/a11y-audit.md -->
+Perform an accessibility audit on $ARGUMENTS.
+
+Checklist:
+1. **Semantic HTML** — correct elements used (button vs div, nav vs div)
+2. **ARIA attributes** — necessary aria-label, aria-describedby, role
+3. **Keyboard navigation** — all interactive elements keyboard-accessible
+4. **Focus management** — modals and dropdowns have focus traps
+5. **Color contrast** — sufficient contrast between text and background
+6. **Image alt text** — img has alt, decorative images have aria-hidden
+7. **Dynamic content** — dynamically updated content has aria-live
+
+Output each issue's location and fix suggestion.
+```
+
+### 7.5 Full Workflow Demo
+
+Say we want to add a "reading progress bar" component to the blog:
+
+```bash
+# 1. Generate component scaffold
+> /gen-component ReadingProgress
+
+# Claude generates components/ReadingProgress.tsx
+# with scroll listener, progress calculation, Tailwind styles
+
+# 2. Check accessibility
+> /a11y-audit components/ReadingProgress.tsx
+
+# Claude flags: needs role="progressbar" and aria-valuenow
+
+# 3. Generate tests
+> /test components/ReadingProgress.tsx
+
+# 4. Check i18n (if the component has text)
+> /i18n-check
+
+# 5. Review and commit
+> /review
+> /commit-msg
+```
+
+Five commands — from scaffolding to commit, full workflow covered.
+
+---
+
+## 8. Practical Example: Flutter Development
+
+Flutter projects (especially with Clean Architecture) involve a lot of boilerplate. Slash Commands can dramatically reduce this repetitive work.
+
+### 8.1 Project Structure Convention
+
+Assuming a standard Clean Architecture setup:
+
+```
+lib/
+  core/
+    error/failures.dart
+    usecases/usecase.dart
+  features/
+    auth/
+      data/
+        models/
+        repositories/
+        datasources/
+      domain/
+        entities/
+        repositories/
+        usecases/
+      presentation/
+        cubits/
+        pages/
+        widgets/
+```
+
+### 8.2 `/flutter-feature` — Feature Scaffolding
+
+```markdown
+<!-- .claude/commands/flutter-feature.md -->
+Create a complete directory structure for a new Flutter feature module.
+
+Feature name: $ARGUMENTS
+
+Create the following directories and files:
+
+lib/features/[feature_name]/
+  data/
+    models/[feature_name]_model.dart
+    repositories/[feature_name]_repository_impl.dart
+    datasources/[feature_name]_remote_datasource.dart
+  domain/
+    entities/[feature_name].dart
+    repositories/[feature_name]_repository.dart
+    usecases/get_[feature_name].dart
+  presentation/
+    cubits/[feature_name]_cubit.dart
+    cubits/[feature_name]_state.dart
+    pages/[feature_name]_page.dart
+    widgets/
+
+Each file should contain only the basic skeleton (class definitions, necessary imports),
+not full implementations.
+
+Reference existing feature modules (e.g., lib/features/auth/) for code style.
+Use snake_case for feature names.
+```
+
+### 8.3 `/flutter-bloc` — Cubit/Bloc Generation
+
+```markdown
+<!-- .claude/commands/flutter-bloc.md -->
+Generate Cubit and State classes for $ARGUMENTS.
+
+Argument format: feature_name state_list
+Example: /flutter-bloc favorites Initial,Loading,Loaded,Error
+
+Rules:
+1. Use flutter_bloc's Cubit (not Bloc, unless explicitly requested)
+2. State uses sealed class (Dart 3)
+3. Loaded state includes relevant data fields
+4. Error state includes a String message field
+5. Cubit methods: define signatures only, use TODO comments for bodies
+6. Add equatable support
+
+Files:
+- lib/features/[feature_name]/presentation/cubits/[feature_name]_cubit.dart
+- lib/features/[feature_name]/presentation/cubits/[feature_name]_state.dart
+
+Reference existing Cubit implementations in the project for style.
+```
+
+### 8.4 `/flutter-model` — Data Model Generation
+
+```markdown
+<!-- .claude/commands/flutter-model.md -->
+Generate Flutter data models based on the description.
+
+$ARGUMENTS
+
+Requirements:
+1. Entity (domain layer): pure Dart class, no package dependencies
+2. Model (data layer): extends Entity, adds fromJson/toJson
+3. Use freezed or hand-written, depending on existing project style
+4. If using Hive, add TypeAdapter
+5. Include copyWith method
+
+Check existing Model implementations in the project first for consistency.
+```
+
+### 8.5 `/flutter-test` — Flutter Test Generation
+
+```markdown
+<!-- .claude/commands/flutter-test.md -->
+Generate tests for $ARGUMENTS.
+
+Auto-detect test type:
+- domain/usecases/ → unit test, mock Repository
+- data/repositories/ → unit test, mock DataSource
+- presentation/cubits/ → bloc_test, mock UseCase
+- presentation/pages/ → widget test, mock Cubit
+- presentation/widgets/ → widget test
+
+Rules:
+1. Use mocktail for mocking
+2. Cubit tests use the bloc_test package
+3. Widget tests use BlocProvider.value to inject mock Cubit
+4. Test files mirror lib/ directory structure under test/
+5. Organize with group/test blocks
+
+Read the target file to understand dependencies first, then write tests.
+```
+
+### 8.6 `/flutter-review` — Flutter Code Review
+
+```markdown
+<!-- .claude/commands/flutter-review.md -->
+Code review the current git diff --staged with Flutter-specific checks.
+
+In addition to general review (security, performance, maintainability), check:
+
+1. **Architecture compliance** — Does it follow Clean Architecture dependency rules?
+   - Domain layer must not depend on data or presentation layers
+   - Data layer must not depend on presentation layer
+2. **State management** — Is Cubit/Bloc used correctly?
+   - Is State immutable?
+   - Is data being manipulated directly in Widgets? (should go through Cubit)
+3. **Widget optimization**
+   - Unnecessary rebuilds (missing const, BlocSelector)?
+   - Deeply nested Widget trees (suggest extraction)?
+4. **Dart conventions**
+   - Using Dart 3 features (patterns, sealed classes)?
+   - Naming follows Dart conventions (lowerCamelCase, UpperCamelCase)?
+5. **Dependency injection** — Properly registered in get_it?
+```
+
+### 8.7 Hands-On: Building a "Favorites" Feature with Commands
+
+A complete walkthrough of building a favorites feature from scratch using the commands above:
+
+```bash
+# Step 1: Create the feature module skeleton
+> /flutter-feature favorites
+
+# Claude creates the full directory structure:
+# lib/features/favorites/data/models/favorites_model.dart
+# lib/features/favorites/data/repositories/favorites_repository_impl.dart
+# lib/features/favorites/domain/entities/favorites.dart
+# lib/features/favorites/domain/repositories/favorites_repository.dart
+# lib/features/favorites/domain/usecases/get_favorites.dart
+# lib/features/favorites/presentation/cubits/favorites_cubit.dart
+# lib/features/favorites/presentation/cubits/favorites_state.dart
+# lib/features/favorites/presentation/pages/favorites_page.dart
+
+# Step 2: Generate data models
+> /flutter-model Favorite entity: id(String), itemId(String),
+  itemType(enum: article/video/podcast), createdAt(DateTime),
+  userId(String). Use Hive for storage.
+
+# Step 3: Generate Cubit
+> /flutter-bloc favorites Initial,Loading,Loaded,Error
+
+# Step 4: Implement business logic
+> Implement the favorites UseCases:
+  - AddFavorite: add to favorites, check if already favorited
+  - RemoveFavorite: remove from favorites
+  - GetFavorites: get favorites list with pagination
+  - CheckFavorite: check if an item is favorited
+
+# Step 5: Generate tests
+> /flutter-test lib/features/favorites/domain/usecases/
+> /flutter-test lib/features/favorites/presentation/cubits/favorites_cubit.dart
+
+# Step 6: Code review
+> /flutter-review
+```
+
+Six steps to complete a feature's skeleton, models, state management, business logic, tests, and review.
+
+---
+
+## 9. Best Practices and Anti-Patterns
+
+### 9.1 Best Practices
+
+1. **One command, one job** — Keep commands single-purpose. Use composition for complex workflows
+2. **Provide enough context** — Tech stack, framework version, project conventions — put them in the command
+3. **Constraints over freedom** — Telling Claude what NOT to do is more important than telling it what to do
+4. **Reference, don't copy** — Have Claude read project files for conventions instead of duplicating them in commands
+5. **Read before write** — Add "read the target file first" to commands to prevent Claude from generating in a vacuum
+6. **Format the output** — Specify output format (tables, lists, code blocks) for more readable results
+7. **Team alignment** — Commit commands to Git, pair with CLAUDE.md for unified standards
+8. **Regular maintenance** — Delete unused commands, update outdated ones
+
+### 9.2 Anti-Patterns
+
+| Anti-Pattern | Problem | Correct Approach |
+|-------------|---------|-----------------|
+| Vague commands | "Help me write code" — Claude doesn't know what | Specify task, tech stack, constraints |
+| Giant commands | 500-line command files | Split into smaller commands, compose them |
+| Hardcoded conventions | Conventions written directly in commands | Reference CLAUDE.md or project files |
+| Not using $ARGUMENTS | Have to edit the command file every time | Parameterize with $ARGUMENTS |
+| Duplicate commands | review.md and code-review.md do the same thing | Unify naming, remove duplicates |
+| No constraints | Claude freestyles, unpredictable results | Explicitly list "don't do X" |
+| Ignoring project context | Commands don't reference project files | Have Claude read relevant files first |
+| Not testing commands | Commit without verifying output | Run it yourself first, confirm output meets expectations |
+
+---
+
+## 10. FAQ
+
+**Q1: What's the difference between Slash Commands and typing prompts directly?**
+
+Functionally, nothing — Slash Commands are just saved prompts. The difference is efficiency: once saved, you don't need to retype them every time, and you won't accidentally omit key constraints.
+
+**Q2: What file formats are supported for commands?**
+
+Only `.md` (Markdown) files. The content is plain text prompts — Markdown formatting is just for readability. Claude treats the entire file content as a prompt.
+
+**Q3: Can I have multiple `$ARGUMENTS`?**
+
+No. There's only one `$ARGUMENTS`, replaced with all text after the command name. If you need multiple parameters, define a format in the command (e.g., "param1 param2") and let Claude parse it.
+
+**Q4: Can commands call other commands?**
+
+Not directly. But you can execute multiple commands sequentially in one session — they share context. If you need a fixed command sequence, write a compound command with all steps in one file.
+
+**Q5: What happens when project-level and user-level commands conflict?**
+
+If they share the same name, project-level takes priority. Use different naming to avoid conflicts: project-level with project-specific prefixes (e.g., `flutter-`, `next-`), user-level with generic names (e.g., `review`, `test`).
+
+**Q6: Is there a size limit for command files?**
+
+No hard limit, but keep them under 200 lines. Long commands consume context window space, and Claude may ignore later instructions. If a command exceeds 200 lines, consider splitting it.
+
+**Q7: How do I see what commands are available?**
+
+Type `/` in Claude Code and press Tab to list all available commands (both built-in and custom).
+
+---
+
+## Conclusion
+
+Slash Commands are one of the easiest-to-adopt, highest-ROI features in Claude Code. The core approach:
+
+1. **Identify repetition** → Find prompts you type repeatedly
+2. **Distill into commands** → Add context, constraints, output format, save as `.md` files
+3. **Compose** → Chain multiple commands for complete workflows
+4. **Share with the team** → Commit to Git, unify how the team works
+
+Starting today, every time you catch yourself typing a similar prompt again, turn it into a command.
+
+---
+
+## Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-overview) — Comprehensive overview of Claude Code's core capabilities
+- [CLAUDE.md Writing Guide](/en/blog/claude-code-claude-md) — Help Claude understand your project
+- [Claude Code Hooks Guide](/en/blog/claude-code-hooks) — Deterministic automation, complementary to Slash Commands
+- [Context Management Guide](/en/blog/claude-code-context) — Manage context for more precise command execution
+- [Multi-Agent Parallelism Guide](/en/blog/claude-code-multi-agent) — Commands + multi-terminal for team-level efficiency
+- [Claude Code Official Docs](https://docs.anthropic.com/en/docs/claude-code) — Latest features and API reference

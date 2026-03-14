@@ -1,0 +1,861 @@
+---
+title: "Claude Code Performance and Cost Optimization Guide: Making Your AI Coding Assistant Fast and Efficient"
+date: "2026-03-17"
+description: A systematic guide to Claude Code performance optimization and cost control, covering token pricing, model selection, context optimization, session strategies, prompt economics, caching and reuse, team cost management, with complete cost monitoring solutions.
+tags: ["AI", "Engineering"]
+---
+
+## Introduction
+
+In previous posts, we covered [context management](/en/blog/claude-code-context) operations in detail, discussed [how to write effective prompts](/en/blog/claude-code-prompt), and touched on basic cost control strategies in the [CI/CD guide](/en/blog/claude-code-cicd). But we've been missing a post that systematically addresses optimization from a **performance and cost** perspective.
+
+Claude Code is powerful, but it's not free. Every conversation, every file read, every code generation consumes tokens. Used well, it's a productivity multiplier. Used poorly, the bill will sting.
+
+The goal of this post is straightforward: **maximize efficiency and minimize cost without sacrificing output quality.**
+
+---
+
+## Understanding Costs: Token Pricing Mechanics
+
+To optimize costs, you first need to understand how costs are generated.
+
+### What Are Tokens
+
+Tokens are the basic units that large language models use to process text. They're not characters or words — they're "fragments" produced by the model's tokenizer.
+
+A key insight: **Chinese text consumes significantly more tokens than English.** The same semantic content in Chinese typically requires 1.5-2x more tokens, because Chinese characters have lower coverage in the model's vocabulary and are often split into multiple tokens.
+
+```
+# English: ~4 tokens
+"Hello world" → ["Hello", " world"]
+
+# Chinese: ~6-8 tokens
+"你好世界" → ["你", "好", "世", "界"] (each character may be 1-2 tokens)
+```
+
+If you primarily interact with Claude in Chinese, your token consumption will be higher than English users. Worth considering when writing your CLAUDE.md and prompts.
+
+### Token Consumption Breakdown
+
+Every time you interact with Claude Code, token consumption consists of these components:
+
+| Component | Description | Consumed Every Turn? |
+|-----------|-------------|---------------------|
+| System prompt | Claude Code's built-in instructions | Yes (sent every turn) |
+| CLAUDE.md | Your project configuration | Yes (sent every turn) |
+| Conversation history | All previous conversation content | Yes (accumulates) |
+| User input | Your current message | Yes |
+| Tool call results | File reads, command outputs, etc. | Yes (accumulates) |
+| Model output | Claude's response and code | Yes |
+
+The critical point: **conversation history and tool call results accumulate.** The longer the session, the more tokens each turn consumes, because all previous content is re-sent to the model.
+
+### Input vs Output Price Difference
+
+In Claude's pricing model, **output tokens are significantly more expensive than input tokens** (typically 3-5x). This means:
+
+- Having Claude generate verbose, redundant code = burning money
+- Having Claude output concise, precise answers = saving money
+- Explicitly requesting "only output the key code, no explanations" in your prompt can significantly reduce output tokens
+
+### Model Price Comparison
+
+| Model | Input Price (per MTok) | Output Price (per MTok) | Capability |
+|-------|----------------------|------------------------|------------|
+| Opus | $15 | $75 | Strongest reasoning, complex architecture |
+| Sonnet | $3 | $15 | Daily development, best value |
+| Haiku | $0.25 | $1.25 | Simple tasks, maximum efficiency |
+
+To put it in perspective: **Opus output costs 5x Sonnet and 60x Haiku.**
+
+### A Real Session Cost Breakdown
+
+Consider a typical bug-fixing session:
+
+```
+Session flow:
+1. You describe the bug (200 tokens input)
+2. Claude reads 3 files (3000 tokens tool results)
+3. Claude analyzes and asks questions (500 tokens output)
+4. You provide more info (100 tokens input)
+5. Claude reads 2 more files (2000 tokens tool results)
+6. Claude proposes a fix (800 tokens output)
+7. You confirm execution (50 tokens input)
+8. Claude modifies code (600 tokens output)
+
+Cumulative consumption:
+- Turn 1: system prompt(2000) + CLAUDE.md(500) + input(200) = 2700 input + analysis output
+- Turn 4: all above + conversation history + new input ≈ 8000 input + proposal output
+- Turn 7: all accumulated ≈ 12000 input + code output
+
+With Sonnet: ~$0.05-0.08
+With Opus: ~$0.25-0.40
+```
+
+**The longer the session, the faster the per-turn cost grows.** This is why session management matters so much.
+
+---
+
+## Model Selection Strategy
+
+Choosing the right model is the first step in cost optimization — and the most commonly overlooked. Many people default to Sonnet for everything, but different tasks call for different models.
+
+### The Three Models
+
+**Opus** — The deep thinker:
+- Complex architecture design and refactoring
+- Large-scale changes spanning multiple files
+- Deep reasoning for tricky bug investigations
+- Security audits and code reviews
+
+**Sonnet** — The all-rounder:
+- Day-to-day feature development
+- Medium-complexity bug fixes
+- Code explanations and documentation
+- Best price-to-performance ratio for most coding tasks
+
+**Haiku** — The quick executor:
+- Simple code formatting
+- Variable renaming, type annotations
+- Generating boilerplate code
+- Simple Q&A and lookups
+
+### Choosing Models by Task Type
+
+| Task Type | Recommended Model | Reason |
+|-----------|------------------|--------|
+| New feature (simple) | Sonnet | Best value |
+| New feature (complex architecture) | Opus | Needs deep reasoning |
+| Bug fix (straightforward) | Sonnet | Sufficient and fast |
+| Bug fix (mysterious) | Opus | Needs cross-file reasoning |
+| Code refactoring | Sonnet/Opus | Depends on complexity |
+| Writing tests | Sonnet | Pattern-based task |
+| Code review | Sonnet | Sufficient |
+| Generating boilerplate | Haiku | Simple repetitive task |
+| Documentation/comments | Haiku | No deep reasoning needed |
+| Explaining code | Sonnet | Needs comprehension |
+
+### Configuring Models in settings.json
+
+You can set a default model in settings.json to avoid manual switching every time (see the [settings guide](/en/blog/claude-code-settings) for details):
+
+```json
+{
+  "model": "claude-sonnet-4-20250514",
+  "smallFastModel": "claude-haiku-4-5-20251001"
+}
+```
+
+`smallFastModel` is used for Claude Code's internal lightweight tasks (like auto-completion and file summaries). Setting it to Haiku further reduces costs.
+
+### Switching Models Mid-Session
+
+Use the `/model` command to switch models on the fly:
+
+```bash
+# Start with Sonnet for daily development
+> Help me implement user login
+
+# Hit a complex problem, switch to Opus
+/model opus
+> This auth flow has a race condition, help me analyze it
+
+# Problem solved, switch back to Sonnet
+/model sonnet
+> Great, now write the fix
+```
+
+**Practical advice:** Default to Sonnet, switch to Opus only when Sonnet can't handle the problem. For most daily development tasks, the output quality difference between Sonnet and Opus is marginal, but the cost difference is 5x.
+
+### Same Task, Different Model Costs
+
+Take "refactoring a 200-line React component" as an example:
+
+| Metric | Opus | Sonnet | Haiku |
+|--------|------|--------|-------|
+| Input tokens | ~8000 | ~8000 | ~8000 |
+| Output tokens | ~3000 | ~3000 | ~3000 |
+| Input cost | $0.12 | $0.024 | $0.002 |
+| Output cost | $0.225 | $0.045 | $0.00375 |
+| Total cost | $0.345 | $0.069 | $0.00575 |
+| Quality | Excellent | Good | Adequate |
+
+For this kind of medium-complexity task, Sonnet is the optimal choice — quality close to Opus at 1/5 the cost.
+
+---
+
+## Context Optimization
+
+If model selection determines the "unit price," context management determines the "volume." Context is the **biggest cost variable** — for the same task, someone with good context management might spend only 1/3 of the tokens.
+
+> For detailed context management commands and techniques, see the [context management guide](/en/blog/claude-code-context). Here we focus on the "why" and the strategies from a cost perspective.
+
+### Common Causes of Context Bloat
+
+| Cause | Impact | Solution |
+|-------|--------|----------|
+| Not clearing completed tasks | Conversation history keeps accumulating | /clear after task completion |
+| Reading large files at once | Thousands of lines dumped into context | Specify line ranges or ask Claude to read only key sections |
+| Repeated trial-and-error during debugging | Failed attempts fill up context | /compact after reaching a certain point |
+| Overly verbose CLAUDE.md | Sent every single turn | Trim to core rules only |
+| Unnecessary tool calls | Each call result enters context | Specify exactly what info you need in your prompt |
+
+### Three Core Strategies
+
+**Strategy 1: Timely /clear**
+
+Clear immediately after completing a task. Don't do unrelated work in the same session. This is the simplest and most effective cost control measure.
+
+```
+# Bad: one session for three tasks
+> Fix the login bug              ← 5000 tokens consumed
+> Also add dark mode             ← 15000 tokens (includes previous 5000)
+> And write some unit tests      ← 30000 tokens (includes previous 20000)
+# Total: ~50000 tokens
+
+# Good: three independent sessions
+> Fix the login bug              ← 5000 tokens consumed
+/clear
+> Add dark mode                  ← 10000 tokens consumed
+/clear
+> Write unit tests               ← 10000 tokens consumed
+# Total: ~25000 tokens — saved half
+```
+
+**Strategy 2: Smart /compact**
+
+When a task is mid-progress but context is already large, use /compact to compress. The key is providing a good compression prompt:
+
+```bash
+/compact Keep: 1. Current modification plan 2. Confirmed file list 3. Next steps. Discard all debugging details.
+```
+
+**Strategy 3: Precise Context Feeding**
+
+Don't say "help me look at this project." Say "help me look at src/auth/login.ts lines 50-80." The more precise you are, the fewer files Claude reads, and the cleaner your context stays.
+
+### Long Session vs Short Session Cost Comparison
+
+| Scenario | Long session (no clearing) | Short sessions (timely clearing) | Savings |
+|----------|--------------------------|--------------------------------|---------|
+| Fix 3 independent bugs | ~45000 tokens | ~20000 tokens | ~55% |
+| Develop a feature + write tests | ~60000 tokens | ~35000 tokens | ~42% |
+| Code review 5 files | ~80000 tokens | ~40000 tokens | ~50% |
+
+### CLAUDE.md Lean Principles
+
+CLAUDE.md is sent in every single turn of conversation, so every line continuously consumes tokens.
+
+```markdown
+# Bad: verbose CLAUDE.md (~2000 tokens)
+This project is a blog system built with Next.js. We use Tailwind CSS
+for styling, next-intl for internationalization supporting both Chinese
+and English languages...
+(long descriptive paragraphs)
+
+# Good: lean CLAUDE.md (~500 tokens)
+## Stack
+Next.js 16 + Tailwind v4 + next-intl (zh/en)
+
+## Rules
+- Components in components/, utilities in lib/
+- All text via i18n keys, no hardcoding
+- Run npm run lint before committing
+```
+
+Trimming CLAUDE.md from 2000 to 500 tokens saves **30,000 input tokens** over a 20-turn session.
+
+---
+
+## Prompt Economics
+
+Good prompts don't just improve output quality — they directly save money. This isn't a rehash of the [prompt guide](/en/blog/claude-code-prompt), but a re-examination of prompt writing from a cost perspective.
+
+### One-Shot vs Multi-Round Iteration
+
+Multi-round iteration costs grow exponentially, because each turn re-sends all previous conversation history.
+
+```
+# Vague prompt — takes 5 rounds
+> Help me write a form
+  Claude: What kind of form? What fields?
+> A login form with email and password
+  Claude: Need validation? Which UI library?
+> Yes validation, use shadcn
+  Claude: Need a remember-me feature?
+> Yes
+  Claude: (finally starts writing code)
+# Cost: ~25000 tokens
+
+# Precise prompt — done in 1 round
+> Create a login form in app/login/page.tsx:
+> - Fields: email (required, format validation), password (required, min 8 chars)
+> - UI: shadcn/ui Form components
+> - Features: remember-me checkbox, submit calls /api/auth/login
+> - Error handling: display below the form
+# Cost: ~8000 tokens
+```
+
+**A precise prompt can save 60-70% of tokens.**
+
+### Structured Prompt Template
+
+Less ambiguity means fewer retries. Use this template:
+
+```
+[Task] Brief description of what to do
+[Files] Which files are involved
+[Requirements] Specific technical requirements
+[Constraints] What NOT to do
+```
+
+Practical example:
+
+```
+Add reading time display to the BlogPost component:
+- File: components/BlogPost.tsx
+- Display below the title, next to the date
+- Calculate at 250 words/minute for English
+- Don't modify the existing style structure
+- Don't add new dependencies
+```
+
+### Prompt Techniques from a Cost Perspective
+
+Techniques from the [prompt guide](/en/blog/claude-code-prompt), reinterpreted through a cost lens:
+
+| Prompt Technique | Quality Benefit | Cost Benefit | Reason |
+|-----------------|----------------|-------------|--------|
+| Provide specific file paths | High | High | Claude doesn't need to guess and search |
+| State the tech stack | Medium | High | Avoids Claude exploring project structure first |
+| Give example code | High | Medium | Reduces back-and-forth confirmation |
+| Specify "don't do X" | Medium | High | Avoids unnecessary output |
+| Request concise output | Low | High | Directly reduces output tokens |
+
+### Batch Operations vs One-by-One
+
+If you have multiple similar changes, stating them all at once is much cheaper than submitting them individually:
+
+```
+# One-by-one — 3 separate requests
+> Convert UserCard component classNames to Tailwind
+> Convert UserList component classNames to Tailwind
+> Convert UserProfile component classNames to Tailwind
+# Each reloads context, total ~30000 tokens
+
+# Batch — 1 request
+> Migrate these three components from CSS modules to Tailwind:
+> 1. components/UserCard.tsx
+> 2. components/UserList.tsx
+> 3. components/UserProfile.tsx
+> Keep existing visual styles intact.
+# Done in one go, total ~15000 tokens
+```
+
+### Controlling Output Length
+
+Explicitly tell Claude how detailed you want the output:
+
+```bash
+# Token-saving approach
+> Fix this bug. Only output the changed code, no explanations needed.
+
+# Token-burning approach
+> Help me fix this bug
+# Claude will output: problem analysis + solution + full code + explanation + follow-up suggestions
+```
+
+A simple "no explanations needed" can reduce output tokens by 30-50%.
+
+---
+
+## Session Management Strategies
+
+Session management extends context optimization, but focuses more on "when to start a new session" and "how to split tasks."
+
+### Single Long Session vs Multiple Short Sessions
+
+| Dimension | Single Long Session | Multiple Short Sessions |
+|-----------|-------------------|----------------------|
+| Context continuity | High (Claude remembers earlier discussion) | Low (fresh start each time) |
+| Token consumption | High (accumulates) | Low (starts from zero each time) |
+| Error recovery | Hard (wrong assumptions persist) | Easy (new session = clean state) |
+| Best for | Continuous development of a single complex task | Multiple independent tasks |
+
+**Rule of thumb:** If a task requires more than 15 conversation turns, consider splitting it into subtasks.
+
+### When to Start a New Session
+
+- Current task is done, moving to a new one
+- Claude starts "getting confused" (repeating previous mistakes, forgetting agreements)
+- Debugging is going in circles (same approach tried repeatedly)
+- You need a completely different approach
+- The session has exceeded 20 conversation turns
+
+### /resume Cost Considerations
+
+`/resume` can restore a previous session, but keep in mind: the restored session loads a summary of the previous conversation, which itself consumes tokens.
+
+```bash
+# Good use of /resume
+- Yesterday's task was half-done, continuing today
+- Need previous architectural decisions as context
+
+# Bad use of /resume
+- The previous session was already very long (summary will be large too)
+- New task is barely related to the previous session
+- Previous session had lots of failed attempts
+```
+
+If the previous session was long, it's often cheaper to start a new session and manually copy over key decisions. Cleaner context, lower cost.
+
+### Subtask Splitting
+
+Breaking large tasks into smaller ones, each in its own session, is one of the most effective cost control strategies:
+
+```
+# Bad: one session for the entire feature
+> Implement a complete user auth system including registration, login,
+> forgot password, email verification, OAuth, permission management...
+# Session will be extremely long, per-turn cost skyrockets toward the end
+
+# Good: split into independent sessions
+Session 1: Design the auth system data model and API interfaces (output a design doc)
+/clear
+Session 2: Implement registration and login APIs
+/clear
+Session 3: Implement forgot password and email verification
+/clear
+Session 4: Implement OAuth integration
+/clear
+Session 5: Implement permission management
+# Each session starts from a clean state, total cost is lower
+```
+
+The key technique: have the first session output a design document or plan, then feed that document as input to subsequent sessions. This maintains coherence while avoiding context accumulation.
+
+### Multi-Agent Parallel Cost Impact
+
+Claude Code supports multi-agent parallel execution (see the [multi-agent guide](/en/blog/claude-code-multi-agent) for details). From a cost perspective:
+
+- **Advantage:** Each agent has its own independent context, no cross-contamination
+- **Disadvantage:** Each agent loads the system prompt and CLAUDE.md, incurring fixed overhead
+- **Good for:** Multiple independent subtasks (e.g., modifying frontend and backend simultaneously)
+- **Bad for:** Tightly coupled tasks that need frequent context sharing
+
+```bash
+# Good for parallel
+claude --task "Refactor UserService" &
+claude --task "Refactor OrderService" &
+# Two independent services, parallel is faster with similar total cost
+
+# Bad for parallel
+# If OrderService depends on UserService interface changes,
+# sequential execution is more sensible to avoid rework
+```
+
+---
+
+## Caching and Reuse
+
+Claude Code has built-in caching mechanisms. Understanding and leveraging them can significantly reduce costs.
+
+### Prompt Caching Mechanism
+
+The Claude API supports prompt caching: if the prefix of consecutive requests is identical, cached tokens are charged at only 10% of the regular price.
+
+In Claude Code, the following content is typically cached:
+
+| Content | Cache Hit Probability | Reason |
+|---------|---------------------|--------|
+| System prompt | Very high | Identical every turn |
+| CLAUDE.md | Very high | Identical every turn |
+| Early conversation history | High | Unchanged within a session |
+| Recent conversation | Low | Changes every turn |
+
+### Maximizing Cache Hit Rate
+
+**Keep CLAUDE.md stable:** Frequently modifying CLAUDE.md invalidates the cache. Write it well once and avoid unnecessary changes.
+
+**Avoid frequent project switching:** Working continuously in the same project maximizes cache hit rates for the system prompt and CLAUDE.md.
+
+**Stay coherent within a session:** Don't frequently switch topics within a single session — this reduces caching efficiency for conversation history.
+
+### Custom Commands for Reuse
+
+Custom slash commands (see the [skills guide](/en/blog/claude-code-skills) for details) don't just improve efficiency — they save money too:
+
+```markdown
+# .claude/commands/review.md
+Review the following code changes:
+- Check for security vulnerabilities
+- Check compliance with project coding standards
+- Check for performance issues
+- Only output issues found, don't repeat the code
+
+$ARGUMENTS
+```
+
+Benefits of custom commands:
+
+1. **Prompt reuse:** No need to manually type detailed review requirements each time
+2. **Output control:** Commands can include constraints like "only output issues," reducing output tokens
+3. **Consistency:** The same prompt every time means higher cache hit rates
+
+### Code Snippets and Template Reuse
+
+Put commonly used code patterns in CLAUDE.md or project docs, so Claude references them instead of regenerating from scratch:
+
+```markdown
+# In CLAUDE.md — template references
+## Component Template
+When creating new React components, follow the structure in components/Button.tsx.
+
+## API Route Template
+When creating new API routes, follow the error handling pattern in app/api/users/route.ts.
+```
+
+This is far more token-efficient than describing "what kind of component structure I want" in every conversation. Claude reads the reference file directly instead of having you describe it in the chat.
+
+### Using .claudeignore to Reduce Noise
+
+Create a `.claudeignore` file to exclude files and directories Claude doesn't need to see:
+
+```
+# .claudeignore
+node_modules/
+dist/
+.next/
+coverage/
+*.lock
+*.log
+```
+
+This doesn't directly reduce token consumption, but it prevents Claude from reading irrelevant content when searching files, indirectly reducing tokens from tool calls.
+
+---
+
+## CI/CD Cost Control
+
+Claude Code in CI environments has a unique problem: **unattended execution means you can't interrupt waste.** A misconfigured CI task can burn through tokens without you even knowing.
+
+> For complete CI/CD configuration, see the [CI/CD guide](/en/blog/claude-code-cicd). Here we focus on cost control strategies.
+
+### Trigger Condition Optimization
+
+Not every PR needs Claude's review. Not every push needs Claude to run tests.
+
+```yaml
+# GitHub Actions example: only trigger under specific conditions
+on:
+  pull_request:
+    paths:
+      - 'src/**'        # Only trigger on source code changes
+      - '!src/**/*.md'   # Exclude documentation changes
+    types: [opened, synchronize]  # Don't trigger on close
+
+# Further optimization: only trigger deep review for large PRs
+jobs:
+  review:
+    if: github.event.pull_request.changed_files > 5
+    steps:
+      - uses: anthropic/claude-code-action@v1
+        with:
+          model: claude-sonnet-4-20250514
+```
+
+### max_turns Limits
+
+Always set `max_turns` in CI to prevent Claude from entering infinite loops:
+
+```bash
+# Limit to 10 interaction turns maximum
+claude --max-turns 10 --task "Review this PR's code changes"
+```
+
+A CI task without `max_turns` is like an HTTP request without a timeout — it will eventually cause problems.
+
+### Model Downgrade for CI
+
+Most CI tasks don't need Opus. A sensible model allocation:
+
+| CI Task | Recommended Model | Reason |
+|---------|------------------|--------|
+| Code review | Sonnet | Best value |
+| Lint fixes | Haiku | Simple formatting corrections |
+| Test generation | Sonnet | Needs business logic understanding |
+| Documentation updates | Haiku | Template-based task |
+| Security scanning | Sonnet | Needs some reasoning ability |
+| Complex refactoring | Opus | Only when necessary |
+
+```yaml
+# Choose model by task type
+- name: Code Review
+  run: claude --model claude-sonnet-4-20250514 --max-turns 5 --task "..."
+
+- name: Fix Lint
+  run: claude --model claude-haiku-4-5-20251001 --max-turns 3 --task "..."
+```
+
+### Cost Budgets and Alerts
+
+Use Anthropic API usage monitoring to set daily/monthly cost caps:
+
+```bash
+# Check daily usage in CI script (pseudocode)
+DAILY_COST=$(curl -s https://api.anthropic.com/v1/usage | jq '.daily_cost')
+MAX_DAILY=50  # $50/day cap
+
+if (( $(echo "$DAILY_COST > $MAX_DAILY" | bc -l) )); then
+  echo "Warning: Daily cost limit reached ($DAILY_COST/$MAX_DAILY), skipping Claude review"
+  exit 0
+fi
+```
+
+Set up three alert tiers:
+- **Notice:** 70% of budget reached
+- **Warning:** 90% of budget reached
+- **Stop:** 100% of budget reached — automatically skip non-critical Claude tasks
+
+---
+
+## Team Cost Management
+
+Individual developers can rely on self-discipline for cost control, but teams need processes and tools.
+
+### API Key Management
+
+**Don't share a single API Key.** Problems with shared keys:
+
+- Can't track who consumed how much
+- One person's mistake affects everyone
+- Can't set per-person limits
+
+Recommended approaches:
+
+```
+Option A: One API Key per person
+- Pros: Precise usage tracking, per-person limits
+- Cons: Higher management overhead
+
+Option B: API Keys per project
+- Pros: Track costs by project
+- Cons: Can't distinguish individual usage within a project
+
+Option C: API Gateway (recommended for teams)
+- Unified management through a proxy layer
+- Track by user/project/team dimensions
+- Fine-grained limits and alerts
+```
+
+### Per-Project Budget Allocation
+
+Different projects have vastly different Claude usage patterns. Allocate budgets based on project characteristics:
+
+| Project Type | Suggested Monthly Budget/Person | Notes |
+|-------------|-------------------------------|-------|
+| New project development | $100-200 | Heavy code generation needs |
+| Maintenance project | $30-50 | Mainly bug fixes |
+| Infrastructure/DevOps | $20-40 | Occasional use |
+| Documentation project | $10-20 | Low frequency |
+
+### Cost Monitoring Setup
+
+Build a simple cost monitoring dashboard:
+
+```typescript
+// Cost tracking script example
+interface UsageRecord {
+  user: string;
+  project: string;
+  model: string;
+  inputTokens: number;
+  outputTokens: number;
+  cost: number;
+  timestamp: Date;
+}
+
+// Fetch usage data from Anthropic API
+async function fetchUsage(apiKey: string): Promise<UsageRecord[]> {
+  const response = await fetch('https://api.anthropic.com/v1/usage', {
+    headers: { 'x-api-key': apiKey }
+  });
+  return response.json();
+}
+
+// Aggregate by dimension
+function aggregateCost(records: UsageRecord[], groupBy: 'user' | 'project' | 'model') {
+  const groups = new Map<string, number>();
+  for (const record of records) {
+    const key = record[groupBy];
+    groups.set(key, (groups.get(key) || 0) + record.cost);
+  }
+  return groups;
+}
+```
+
+Key metrics to monitor:
+
+- **Daily/weekly/monthly total cost**
+- **Per-person cost ranking** — identify unusually high consumers (may need optimization training)
+- **Model distribution** — if Opus usage is disproportionately high, there's likely room to optimize
+- **Time distribution** — identify usage peaks, optimize CI scheduling
+
+### Team Usage Guidelines
+
+Add cost-awareness clauses to your project's CLAUDE.md:
+
+```markdown
+# CLAUDE.md Cost Control Guidelines
+
+## Model Usage Policy
+- Default to Sonnet for daily development
+- Use Opus only for complex architecture design and difficult bugs
+- Prefer Haiku for CI tasks
+
+## Session Management Policy
+- Run /clear after completing each task
+- Consider /compact or starting a new session after 15+ turns
+- Don't handle unrelated tasks in the same session
+
+## Output Control
+- Add "only output the changed code" for modification tasks
+- Explicitly state when explanations aren't needed
+```
+
+### Cost Strategies by Team Size
+
+| Dimension | Individual Developer | Small Team (3-10) | Enterprise (10+) |
+|-----------|---------------------|-------------------|-------------------|
+| API Keys | Personal key | Per-project | API Gateway |
+| Budget management | Self-discipline | Monthly budgets | Fine-grained quotas |
+| Model strategy | Switch as needed | Team guidelines | Enforced policies |
+| Monitoring | Check the bill | Simple dashboard | Full monitoring system |
+| Training | Self-learning | Share best practices | Formal training |
+| Avg monthly cost/person | $30-100 | $50-150 | $80-200 |
+
+---
+
+## Performance Optimization Tips
+
+Beyond cost, speed matters too. Nobody likes waiting 30 seconds for Claude to think.
+
+### Factors Affecting Response Speed
+
+| Factor | Impact | Controllability |
+|--------|--------|----------------|
+| Model selection | High | Fully controllable |
+| Context size | High | Fully controllable |
+| Output length | Medium | Partially controllable |
+| Network latency | Medium | Partially controllable |
+| API load | Low | Not controllable |
+
+**Model speed ranking:** Haiku >> Sonnet > Opus
+
+Haiku's response speed is typically 3-5x faster than Opus. For tasks that don't require deep reasoning, Haiku isn't just cheaper — it's faster.
+
+### Reducing Unnecessary Tool Calls
+
+Every Claude Code tool call (reading files, executing commands, searching) adds latency and token consumption.
+
+```
+# Inefficient: let Claude find the files
+> Help me fix the user login bug
+# Claude might: search files → read 5 files → search again → read 3 more files
+
+# Efficient: tell Claude exactly where to look
+> Fix the null pointer error at src/auth/login.ts line 45,
+> related type definitions are in src/types/auth.ts
+# Claude reads 2 files directly and starts fixing
+```
+
+Tips for reducing tool calls:
+
+1. **Provide specific file paths** — don't make Claude guess
+2. **Document project structure** — list key directories in CLAUDE.md
+3. **Give enough info upfront** — avoid Claude needing multiple reads to understand context
+4. **Use @file references** — feed file contents directly to Claude
+
+### Hook Performance Impact
+
+[Hooks](/en/blog/claude-code-hooks) execute on every tool call. If the hook script itself is slow, it will noticeably impact the overall experience.
+
+```json
+// Hook configuration in settings.json
+{
+  "hooks": {
+    "afterWrite": {
+      "command": "eslint --fix $FILE"  // Auto-lint after every file write
+    }
+  }
+}
+```
+
+Optimization tips:
+
+- **Keep hooks fast:** Target under 1 second. If linting the entire project takes 10 seconds, lint only the changed file instead
+- **Avoid unnecessary hooks:** Not every event needs a hook. Only add them where truly needed
+- **Run asynchronously:** If a hook doesn't affect subsequent operations, consider async execution
+
+```bash
+# Slow: lint the entire project
+eslint .
+
+# Fast: lint only the changed file
+eslint "$FILE"
+```
+
+### MCP Tool Latency Considerations
+
+MCP (Model Context Protocol) tools (see the [MCP guide](/en/blog/claude-code-mcp) for details) introduce external service calls, each with network latency.
+
+Optimization tips:
+
+- **Local first:** If a local tool can solve it, don't use a remote MCP service
+- **Batch queries:** If the MCP tool supports batch operations, querying multiple items at once is faster than multiple single queries
+- **Cache results:** For data that doesn't change often (like database schemas), consider caching to a local file
+- **Set timeouts:** Configure reasonable timeouts for MCP tools to prevent a slow request from blocking the entire session
+
+### Network Optimization
+
+If you're using Claude Code from regions with high latency, network can be the biggest performance bottleneck:
+
+- Use a stable network connection
+- Consider using an API proxy to reduce latency
+- Avoid executing large tasks during network instability (disconnection and reconnection wastes already-consumed tokens)
+
+---
+
+## Conclusion
+
+Performance optimization and cost control for Claude Code ultimately comes down to three core principles:
+
+**Choose the right model** — The most expensive option isn't always the best. Sonnet handles 80% of daily tasks, Haiku can manage simple formatting and queries, and only truly complex architecture design and tricky bugs warrant Opus.
+
+**Manage your context** — Context is the biggest cost variable. Timely /clear, smart /compact, and precise context feeding — these three practices alone can save over half your tokens.
+
+**Write good prompts** — One precise prompt beats five rounds of vague conversation. Get it right the first time, reduce back-and-forth, and control output length.
+
+### Quick Reference Checklist
+
+| Optimization | Action | Expected Savings |
+|-------------|--------|-----------------|
+| Model selection | Sonnet for daily work, Haiku for simple tasks | 50-80% |
+| Timely clearing | /clear after task completion | 40-55% |
+| Precise prompts | Give enough info upfront, avoid multi-round | 60-70% |
+| Output control | Request concise output, skip explanations | 30-50% |
+| Batch operations | Combine similar tasks into one request | 40-50% |
+| Session splitting | Break large tasks into multiple short sessions | 30-40% |
+| CI optimization | Limit triggers and max_turns | 50-70% |
+| Lean CLAUDE.md | Keep it concise, core rules only | 10-20% |
+
+### Recommended Reading
+
+- [Context Management Guide](/en/blog/claude-code-context) — Complete context management operations manual
+- [Prompt Guide](/en/blog/claude-code-prompt) — Techniques for writing high-quality prompts
+- [CI/CD Guide](/en/blog/claude-code-cicd) — Complete CI/CD environment configuration
+- [Multi-Agent Guide](/en/blog/claude-code-multi-agent) — Multi-agent parallel architecture
+- [Settings Guide](/en/blog/claude-code-settings) — Detailed model and tool configuration
+- [Hooks Guide](/en/blog/claude-code-hooks) — Hook system configuration and optimization
+- [MCP Guide](/en/blog/claude-code-mcp) — MCP tool usage and configuration
+- [Skills Guide](/en/blog/claude-code-skills) — Creating and reusing custom commands

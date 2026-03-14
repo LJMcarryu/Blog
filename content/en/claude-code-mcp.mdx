@@ -1,0 +1,738 @@
+---
+title: "Claude Code MCP Server Deep Dive: Turning Your AI Assistant into a Full-Stack Platform"
+date: "2026-03-14"
+description: A deep dive into MCP (Model Context Protocol) — protocol fundamentals, configuration, popular servers, security best practices, and custom server development, with a Flutter full-stack practical example.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In [section six of the advanced guide](/en/blog/claude-code-overview), I covered MCP basics in about 45 lines: configuring `settings.json`, listing 5 popular servers, and showing two usage scenarios.
+
+But MCP goes much deeper than that. It's the key piece that transforms Claude Code from a "code assistant" into a "full-stack development platform." Through MCP, Claude Code can directly manage GitHub repos, query databases, read Figma designs, and manage Firebase backends — all within the same terminal session.
+
+This post covers MCP thoroughly.
+
+---
+
+## 1. What Is MCP
+
+### 1.1 One-Line Definition
+
+MCP (Model Context Protocol) is an open protocol that defines a standard communication method between AI applications (clients) and external tools/data sources (servers).
+
+Analogy: **MCP is to AI applications what USB-C is to hardware devices.** With a unified interface, any AI app can connect to any tool without writing custom integration code for each one.
+
+### 1.2 Architecture
+
+```
+┌─────────────┐     JSON-RPC 2.0     ┌─────────────┐
+│  Claude Code │ ◄──────────────────► │  MCP Server │
+│  (Client)    │     stdio / HTTP     │  (Server)    │
+└─────────────┘                       └─────────────┘
+       │                                     │
+       │  Discover tools, invoke, get results │  Connect to external systems
+       │                                     │  GitHub / DB / API...
+```
+
+MCP uses a client-server architecture:
+
+- **Client** (Claude Code): discovers available tools, decides when to call them, processes results
+- **Server** (MCP Server): exposes tool capabilities, connects to external systems, executes operations
+- **Protocol**: JSON-RPC 2.0, structured request-response pattern
+
+### 1.3 Three Core Primitives
+
+MCP defines three capability types:
+
+| Primitive | Controlled By | Description | Example |
+|-----------|--------------|-------------|---------|
+| **Tools** | Model-invoked | Executable actions, like API endpoints | Create GitHub Issue, query database |
+| **Resources** | Client-controlled | Read-only data sources, like GET endpoints | Read file contents, get config |
+| **Prompts** | User-triggered | Pre-defined prompt templates | Code review template, SQL generator |
+
+In Claude Code, **Tools are the most commonly used primitive**. When you configure an MCP Server, Claude automatically discovers all tools it provides and calls them at the right time.
+
+### 1.4 Transport Mechanisms
+
+MCP supports two transport methods:
+
+| Transport | Use Case | Characteristics |
+|-----------|----------|----------------|
+| **stdio** | Local servers | Server runs as a child process, communicates via stdin/stdout. Most common |
+| **Streamable HTTP** | Remote servers | Communicates via HTTP endpoints, supports SSE streaming. For cloud deployment |
+
+Claude Code supports both. For local development, the vast majority of servers use stdio.
+
+---
+
+## 2. Configuration
+
+### 2.1 Three Configuration Scopes
+
+MCP Servers can be configured at three levels, from highest to lowest priority:
+
+| Scope | File Path | Applies To | Commit to Git? |
+|-------|-----------|-----------|----------------|
+| Project local | `.claude.json` (project root) | Current project, you only | ❌ In `.gitignore` |
+| Project shared | `.claude/settings.json` | Current project, team-shared | ✅ Team-wide |
+| User global | `~/.claude/settings.json` | All projects | ❌ Personal config |
+
+**Rule of thumb:**
+
+- Configs with personal tokens → project local (`.claude.json`) or user global
+- Servers the whole team needs → project shared (`.claude/settings.json`)
+- Personal utility servers → user global (`~/.claude/settings.json`)
+
+### 2.2 JSON Configuration Format
+
+```json
+{
+  "mcpServers": {
+    "server-name": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_xxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+Field reference:
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `command` | ✅ | Launch command (`npx`, `uvx`, `node`, `python`, etc.) |
+| `args` | ✅ | Command arguments array |
+| `env` | ❌ | Environment variables for tokens, secrets, etc. |
+| `type` | ❌ | Transport type, defaults to `stdio`, use `url` for remote |
+| `url` | ❌ | Remote server HTTP endpoint (required when `type: "url"`) |
+
+### 2.3 CLI Commands
+
+Besides editing JSON manually, you can use the CLI:
+
+```bash
+# Add a stdio server
+claude mcp add github -e GITHUB_TOKEN=ghp_xxx -- npx -y @modelcontextprotocol/server-github
+
+# Add a remote server
+claude mcp add remote-server --transport http --url https://example.com/mcp
+
+# Specify configuration scope
+claude mcp add github --scope user -e GITHUB_TOKEN=ghp_xxx -- npx -y @modelcontextprotocol/server-github
+claude mcp add github --scope project -- npx -y @modelcontextprotocol/server-github
+
+# List configured servers
+claude mcp list
+
+# Remove a server
+claude mcp remove github
+```
+
+### 2.4 Interactive Management
+
+Type `/mcp` in a Claude Code session to interactively view and manage all configured MCP Servers:
+
+- View each server's connection status
+- View each server's tool list
+- Restart servers that have errored
+
+---
+
+## 3. Popular MCP Servers
+
+The MCP ecosystem is already quite rich. Here are the most useful servers organized by source.
+
+### 3.1 Official Reference Implementations
+
+Maintained by Anthropic or the MCP team — reliable and stable:
+
+| Server | Purpose | Install Command |
+|--------|---------|----------------|
+| **Filesystem** | Access files outside the project directory (sandboxed) | `npx -y @modelcontextprotocol/server-filesystem /path` |
+| **GitHub** | Issues, PRs, repo operations, code search | `npx -y @modelcontextprotocol/server-github` |
+| **PostgreSQL** | Read-only PostgreSQL queries | `npx -y @modelcontextprotocol/server-postgres` |
+| **Brave Search** | Web search (requires API key) | `npx -y @modelcontextprotocol/server-brave-search` |
+| **Puppeteer** | Browser automation, screenshots, scraping | `npx -y @modelcontextprotocol/server-puppeteer` |
+| **Fetch** | HTTP requests, fetch web pages/API content | `npx -y @modelcontextprotocol/server-fetch` |
+
+Configuration example — GitHub + Brave Search:
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_xxxxxxxxxxxx"
+      }
+    },
+    "brave-search": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
+      "env": {
+        "BRAVE_API_KEY": "BSA_xxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+### 3.2 First-Party Servers (Company-Maintained)
+
+Developed and maintained by the respective product companies:
+
+| Server | Purpose | Install |
+|--------|---------|---------|
+| **Figma** | Read designs, extract components and styles | `npx -y figma-developer-mcp --figma-api-key=xxx` |
+| **Supabase** | Database operations, Auth, Storage | `npx -y @supabase/mcp-server-supabase` |
+| **Stripe** | Payment management, subscriptions, invoices | `npx -y @stripe/mcp` |
+| **Notion** | Page read/write, database queries | `npx -y @notionhq/notion-mcp-server` |
+| **Slack** | Send messages, manage channels | `npx -y @anthropic/mcp-server-slack` |
+| **Firebase** | Firestore, Auth, App Hosting | `npx -y firebase-tools@latest` |
+| **Sentry** | Error tracking, performance monitoring | `npx -y @sentry/mcp-server-sentry` |
+| **Playwright** | End-to-end testing, browser automation | `npx -y @anthropic/mcp-server-playwright` |
+
+### 3.3 Popular Community Servers
+
+| Server | Purpose | Install |
+|--------|---------|---------|
+| **Context7** | Fetch latest library docs (solves stale training data) | `npx -y @upstash/context7-mcp` |
+| **Sequential Thinking** | Structured reasoning for complex problems | `npx -y @anthropic/mcp-sequential-thinking` |
+| **Firecrawl** | Web scraping, convert to Markdown | `npx -y firecrawl-mcp` |
+
+### 3.4 Configuration Tips
+
+Don't configure too many servers at once. Each server adds tool discovery overhead for Claude. Recommendations:
+
+1. **Core development**: GitHub + Filesystem (needed for almost every project)
+2. **Add as needed**: Add servers matching your project's tech stack
+3. **Temporary use**: Configure temporary servers in `.claude.json`, remove when done
+
+---
+
+## 4. Security Best Practices
+
+MCP gives Claude Code powerful external access, but also introduces new security risks.
+
+### 4.1 Key Attack Vectors
+
+| Attack Type | Description | Risk Level |
+|-------------|-------------|------------|
+| **Tool Poisoning** | Malicious server injects hidden instructions in tool descriptions | 🔴 High |
+| **Output Injection** | Server returns results containing prompt injection | 🔴 High |
+| **Rug Pull** | Server behavior changes after update; previously safe tools become dangerous | 🟡 Medium |
+| **Credential Leakage** | Tokens hardcoded in config files, accidentally committed to Git | 🟡 Medium |
+| **Excessive Permissions** | Server gets more access than needed | 🟡 Medium |
+
+### 4.2 Protective Measures
+
+| Measure | How | Why |
+|---------|-----|-----|
+| **Environment variables** | Put tokens in `env` field, never hardcode | Prevent accidental Git commits |
+| **Pin versions** | `@modelcontextprotocol/server-github@1.2.3` | Prevent rug pull attacks |
+| **Least privilege** | GitHub token with only needed scopes | Limit blast radius |
+| **Review tool descriptions** | Use `/mcp` to inspect exposed tools | Detect suspicious hidden tools |
+| **Human confirmation** | Keep Claude Code's permission prompts enabled | Manual approval for sensitive ops |
+| **Trusted sources** | Prefer official and well-known community servers | Reduce supply chain risk |
+| **Regular audits** | Periodically review configured servers | Clean up unused servers |
+
+### 4.3 Secure Configuration Example
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github@2.2.0"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Key points:
+
+1. **Pin the version** (`@2.2.0`), don't use `latest`
+2. **Reference environment variables** (`${GITHUB_TOKEN}`), don't hardcode tokens
+3. **Configure in `.claude.json`** (not committed to Git), not `.claude/settings.json`
+
+---
+
+## 5. Building Custom MCP Servers
+
+When existing servers don't meet your needs, you can build your own.
+
+### 5.1 Official SDKs
+
+MCP provides multi-language SDKs:
+
+| Language | Package | Maturity |
+|----------|---------|----------|
+| TypeScript | `@modelcontextprotocol/sdk` | ✅ Stable |
+| Python | `mcp[cli]` (FastMCP) | ✅ Stable |
+| Java | `io.modelcontextprotocol:sdk` | ✅ Stable |
+| Kotlin | `io.modelcontextprotocol:kotlin-sdk` | ✅ Stable |
+| C# | `ModelContextProtocol` | ✅ Stable |
+| Go | `github.com/mark3labs/mcp-go` | 🟡 Community |
+| Dart | `package:dart_mcp` | 🟡 Community |
+| Rust | `mcp-server` | 🟡 Community |
+
+### 5.2 TypeScript Example
+
+Building a simple weather query server with `@modelcontextprotocol/sdk`:
+
+```typescript
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+
+const server = new McpServer({
+  name: "weather-server",
+  version: "1.0.0",
+});
+
+// Define a tool
+server.tool(
+  "get-weather",
+  "Get weather information for a specified city",
+  {
+    city: z.string().describe("City name, e.g. Beijing"),
+  },
+  async ({ city }) => {
+    // In a real project, call a weather API
+    const response = await fetch(
+      `https://api.weatherapi.com/v1/current.json?key=${process.env.WEATHER_API_KEY}&q=${city}`
+    );
+    const data = await response.json();
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(data, null, 2),
+        },
+      ],
+    };
+  }
+);
+
+// Start the server
+const transport = new StdioServerTransport();
+await server.connect(transport);
+```
+
+### 5.3 Python Example (FastMCP)
+
+Python's FastMCP framework is more concise:
+
+```python
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("my-server")
+
+@mcp.tool()
+def query_inventory(product_id: str) -> str:
+    """Query product inventory information"""
+    # In a real project, query the database
+    return f"Product {product_id} stock: 42 units"
+
+@mcp.tool()
+def update_price(product_id: str, new_price: float) -> str:
+    """Update product price"""
+    # In a real project, update the database
+    return f"Product {product_id} price updated to {new_price}"
+
+if __name__ == "__main__":
+    mcp.run(transport="stdio")
+```
+
+### 5.4 Registering with Claude Code
+
+Once built, register in your config:
+
+```json
+{
+  "mcpServers": {
+    "weather": {
+      "command": "node",
+      "args": ["./mcp-servers/weather/index.js"]
+    },
+    "inventory": {
+      "command": "python",
+      "args": ["./mcp-servers/inventory/server.py"]
+    }
+  }
+}
+```
+
+Or via CLI:
+
+```bash
+claude mcp add weather -- node ./mcp-servers/weather/index.js
+claude mcp add inventory -- python ./mcp-servers/inventory/server.py
+```
+
+### 5.5 Development & Debugging
+
+MCP provides an official Inspector tool for debugging:
+
+```bash
+# Install MCP Inspector
+npx @modelcontextprotocol/inspector
+
+# Test your server
+npx @modelcontextprotocol/inspector node ./mcp-servers/weather/index.js
+```
+
+The Inspector provides a web UI where you can:
+
+- View all tools exposed by the server
+- Manually invoke tools and inspect results
+- Examine JSON-RPC communication logs
+
+---
+
+## 6. Practical Example: Flutter Full-Stack Development
+
+This is where MCP truly shines. By combining multiple MCP Servers, Claude Code can cover the entire Flutter project lifecycle from design to deployment.
+
+### 6.1 Tech Stack & MCP Configuration
+
+Let's say we're building a Flutter e-commerce app with this stack:
+
+- **Frontend**: Flutter (Dart)
+- **Backend**: Firebase (Firestore + Auth + Hosting)
+- **Design**: Figma
+- **Version Control**: GitHub
+
+The corresponding MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "dart": {
+      "command": "dart",
+      "args": ["tooling-daemon", "--mcp"]
+    },
+    "figma": {
+      "command": "npx",
+      "args": ["-y", "figma-developer-mcp", "--figma-api-key=fig_xxx"]
+    },
+    "firebase": {
+      "command": "npx",
+      "args": ["-y", "firebase-tools@latest"],
+      "env": {
+        "FIREBASE_TOKEN": "your-firebase-token"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "ghp_xxxxxxxxxxxx"
+      }
+    }
+  }
+}
+```
+
+### 6.2 Dart & Flutter MCP Server
+
+The Dart SDK has built-in MCP Server support (via `dart tooling-daemon --mcp`), providing these tools:
+
+| Tool | Function |
+|------|----------|
+| `dart_fix` | Auto-fix Dart code issues (lint suggestions) |
+| `dart_format` | Format Dart code |
+| `pub_search` | Search pub.dev packages |
+| `pub_add` | Add dependencies to `pubspec.yaml` |
+| `pub_outdated` | Check for outdated dependencies |
+| `analyze` | Static analysis, report errors and warnings |
+
+Real usage scenario:
+
+```
+You: Search pub.dev for the most popular state management libraries,
+     compare the latest versions of riverpod and bloc
+
+Claude: [calls pub_search] Search results...
+  - riverpod: ^2.6.1, 5892 likes
+  - flutter_bloc: ^8.1.6, 4521 likes
+  Let me compare the two...
+
+You: Go with riverpod, add the dependency
+
+Claude: [calls pub_add] Added flutter_riverpod: ^2.6.1 to pubspec.yaml
+```
+
+### 6.3 Figma MCP: Design to Code
+
+The Figma MCP Server lets Claude read design files directly:
+
+```
+You: Read the Figma design at https://figma.com/file/xxx,
+     extract the product card component's design specs
+
+Claude: [calls figma/get_file] Analyzing design...
+
+Product card component specs:
+- Border radius: 12px
+- Shadow: 0 2px 8px rgba(0,0,0,0.1)
+- Image area: 4:3 aspect ratio
+- Title: 16px, FontWeight.w600
+- Price: 20px, Color(0xFFE53935)
+- Padding: 16px
+
+Let me generate the corresponding Flutter widget...
+```
+
+Claude then generates Flutter code based on the extracted design specs:
+
+```dart
+class ProductCard extends StatelessWidget {
+  final String imageUrl;
+  final String title;
+  final double price;
+
+  const ProductCard({
+    super.key,
+    required this.imageUrl,
+    required this.title,
+    required this.price,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AspectRatio(
+            aspectRatio: 4 / 3,
+            child: Image.network(imageUrl, fit: BoxFit.cover),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Text('\$${price.toStringAsFixed(2)}',
+                    style: const TextStyle(
+                        fontSize: 20, color: Color(0xFFE53935))),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+```
+
+### 6.4 Firebase MCP: Backend Operations
+
+The Firebase MCP Server lets Claude manage the backend directly:
+
+```
+You: Create a products collection in Firestore with some test product data
+
+Claude: [calls firebase/firestore_add_document]
+Created products collection with 3 test documents:
+- product_001: Flutter Getting Started Guide, $59.00
+- product_002: Dart Programming in Practice, $79.00
+- product_003: Firebase Full-Stack Development, $99.00
+
+You: Configure Firebase Auth, enable email login
+
+Claude: [calls firebase/auth_configure]
+Email/Password authentication has been enabled.
+```
+
+### 6.5 Complete Workflow
+
+Chaining all MCP Servers together, a complete development flow:
+
+```
+Step 1: Design → Code
+You: Read the Figma design and convert the homepage product list page to Flutter code
+
+Step 2: Add Dependencies
+You: This page needs networking and state management, pick suitable libraries and add them
+
+Step 3: Backend Integration
+You: Create the Firestore data model and write a Repository layer connecting to Firebase
+
+Step 4: Feature Completion
+You: Add user authentication — users must log in to view the shopping cart
+
+Step 5: Code Quality
+You: Analyze the entire project's code quality and fix all lint warnings
+
+Step 6: Submit Code
+You: Create a PR titled "feat: add product listing page"
+```
+
+At each step, Claude calls the corresponding MCP tools while you simply describe your needs in natural language.
+
+---
+
+## 7. MCP vs Other Extension Methods
+
+Claude Code has multiple extension mechanisms, each with its own sweet spot:
+
+| Feature | MCP Server | Hooks | Slash Commands | CLAUDE.md |
+|---------|-----------|-------|---------------|-----------|
+| **Nature** | External tool protocol | Shell commands | Prompt templates | Natural language instructions |
+| **Execution** | Claude decides when to call | System auto-triggers | User manually triggers | Claude follows after understanding |
+| **Determinism** | Claude's judgment | 100% deterministic | 100% deterministic | Advisory |
+| **Scope** | Connect external systems | Local shell operations | Reuse prompts | Behavior constraints |
+| **Typical use** | GitHub, databases, APIs | Formatting, linting, security | Code review, test generation | Coding style, architecture |
+| **Config location** | settings.json | settings.json | .claude/commands/ | CLAUDE.md |
+
+### When to Use Which?
+
+- **Need to access external systems** (GitHub, databases, Figma) → MCP
+- **Need deterministic local operations** (lint after every save) → Hooks
+- **Need to reuse complex prompts** (code review templates) → Slash Commands
+- **Need to constrain Claude's behavior** (coding style, forbidden operations) → CLAUDE.md
+
+They're not mutually exclusive. Best practice is to combine them:
+
+```
+CLAUDE.md: Define project standards and coding style
+Hooks: Ensure code quality (auto-format, lint)
+Slash Commands: Encapsulate common workflows (/review, /test)
+MCP: Connect external tools and data sources
+```
+
+---
+
+## 8. FAQ
+
+### Q1: MCP Server not showing up in the tool list?
+
+Troubleshooting steps:
+
+1. Run `/mcp` to check server status
+2. Verify JSON config format (watch for commas, quotes)
+3. Confirm the `command` program is installed (e.g., `npx`, `uvx`)
+4. Check that tokens in `env` are valid
+5. Try `claude mcp remove xxx` then re-add
+
+### Q2: How to debug a server that errors on startup?
+
+```bash
+# Debug with Inspector
+npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/server-github
+
+# Run the server manually to see error output
+npx -y @modelcontextprotocol/server-github 2>&1
+```
+
+### Q3: Do multiple servers affect performance?
+
+Yes. Each server is a separate process, and Claude needs to discover all tools at the start of each session. Recommendations:
+
+- Keep commonly used servers to 3-5
+- Configure temporary servers in `.claude.json`, remove when done
+- Clean up unused servers promptly
+
+### Q4: How to share MCP configuration across a team?
+
+Put configs without sensitive information in `.claude/settings.json` (committed to Git):
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "${GITHUB_TOKEN}"
+      }
+    }
+  }
+}
+```
+
+Team members each set the `GITHUB_TOKEN` environment variable locally.
+
+### Q5: How to handle errors in custom servers?
+
+Return `isError: true` in the tool implementation:
+
+```typescript
+server.tool("risky-operation", "Execute a risky operation", {}, async () => {
+  try {
+    const result = await doSomething();
+    return { content: [{ type: "text", text: result }] };
+  } catch (error) {
+    return {
+      content: [{ type: "text", text: `Error: ${error.message}` }],
+      isError: true,
+    };
+  }
+});
+```
+
+### Q6: What's the difference between MCP and Claude Code's built-in tools?
+
+Claude Code has built-in tools for file read/write, Bash execution, and search. MCP extends access to external systems that Claude Code can't reach directly. They're complementary:
+
+- **Built-in tools**: Local filesystem, shell commands, code search
+- **MCP tools**: GitHub API, databases, third-party services, browser automation
+
+### Q7: Are remote MCP Servers secure?
+
+Remote servers communicate over HTTP, requiring extra caution:
+
+- Ensure HTTPS is used
+- Verify the server's identity (domain, certificate)
+- Don't pass sensitive information in URLs
+- Prefer officially hosted remote servers
+
+---
+
+## Summary
+
+MCP is Claude Code's most powerful extension mechanism. Key takeaways:
+
+1. **MCP = USB-C for AI** — A standardized protocol that lets Claude Code connect to any external tool
+2. **Security first** — Pin versions, use environment variables, apply least privilege. Don't sacrifice security for convenience
+3. **Combine and conquer** — MCP + Hooks + Slash Commands + CLAUDE.md, each serving its purpose
+
+From GitHub operations to database queries, from Figma designs to Firebase backends, MCP turns Claude Code into a true full-stack development platform.
+
+---
+
+## Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-overview) — Comprehensive overview of Claude Code's core capabilities
+- [CLAUDE.md Writing Guide](/en/blog/claude-code-claude-md) — Help Claude understand your project
+- [Claude Code Hooks Guide](/en/blog/claude-code-hooks) — Deterministic automation
+- [Context Management Guide](/en/blog/claude-code-context) — Better context for more precise MCP tool calls
+- [Multi-Agent Parallelism Guide](/en/blog/claude-code-multi-agent) — MCP + multi-agent for team-level efficiency
+- [Custom Slash Commands Guide](/en/blog/claude-code-skills) — Encapsulate common workflows
+- [MCP Official Documentation](https://modelcontextprotocol.io) — Protocol spec and server directory
+- [MCP Servers Repository](https://github.com/modelcontextprotocol/servers) — Official reference implementations

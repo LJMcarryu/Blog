@@ -1,0 +1,876 @@
+---
+title: "The Complete Guide to Effective Prompts in Claude Code: Making AI Understand Your Intent"
+date: "2026-03-06"
+description: A deep dive into prompt writing techniques for Claude Code — six core principles, ready-to-use templates, context feeding strategies, advanced tactics, and a complete Flutter development walkthrough.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In [section seven of the advanced guide](/en/blog/claude-code-overview), I covered four basic prompt tips in about 55 lines: task decomposition, adding constraints, pipe input, and iterative development.
+
+But after months of daily use, I'm increasingly convinced of one thing: **prompt quality is the single biggest variable determining Claude Code's output quality.** For the same task, a vague prompt and a well-crafted prompt can produce code that differs by an order of magnitude in quality.
+
+This post covers prompt techniques thoroughly — from the underlying logic to practical templates, all the way to a complete Flutter development walkthrough.
+
+---
+
+## 1. The Logic Behind Prompts
+
+### 1.1 Claude Code Is Not a Regular Chatbot
+
+Before using Claude Code, you've probably used ChatGPT or Claude's web interface. In those contexts, writing casual prompts is fine — it's just conversation.
+
+But Claude Code is different. It's an **Agent** with tool-calling capabilities:
+
+- It can read and write your file system
+- It can execute shell commands
+- It can search your codebase
+- It can invoke MCP tools
+
+This means a vague prompt doesn't just produce "inaccurate answers" — it can:
+
+- Modify the wrong files
+- Introduce unnecessary dependencies
+- Break existing functionality
+- Waste massive amounts of tokens going in the wrong direction
+
+### 1.2 The Economics of Good Prompts
+
+Claude Code charges by token. A good prompt delivers:
+
+| Dimension | Bad Prompt | Good Prompt |
+|-----------|-----------|-------------|
+| Iterations | 3-5 rounds to get it right | 1-2 rounds done |
+| Token usage | Wasted on trial and error | Precisely targeted |
+| Code quality | Needs manual fixes | Mostly usable |
+| Context usage | Fills window quickly | Leaves room |
+
+Quick math: if each iteration costs 5,000 tokens, a bad prompt needs 5 rounds (25,000 tokens), while a good prompt needs just 1 (5,000 tokens). **A 5x difference.**
+
+### 1.3 The Three-Layer Structure
+
+An effective Claude Code prompt typically has three layers:
+
+```
+[Goal] What you want done
+[Constraints] How to do it, what not to do
+[Acceptance] How to verify it's correct
+```
+
+All the techniques that follow are essentially optimizing these three layers.
+
+---
+
+## 2. Six Core Principles
+
+### 2.1 Specific Beats Vague
+
+This is the most basic and most important principle.
+
+Bad prompt:
+```
+Build me a login page
+```
+
+Good prompt:
+```
+Create login_page.dart under lib/features/auth/presentation/pages/:
+- Use Riverpod for state management
+- Email + password login
+- Form validation: email format, password at least 8 characters
+- Login button shows loading state during request
+- Follow the layout style of register_page.dart
+```
+
+The difference? The good prompt tells Claude:
+
+1. **Where** to create the file (path)
+2. **What tech** to use (Riverpod)
+3. **What features** to build (email + password)
+4. **What standards** to meet (validation rules)
+5. **What style** to follow (reference existing file)
+
+### 2.2 Constraints Drive Quality
+
+A prompt without constraints is like a project without a requirements doc — Claude will follow its own assumptions, and the result is rarely what you want.
+
+Common constraint types:
+
+| Constraint Type | Example |
+|----------------|---------|
+| Dependency | "Don't introduce new third-party packages" |
+| API | "Keep the existing public API unchanged" |
+| Style | "Follow the project's existing naming conventions" |
+| Performance | "List rendering must not lag, consider virtual scrolling" |
+| Compatibility | "Support iOS 14+ and Android 8+" |
+| Type safety | "All new code must be type-safe, no dynamic" |
+
+Practical example:
+
+```
+Refactor UserRepository with these requirements:
+- Keep UserRepository's public interface unchanged
+- Extract HTTP calls into UserRemoteDataSource
+- Extract caching logic into UserLocalDataSource
+- Don't introduce new dependencies
+- All methods must remain type-safe
+- Error handling uses Either<Failure, T> pattern
+```
+
+### 2.3 Step-by-Step Beats All-at-Once
+
+Claude Code's context window is finite. A massive prompt trying to do everything at once often:
+
+- Misses details
+- Contradicts itself
+- Overflows context
+
+A better approach is incremental:
+
+```
+Step 1 (current):
+Create the CheckInModel data model with userId, date, and streak fields.
+Place it under lib/features/checkin/domain/models/.
+
+---
+
+Future steps (don't do these yet):
+- Step 2: Create CheckInRepository interface
+- Step 3: Implement Firebase data source
+- Step 4: Write Riverpod provider
+- Step 5: Create UI page
+```
+
+Key technique: **Tell Claude about future plans but explicitly say "don't do these yet"** — this way it can make better design decisions in the current step (like leaving room for interfaces) without overstepping.
+
+### 2.4 Read Before You Edit
+
+This is a technique many people overlook. Before asking Claude to modify code, have it read the relevant files first:
+
+```
+First, read these files:
+- lib/features/auth/data/repositories/auth_repository_impl.dart
+- lib/features/auth/domain/repositories/auth_repository.dart
+- lib/core/network/api_client.dart
+
+Then refactor auth_repository_impl.dart to extract the token refresh logic
+into a standalone TokenManager class.
+```
+
+Why does this matter?
+
+1. Claude understands the existing code style and patterns
+2. Avoids generating solutions incompatible with existing code
+3. Reduces "I assumed your code looked like this" errors
+
+You can take it further with `@` file references:
+
+```
+Look at @lib/core/theme/app_theme.dart for the theme definition approach,
+then create a UI for the CheckIn page that fits the existing design system.
+```
+
+### 2.5 Provide References
+
+One of Claude's greatest strengths is pattern matching. Give it a reference and it can precisely replicate the style:
+
+```
+Following the structure of lib/features/todo/presentation/pages/todo_list_page.dart,
+create checkin_list_page.dart.
+
+Requirements:
+- Same ConsumerStatefulWidget pattern
+- Same AppBar style
+- Use SliverList instead of ListView for the list
+- Same EmptyStateWidget for empty state
+```
+
+You can also reference external code:
+
+```
+Follow this official Riverpod example pattern:
+https://riverpod.dev/docs/essentials/first_request
+
+Implement async state management for CheckInNotifier.
+```
+
+### 2.6 Define Acceptance Criteria
+
+Tell Claude how to know it's "done right":
+
+```
+Write unit tests for the CheckIn feature. Acceptance criteria:
+- Cover three scenarios: normal check-in, duplicate check-in, streak interruption
+- Each test uses arrange-act-assert pattern
+- Mocks use mocktail
+- Running flutter test test/features/checkin/ passes all tests
+```
+
+Without acceptance criteria, Claude doesn't know when to stop — it tends to over-implement or miss critical scenarios.
+
+---
+
+## 3. Prompt Template Library
+
+Here are the prompt templates I use most frequently. Copy and adapt them directly.
+
+### 3.1 Bug Fix Template
+
+```
+Bug description: [specific symptom]
+Reproduction steps: [1. 2. 3.]
+Expected behavior: [what should happen]
+Actual behavior: [what actually happens]
+
+Related files: [file paths]
+
+Please analyze the root cause first, then provide a fix. After fixing, ensure:
+- Existing functionality is not affected
+- Add a regression test
+```
+
+Practical usage:
+
+```
+Bug description: CheckIn page shows streak as 0 after 7 consecutive days
+Reproduction steps:
+1. Check in for 7 consecutive days
+2. Open the check-in page on day 8
+3. Streak shows 0 instead of 8
+
+Expected behavior: Streak should show 8
+Actual behavior: Streak shows 0
+
+Related files: lib/features/checkin/data/repositories/checkin_repository_impl.dart
+
+Please analyze the root cause first, then provide a fix. After fixing, ensure:
+- Other check-in logic is not affected
+- Add unit tests for cross-week streak calculation
+```
+
+### 3.2 New Feature Template
+
+```
+Feature requirement: [one-sentence description]
+
+Detailed requirements:
+- [Requirement 1]
+- [Requirement 2]
+- [Requirement 3]
+
+Technical constraints:
+- [Constraint 1]
+- [Constraint 2]
+
+Reference: [existing files or external links]
+
+Provide an implementation plan first. Start coding after confirmation.
+```
+
+### 3.3 Refactoring Template
+
+```
+Refactoring goal: [what to refactor and why]
+
+Current problems:
+- [Problem 1]
+- [Problem 2]
+
+Expected outcome:
+- [Outcome 1]
+- [Outcome 2]
+
+Constraints:
+- Keep public API unchanged
+- Don't introduce new dependencies
+- All existing tests must pass
+
+First read [related files], then propose a refactoring plan.
+```
+
+### 3.4 Code Review Template
+
+```
+Review the following code, focusing on:
+- Potential bugs and edge cases
+- Performance issues
+- Type safety
+- Error handling completeness
+- Compliance with project coding standards
+
+Provide specific improvement suggestions with code examples.
+```
+
+### 3.5 Test Writing Template
+
+```
+Write unit tests for [file path]:
+- Cover all public methods
+- Include happy path and error path
+- Mock external dependencies (use mocktail)
+- Place test file at [test path]
+- Follow the style of [existing test file]
+```
+
+### 3.6 Performance Optimization Template
+
+```
+[Page/feature] has performance issues: [specific symptoms]
+
+Please analyze possible causes and provide optimization suggestions. Requirements:
+- Profile first, identify the bottleneck
+- Show before/after comparison
+- Don't change functional behavior
+- Prioritize optimizations with the best effort-to-impact ratio
+```
+
+---
+
+## 4. Context Feeding Techniques
+
+The prompt itself is only part of the equation. **How you feed context to Claude** matters just as much.
+
+### 4.1 Pipe Input
+
+Piping is one of Claude Code's most underrated capabilities. It lets you feed any command's output directly to Claude:
+
+```bash
+# Have Claude analyze build errors and suggest fixes
+flutter build apk 2>&1 | claude "Analyze these build errors and suggest fixes"
+
+# Have Claude analyze test failures
+flutter test test/features/checkin/ 2>&1 | claude "Analyze the failing tests and find root causes"
+
+# Have Claude review recent changes
+git diff HEAD~3 | claude "Review these changes, focus on potential issues"
+
+# Have Claude fix lint warnings
+flutter analyze 2>&1 | claude "Fix all lint warnings"
+
+# Have Claude explain dependency conflicts
+flutter pub get 2>&1 | claude "Explain this dependency conflict and suggest a resolution"
+```
+
+Advantages of pipe input:
+
+- Precise context (actual output, not your description of it)
+- Saves time on manual copy-paste
+- Can combine multiple commands
+
+### 4.2 @ File References
+
+In Claude Code conversations, use `@` to reference files directly — Claude will automatically read their contents:
+
+```
+Look at @lib/features/checkin/domain/models/checkin_model.dart
+and @lib/features/checkin/data/repositories/checkin_repository.dart
+
+What design issues do these two files have? Suggest improvements.
+```
+
+Multi-file references are especially useful when you need Claude to understand contextual relationships.
+
+### 4.3 Image Input
+
+Claude Code supports image input, which is incredibly useful for UI development:
+
+```
+Look at this design mockup @design/checkin_page.png
+
+Implement this page in Flutter with these requirements:
+- Use the project's existing design system (@lib/core/theme/app_theme.dart)
+- Responsive layout for phones and tablets
+- Animations using Flutter's built-in AnimationController
+```
+
+### 4.4 Structured Context Blocks
+
+When you need to give Claude extensive context, use a structured format:
+
+```
+## Project Background
+This is a Flutter check-in app using Clean Architecture + Riverpod.
+
+## Current Architecture
+- Domain layer: models, repositories (interfaces), use_cases
+- Data layer: repositories (implementations), data_sources, DTOs
+- Presentation layer: pages, widgets, providers
+
+## Your Task
+Implement CheckInRemoteDataSource in the Data layer, connecting to Firebase Firestore.
+
+## Constraints
+- Follow the existing DataSource interface pattern (reference @lib/features/auth/data/data_sources/auth_remote_data_source.dart)
+- Error handling uses try-catch + ServerException
+- All Firestore operations use batch write
+```
+
+### 4.5 Using the Clipboard
+
+Sometimes context comes from a browser, Slack, or other tools. Paste it directly into Claude Code:
+
+```
+Here's a crash log from user feedback:
+
+[paste crash log]
+
+Analyze the crash cause, locate the corresponding code, and suggest a fix.
+```
+
+---
+
+## 5. Advanced Techniques
+
+### 5.1 Role Setting
+
+Giving Claude a role can significantly influence output quality:
+
+```
+You are a senior Flutter architect, expert in Clean Architecture and Riverpod.
+Review this PR's code, focusing on architectural soundness and testability.
+```
+
+Useful roles:
+
+| Role | Use Case |
+|------|----------|
+| Senior Flutter architect | Architecture design, code review |
+| Security engineer | Security audits, vulnerability scanning |
+| Performance optimization expert | Performance analysis, optimization |
+| Technical documentation writer | API docs, README |
+| QA engineer | Test case design, edge case analysis |
+
+### 5.2 Chain-of-Thought Guidance
+
+For complex problems, guide Claude to think step by step:
+
+```
+The CheckIn page is laggy on low-end devices. Please:
+
+1. First analyze possible performance bottlenecks (list at least 5 possible causes)
+2. Rate each cause by likelihood (high/medium/low)
+3. For the top 3 most likely causes, provide specific optimization plans
+4. Include code examples for each plan
+```
+
+This is far better than just saying "optimize performance" because it forces Claude to analyze before acting.
+
+### 5.3 Negative Constraints
+
+Telling Claude **what not to do** is sometimes more effective than telling it what to do:
+
+```
+Refactor CheckInProvider with these requirements:
+- Don't use StateNotifier (deprecated), use Notifier
+- Don't call Repository directly in Provider, go through UseCase
+- Don't use dynamic types
+- Don't add any print statements
+- Don't change existing Provider naming
+```
+
+### 5.4 Multi-Turn Strategy
+
+Don't try to complete complex tasks in a single turn. Design a multi-turn conversation strategy:
+
+```
+Round 1: Analysis and planning
+"Analyze the CheckIn module's current architecture and propose a refactoring plan.
+Analysis only, no code."
+
+Round 2: Confirm the plan
+"Plan B is better. But two adjustments: [adjustment 1], [adjustment 2].
+Confirm and start implementing."
+
+Round 3: Implement core
+"Implement the Domain layer changes first: Model, Repository interface, UseCase."
+
+Round 4: Implement data layer
+"Next, implement the Data layer: Repository implementation, DataSource, DTO."
+
+Round 5: Implement UI
+"Finally, implement the Presentation layer: Provider, Page, Widgets."
+
+Round 6: Testing
+"Write unit tests for all new code."
+
+Use /compact between rounds to compress context.
+```
+
+### 5.5 Combine with CLAUDE.md
+
+Write project-level prompt conventions into [CLAUDE.md](/en/blog/claude-code-claude-md) so they apply automatically to every conversation:
+
+```markdown
+# CLAUDE.md
+
+## Code Standards
+- Flutter project uses Clean Architecture
+- State management with Riverpod 2.x (Notifier, not StateNotifier)
+- Error handling with Either<Failure, T>
+- All Repository methods return Future<Either<Failure, T>>
+- Tests use mocktail, not mockito
+
+## Naming Conventions
+- File names: snake_case
+- Class names: PascalCase
+- Provider names: camelCase + Provider suffix
+```
+
+This way your prompts don't need to repeat these constraints every time.
+
+### 5.6 Combine with Slash Commands
+
+Save frequently used prompt templates as [Slash Commands](/en/blog/claude-code-skills):
+
+```markdown
+<!-- .claude/commands/flutter-feature.md -->
+Create a new feature module under lib/features/$ARGUMENTS/:
+
+1. Domain layer:
+   - Create data models under models/
+   - Create Repository interface under repositories/
+   - Create UseCase under use_cases/
+
+2. Data layer:
+   - Implement Repository under repositories/
+   - Create Remote and Local DataSource under data_sources/
+   - Create DTOs under dtos/
+
+3. Presentation layer:
+   - Create Riverpod Provider under providers/
+   - Create pages under pages/
+   - Create widgets under widgets/
+
+Follow the project's existing Clean Architecture patterns.
+Reference lib/features/auth/ as a guide.
+```
+
+Then just type `/flutter-feature checkin` to trigger the full prompt.
+
+---
+
+## 6. Practical Example: Flutter Check-In Feature
+
+Here's a complete Flutter development walkthrough showing how to use effective prompts to drive Claude Code through building a "daily check-in" feature.
+
+### 6.1 Requirements Analysis (Round 1)
+
+```
+I want to add a "daily check-in" feature to a Flutter app.
+Don't write code yet — help me analyze requirements and design the architecture.
+
+Feature description:
+- Users can check in once per day
+- Consecutive check-ins have a streak counter
+- Check-in calendar view (current month)
+- Check-in rewards points (normal: 1 pt, 7-day streak: 5 pts, 30-day streak: 20 pts)
+
+Tech stack:
+- Flutter + Riverpod
+- Firebase Firestore for storage
+- Clean Architecture
+
+Please provide:
+1. Data model design
+2. Directory structure
+3. List of core classes and interfaces
+4. Edge cases to watch out for
+```
+
+Claude will produce a complete architecture proposal. You can adjust the design in this round:
+
+```
+The plan looks good overall, but a few adjustments:
+1. CheckInRecord doesn't need a location field — remove it
+2. Streak calculation should happen server-side (Cloud Function), not client-side
+3. Skip the points system for now — we'll add it later
+4. Use the table_calendar package for the calendar widget
+
+Confirm these adjustments, then we'll start implementing.
+```
+
+### 6.2 Data Models (Round 2)
+
+```
+Starting the check-in feature implementation. Step 1: Create data models.
+
+Under lib/features/checkin/domain/models/, create:
+
+1. checkin_record.dart - Check-in record
+   - id: String
+   - userId: String
+   - date: DateTime (date only, no time)
+   - streak: int (current consecutive days)
+   - createdAt: DateTime
+
+2. checkin_stats.dart - Check-in statistics
+   - totalDays: int
+   - currentStreak: int
+   - longestStreak: int
+   - thisMonthDays: int
+
+Requirements:
+- Use freezed for immutable classes
+- Include fromJson/toJson
+- date field serializes as 'yyyy-MM-dd' string
+- Follow the style of @lib/features/auth/domain/models/user_model.dart
+```
+
+### 6.3 Repository Interface (Round 3)
+
+```
+/compact
+
+Step 2: Create the Repository interface.
+
+Under lib/features/checkin/domain/repositories/, create checkin_repository.dart:
+
+Methods:
+- checkIn(userId: String) → Future<Either<Failure, CheckInRecord>>
+- getCheckInRecords(userId: String, month: DateTime) → Future<Either<Failure, List<CheckInRecord>>>
+- getCheckInStats(userId: String) → Future<Either<Failure, CheckInStats>>
+- isCheckedInToday(userId: String) → Future<Either<Failure, bool>>
+
+Follow the interface style of @lib/features/auth/domain/repositories/auth_repository.dart.
+```
+
+Note the `/compact` to compress context — the detailed conversation from previous rounds is no longer needed.
+
+### 6.4 Data Layer Implementation (Round 4)
+
+```
+/compact
+
+Step 3: Implement the data layer.
+
+1. Under lib/features/checkin/data/data_sources/, create checkin_remote_data_source.dart:
+   - Connect to Firebase Firestore
+   - Collection path: users/{userId}/checkins
+   - Use server timestamp for check-in time
+   - Query current month records with where + orderBy
+
+2. Under lib/features/checkin/data/repositories/, create checkin_repository_impl.dart:
+   - Implement CheckInRepository interface
+   - Error handling: convert Firebase exceptions to Failure
+   - isCheckedInToday uses local cache optimization (avoid querying Firestore every time)
+
+Constraints:
+- No dynamic types
+- All Firestore operations wrapped in try-catch
+- Follow the implementation patterns in @lib/features/auth/data/
+```
+
+### 6.5 UI Implementation (Round 5)
+
+```
+/compact
+
+Step 4: Implement the UI layer.
+
+1. Under lib/features/checkin/presentation/providers/, create:
+   - checkin_provider.dart: manage check-in state
+   - checkin_records_provider.dart: manage calendar data
+
+2. Under lib/features/checkin/presentation/pages/, create checkin_page.dart:
+   - Top: today's check-in button (large, prominent)
+   - Middle: check-in calendar (using table_calendar)
+   - Bottom: stats cards (total days, current streak, longest streak)
+   - Check-in button has animation feedback on tap
+
+3. Under lib/features/checkin/presentation/widgets/, create:
+   - checkin_button.dart: check-in button (with animation)
+   - checkin_stats_card.dart: statistics card
+
+Constraints:
+- Providers use AsyncNotifier pattern
+- Page uses ConsumerStatefulWidget
+- All text uses l10n, no hardcoded strings
+- Follow the layout of @lib/features/todo/presentation/pages/todo_list_page.dart
+```
+
+### 6.6 Testing (Round 6)
+
+```
+/compact
+
+Step 5: Write unit tests.
+
+Write tests for the check-in feature under test/features/checkin/:
+
+1. checkin_repository_impl_test.dart:
+   - Normal check-in success
+   - Duplicate check-in (already checked in today)
+   - Get current month records
+   - Get statistics data
+   - Firestore exception handling
+
+2. checkin_provider_test.dart:
+   - Initial state
+   - State update after successful check-in
+   - Error state after failed check-in
+
+Requirements:
+- Mocks use mocktail
+- Each test uses arrange-act-assert pattern
+- Running flutter test test/features/checkin/ passes all tests
+```
+
+### 6.7 Code Review (Round 7)
+
+```
+/compact
+
+Final step: review the entire check-in feature's code.
+
+Please check:
+1. Does the architecture follow Clean Architecture principles?
+2. Any potential bugs (especially date handling and timezone issues)?
+3. Are Riverpod Provider lifecycles reasonable?
+4. Any Firestore query performance issues?
+5. Is error handling comprehensive?
+6. Is type safety maintained throughout?
+
+Provide specific improvement suggestions.
+```
+
+This complete 7-round conversation demonstrates several key points:
+
+- **One concern per round**: models → interfaces → implementation → UI → tests → review
+- **Each round has clear constraints and acceptance criteria**
+- **Use `/compact` to manage context**
+- **Future steps are communicated but not executed**
+- **Final round does a holistic review**
+
+---
+
+## 7. Anti-Patterns: Prompts to Avoid
+
+### 7.1 "Help Me Build XXX"
+
+```
+❌ Help me build a check-in feature
+```
+
+Problem: Zero context. Claude doesn't know your tech stack, architecture, or constraints. It'll follow its own defaults, which are rarely what you want.
+
+### 7.2 Over-Detailed Implementation Instructions
+
+```
+❌ After line 15, add an if statement that checks if user.isCheckedIn is true,
+if so return, if not call repository.checkIn(user.id),
+then assign the result to a result variable...
+```
+
+Problem: You're writing code in natural language. This is slower than writing code directly, and Claude might have a better implementation approach. **Tell it "what to do," not "how to do it."**
+
+### 7.3 Cramming Too Many Tasks at Once
+
+```
+❌ Implement the check-in feature including data models, Repository, DataSource,
+Provider, UI pages, animations, unit tests, integration tests, i18n,
+dark mode support, and a Cloud Function to sync check-in data to the backend.
+```
+
+Problem: Too many tasks — Claude will lose focus. Split into multiple rounds, one concern per round.
+
+### 7.4 Modification Requests Without Context
+
+```
+❌ Fix that bug
+```
+
+Problem: Which bug? In which file? What symptoms? Claude can't read your mind.
+
+### 7.5 Contradictory Constraints
+
+```
+❌ Refactor this module with these requirements:
+- Don't change any existing code
+- Split all classes into smaller classes
+```
+
+Problem: How do you split classes without changing code? Contradictory constraints confuse Claude and degrade output quality.
+
+### 7.6 Expecting Claude to Read Your Mind
+
+```
+❌ This code isn't great, optimize it
+```
+
+Problem: "Not great" how? Poor performance? Bad readability? Flawed architecture? Different kinds of "not great" lead to completely different optimization directions.
+
+---
+
+## 8. Frequently Asked Questions
+
+### Q1: Does a long prompt waste tokens?
+
+No. A detailed prompt might cost an extra 200 tokens, but it can save 3-4 iterations (each costing 5,000+ tokens). **Invest upfront, reap returns later.**
+
+### Q2: Are English prompts more effective than Chinese?
+
+In Claude Code, the difference is minimal. Claude's Chinese comprehension is strong. Use whichever language you're most comfortable with. The only exception: if your codebase is entirely in English, English prompts avoid mixed-language comments.
+
+### Q3: How do I know if my prompt is good?
+
+Watch two metrics:
+1. **Iteration count**: If a task takes more than 3 rounds, the prompt can be improved
+2. **Manual edit volume**: If Claude's output needs heavy manual adjustment, constraints weren't clear enough
+
+### Q4: What if Claude misunderstands?
+
+Don't repeat the same prompt. Try a different approach:
+- Provide more context
+- Use concrete examples
+- Break into smaller steps
+- Directly point out what it got wrong
+
+### Q5: Claude starts "forgetting" earlier constraints in long conversations?
+
+This is a context window limitation. Solutions:
+1. Use `/compact` to compress context
+2. Put key constraints in CLAUDE.md (auto-loaded every conversation)
+3. Repeat critical constraints in new prompts
+4. Start a new session and re-feed key context
+
+### Q6: Can Claude write prompts for me?
+
+Yes. This is actually a great technique:
+
+```
+I want to implement a check-in feature. Please write a detailed prompt
+that I can use to have you (or another Claude session) implement this feature.
+
+Project tech stack: Flutter + Riverpod + Firebase + Clean Architecture
+```
+
+Claude-generated prompts are usually more structured than hand-written ones.
+
+### Q7: Do prompt templates limit Claude's creativity?
+
+No. Templates provide structure, not content. Like writing an article with an outline — the content is still free-form. Good templates actually let Claude focus its "creativity" on solving problems rather than guessing your intent.
+
+---
+
+## Summary
+
+Writing good prompts isn't magic. It comes down to three things:
+
+1. **Be clear** — goals, constraints, acceptance criteria
+2. **Give context** — file references, pipe input, reference code
+3. **Go step by step** — one concern at a time, iterate forward
+
+Internalize these principles as habits, and your collaboration with Claude Code will improve dramatically.
+
+---
+
+## Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-overview) — Where prompt techniques were first introduced
+- [The Complete CLAUDE.md Guide](/en/blog/claude-code-claude-md) — Write project-level prompt conventions into CLAUDE.md
+- [Claude Code Hooks Guide](/en/blog/claude-code-hooks) — Automate repetitive operations with Hooks
+- [Context Management Guide](/en/blog/claude-code-context) — Manage context well to make prompts more effective
+- [Multi-Agent Parallelism Guide](/en/blog/claude-code-multi-agent) — Prompt strategies for multi-terminal collaboration
+- [Custom Slash Commands Guide](/en/blog/claude-code-skills) — Turn prompt templates into one-click commands
+- [MCP Server Deep Dive](/en/blog/claude-code-mcp) — Extend Claude's capabilities with MCP
