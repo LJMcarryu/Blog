@@ -1,0 +1,610 @@
+---
+title: "Claude Code Memory 系统深度指南：跨会话记忆、自动记忆与最佳实践"
+date: "2026-03-19"
+description: 深入讲解 Claude Code 的 Memory 系统，涵盖三层记忆架构、/memory 命令高级用法、auto-memory 触发机制、文件管理策略、跨项目组织方案与实战模式。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+在 [CLAUDE.md 指南](/zh/blog/claude-code-claude-md)里，我们讲了 `/memory` 命令的基础用法、三层 CLAUDE.md 体系、以及从 Memory 到 CLAUDE.md 的工作流。在[上下文管理指南](/zh/blog/claude-code-context)里，我们讲了如何高效管理 Claude Code 的上下文窗口。
+
+但 Memory 系统远不止 `/memory` 一个命令。
+
+Claude Code 有一套完整的**跨会话持久化记忆机制**——包括手动记忆、自动记忆、主题文件、多层级存储。理解这套机制，能让 Claude 在每次新会话中都"记住"你的项目约定、个人偏好和历史决策，而不是每次从零开始。
+
+一句话定位：**CLAUDE.md 指南讲了基础，这篇讲透 Memory 系统的完整能力和最佳实践。**
+
+---
+
+## 一、Memory 系统全景
+
+### 1.1 Memory 的本质
+
+Memory 系统的核心目标：**让 Claude 在新会话中拥有跨会话的上下文**。
+
+每次你启动一个新的 Claude Code 会话，Claude 不会记得上次对话的内容。但通过 Memory 系统，你可以把重要信息持久化到文件中，Claude 在每次启动时自动加载这些文件，从而"记��"关键信息。
+
+这和人类的记忆类似：
+- **工作记忆**（当前会话上下文）：容量有限，会话结束就消失
+- **长期记忆**（Memory 文件）：持久化存储，每次会话自动加载
+
+### 1.2 三层记忆架构
+
+```
+┌─────────────────────────────────────────────────┐
+│              用户级 Memory                        │
+│         ~/.claude/CLAUDE.md                      │
+│         所有项目共享，个人全局偏好                   │
+├─────────────────────────────────────────────────┤
+│           项目用户级 Memory                       │
+│    ~/.claude/projects/<hash>/CLAUDE.md           │
+│    ~/.claude/projects/<hash>/memory/MEMORY.md    │
+│    ~/.claude/projects/<hash>/memory/*.md          │
+│    特定项目的个人笔记，不提交 Git                    │
+├─────────────────────────────────────────────────┤
+│             项目级 CLAUDE.md                      │
+│         <project>/.claude/CLAUDE.md              │
+│         <project>/CLAUDE.md                      │
+│         团队共享，提交到 Git                        │
+└─────────────────────────────────────────────────┘
+```
+
+每一层的定位不同：
+
+| 层级 | 存储位置 | 谁能看到 | 典型内容 |
+|------|---------|---------|---------|
+| 用户级 | `~/.claude/CLAUDE.md` | 只有你 | 全局偏好（语言、风格、工具链） |
+| 项目用户级 | `~/.claude/projects/<hash>/` | 只有你 | 项目中的个人笔记、调试心得 |
+| 项目级 | 项目根目录 | 整个团队 | 项目约定、架构决策、编码规范 |
+
+### 1.3 Auto-Memory 目录
+
+除了 CLAUDE.md 文件，Claude Code 还有一个**自动记忆目录**：
+
+```
+~/.claude/projects/<hash>/memory/
+├── MEMORY.md          # 主记忆文件（自动加载到上下文）
+├── debugging.md       # 主题文件：调试经验
+├── patterns.md        # 主题文件：项目模式
+└── api-notes.md       # 主题文件：API 相关笔记
+```
+
+关键规则：
+- `MEMORY.md` **每次会话自动加载**，前 200 行会被注入到上下文中
+- 主题文件**不会自动加载**，但 Claude 可以按需读取
+- 这个目录由 Claude 自己管理（auto-memory 功能），你也可以手动编辑
+
+### 1.4 加载时机和优先级
+
+Claude Code 启动时，按以下顺序加载 Memory：
+
+1. **用户级** `~/.claude/CLAUDE.md`
+2. **项目用户级** `~/.claude/projects/<hash>/CLAUDE.md`
+3. **项目级** 项目根目录的 `CLAUDE.md` 和 `.claude/CLAUDE.md`
+4. **子目录级** 当前工作目录下的 `CLAUDE.md`（如果不在根目录）
+5. **Auto-Memory** `~/.claude/projects/<hash>/memory/MEMORY.md`
+
+所有层级的内容都会被加载，不存在覆盖关系——它们是**叠加**的。如果不同层级有冲突的指令，Claude 会倾向于遵循更具体的层级（项目级 > 用户级）。
+
+---
+
+## 二、/memory 命令深度使用
+
+### 2.1 基础回顾
+
+> 详细的基础用法见 [CLAUDE.md 指南第六节](/zh/blog/claude-code-claude-md)。这里只做简要回顾。
+
+`/memory` 命令会打开一个编辑器，让你编辑**项目用户级** CLAUDE.md 文件：
+
+```
+你：/memory
+# 打开编辑器，编辑 ~/.claude/projects/<hash>/CLAUDE.md
+```
+
+保存后，内容会在当前会话和所有后续会话中生效。
+
+### 2.2 高级用法
+
+#### 结构化记忆
+
+不要把 `/memory` 当成随手记的便签。用结构化的格式组织信息：
+
+```markdown
+# 项目约定
+
+## 测试
+- 运行测试前需要先启动 Docker：docker compose up -d
+- 集成测试使用 test 数据库，不要用 dev 数据库
+- 测试文件放在 __tests__ 目录，不要放在 src 里
+
+## 部署
+- staging 分支自动部署到 staging 环境
+- 生产部署需要先跑 npm run build:check
+
+## 代码风格
+- 使用 named export，不用 default export
+- React 组件用 function 声明，不用箭头函数
+```
+
+#### 否定记忆（"不要做"）
+
+否定记忆特别有用——告诉 Claude 不要做某些事：
+
+```markdown
+## 禁止事项
+- 不要自动添加 console.log 调试语句
+- 不要修改 .env 文件
+- 不要在 PR 描述中使用 emoji
+- 不要自动运行 npm install
+```
+
+#### 条件记忆
+
+针对不同场景设置不同的行为：
+
+```markdown
+## 场景规则
+- 修改数据库 schema 后：运行 npx prisma generate && npx prisma db push
+- 修改 API 路由后：更新 docs/api.md 中的对应文档
+- 创建新组件后：在 components/index.ts 中添加导出
+```
+
+### 2.3 /memory vs 手动编辑
+
+| 场景 | 推荐方式 | 原因 |
+|------|---------|------|
+| 快速记一条规则 | `/memory` | 方便，自动定位文件 |
+| 大规模整理 | 手动编辑文件 | 编辑器更适合批量操作 |
+| 编辑 auto-memory | 手动编辑 | `/memory` 只编辑 CLAUDE.md，不编辑 memory 目录 |
+| 编辑用户级 CLAUDE.md | 手动编辑 | `/memory` 只编辑项目用户级 |
+
+手动编辑的路径：
+```bash
+# 项目用户级 CLAUDE.md
+~/.claude/projects/<hash>/CLAUDE.md
+
+# Auto-Memory 目录
+~/.claude/projects/<hash>/memory/MEMORY.md
+
+# 用户级 CLAUDE.md
+~/.claude/CLAUDE.md
+```
+
+> **提示**：不知道 hash 是什么？在 Claude Code 中问"我的项目记忆文件在哪里"，它会告诉你完整路径。
+
+---
+
+## 三、Auto-Memory 机制
+
+### 3.1 什么是 Auto-Memory
+
+Auto-Memory 是 Claude Code 的**自动记忆建议**功能。当 Claude 在对话中发现值得记住的信息时，会主动提议保存到 memory 目录。
+
+与 `/memory` 命令的区别：
+- `/memory`：你主动告诉 Claude 要记住什么
+- Auto-Memory：Claude 主动建议记住什么
+
+### 3.2 触发条件
+
+Auto-Memory 通常在以下场景触发：
+
+**1. 你纠正了 Claude 的错误**
+```
+你：不对，这个项目用 pnpm，不是 npm
+Claude：明白了。我建议把这个记录到 memory 中，
+这样以后的会话也能记住这个偏好。
+[保存到 memory？ 是 / 否]
+```
+
+**2. 你重复表达了某个偏好**
+```
+你：（第三次）用 TypeScript 的 interface，不要用 type
+Claude：我注意到你多次提到这个偏好。
+建议保存到 memory 中。
+```
+
+**3. Claude 发现了项目约定**
+```
+Claude：我注意到这个项目的所有 API 路由都使用
+zod 做参数验证。要把这个模式记录到 memory 吗？
+```
+
+**4. 你明确要求记住**
+```
+你：记住，这个项目的测试要用 vitest --run，不要用 watch 模式
+Claude：好的，我会把这个保存到 memory。
+```
+
+### 3.3 MEMORY.md 的 200 行截断规则
+
+这是一个关键的技术细节：
+
+**`MEMORY.md` 只有前 200 行会被加载到上下文中。** 超过 200 行的内容会被截断，Claude 看不到。
+
+这意味着：
+- 把最重要的信息放在文件开头
+- 定期清理不再需要的记忆
+- 详细内容放到主题文件中，在 MEMORY.md 里只放摘要和链接
+
+```markdown
+# MEMORY.md（控制在 200 行以内）
+
+## 项目概览
+- 框架：Next.js 14 + TypeScript
+- 包管理：pnpm
+- 详细架构见 [architecture.md](./architecture.md)
+
+## 关键约定
+- 测试框架：Vitest
+- 代码风格详见 [patterns.md](./patterns.md)
+```
+
+### 3.4 主题文件的创建和引用
+
+当某个主题的信息量较大时，应该创建独立的主题文件：
+
+```
+~/.claude/projects/<hash>/memory/
+├── MEMORY.md              # 索引 + 高频信息
+├── architecture.md        # 项目架构详情
+├── debugging.md           # 调试经验和已知问题
+├── api-patterns.md        # API 设计模式
+└── deployment.md          # 部署流程和注意事项
+```
+
+主题文件不会自动加载到上下文，但 Claude 可以在需要时读取它们。在 MEMORY.md 中引用主题文件，Claude 就知道去哪里找详细信息。
+
+### 3.5 接受 vs 拒绝建议
+
+Auto-Memory 建议不是都要接受。判断标准：
+
+**应该接受的：**
+- 项目级的稳定约定（包管理器、测试框架、代码风格）
+- 反复出现的纠正（说明 Claude 确实需要记住）
+- 重要的架构决策
+
+**应该拒绝的：**
+- 临时性的信息（"这个 bug 在 feature-x 分支"）
+- 过于具体的实现细节（"UserService 的第 42 行有个 TODO"）
+- 可能很快过时的信息
+
+### 3.6 局限性
+
+Auto-Memory 有几个重要的局限：
+
+- **不会自动清理**：过时的记忆不会自动删除，需要你手动维护
+- **不会自动合并**：重复的记忆可能被多次保存
+- **不会跨项目同步**：项目 A 的记忆不会自动应用到项目 B
+- **触发不可控**：你无法精确控制什么时候触发建议
+
+---
+
+## 四、Memory 文件管理
+
+### 4.1 查看所有 Memory 文件
+
+```bash
+# 查看项目的 auto-memory 目录
+ls ~/.claude/projects/
+
+# 找到当前项目的 hash
+# 在 Claude Code 中问："我的 memory 文件在哪里"
+
+# 查看 memory 目录内容
+ls ~/.claude/projects/<hash>/memory/
+
+# 查看 MEMORY.md
+cat ~/.claude/projects/<hash>/memory/MEMORY.md
+```
+
+或者直接在 Claude Code 中：
+```
+你：列出我所有的 memory 文件
+你：显示我的 MEMORY.md 内容
+```
+
+### 4.2 编辑整理
+
+Memory 文件需要定期整理，就像整理笔记一样：
+
+**合并重复**：
+```markdown
+# 整理前
+- 用 pnpm 不要用 npm
+- 包管理器是 pnpm
+- 记住用 pnpm
+
+# 整理后
+- 包管理器：pnpm（不要用 npm/yarn）
+```
+
+**删除过时**：
+```markdown
+# 删除这些（项目已经迁移到 Vitest）
+- ❌ 测试框架是 Jest
+- ❌ Jest 配置在 jest.config.ts
+```
+
+**重新分类**：把混在一起的信息拆分到主题文件中。
+
+### 4.3 推荐的文件结构
+
+```
+memory/
+├── MEMORY.md              # 索引文件（< 200 行）
+│   ├── 项目概览（5-10 行）
+│   ├── 关键约定（20-30 行）
+│   ├── 主题文件索引（5-10 行）
+│   └── 近期重要变更（5-10 行）
+├── patterns.md            # 代码模式和约定
+├── debugging.md           # 调试经验
+└── decisions.md           # 架构决策记录
+```
+
+原则：
+- MEMORY.md 是**索引**，不是**仓库**
+- 高频信息放 MEMORY.md，低频详情放主题文件
+- 每个主题文件控制在 100 行以内
+
+### 4.4 大小控制
+
+Memory 文件的大小直接影响性能：
+
+- MEMORY.md 的前 200 行**每次会话都会加载**
+- 加载的内容消耗 context window 的 token
+- 过大的 memory 会挤压实际工作的上下文空间
+
+> 关于 token 消耗和上下文管理的详细讨论，见[上下文管理指南](/zh/blog/claude-code-context)和[性能优化指南](/zh/blog/claude-code-performance)。
+
+建议的大小限制：
+- MEMORY.md：100-150 行（留 buffer，不要用满 200 行）
+- 单个主题文件：50-100 行
+- 总 memory 文件数：不超过 5-8 个
+
+### 4.5 定期维护节奏
+
+推荐的维护频率：
+
+| 频率 | 操作 |
+|------|------|
+| 每周 | 快速浏览 MEMORY.md，删除过时条目 |
+| 每月 | 全面整理：合并重复、更新过时、重新分类 |
+| 项目里程碑后 | 大规模清理：删除已完成功能的临时记忆 |
+| 换项目阶段时 | 把有价值的模式提炼到用户级 CLAUDE.md |
+
+---
+
+## 五、跨项目 Memory 策略
+
+### 5.1 用户级 vs 项目用户级
+
+内容划分的核心原则：**跨项目通用的放用户级，项目特定的放项目用户级。**
+
+```markdown
+# ~/.claude/CLAUDE.md（用户级）
+## 全局偏好
+- 回复语言：中文
+- 代码注释语言：英文
+- 提交信息格式：Conventional Commits
+- 偏好 TypeScript 而非 JavaScript
+- 使用 function 声明而非箭头函数定义组件
+```
+
+```markdown
+# ~/.claude/projects/<hash>/CLAUDE.md（项目用户级）
+## 项目特定
+- 包管理器：pnpm
+- 测试命令：pnpm test
+- 数据库：PostgreSQL + Prisma
+- 部署：Vercel
+```
+
+### 5.2 多项目开发者的组织策略
+
+如果你同时维护多个项目，用户级 CLAUDE.md 是统一偏好的关键：
+
+```markdown
+# ~/.claude/CLAUDE.md
+
+## 通用编码偏好
+- TypeScript strict mode
+- ESLint + Prettier
+- Conventional Commits
+
+## 通用工具偏好
+- 终端：使用 bash 语法
+- Git：不要自动 push，只 commit
+- 测试：优先使用 Vitest
+
+## 通用沟通偏好
+- 回复用中文
+- 代码注释用英文
+- 不要在代码中加 emoji
+```
+
+这样每个项目都会继承这些偏好，不需要在每个项目的 memory 中重复。
+
+### 5.3 从个人 Memory 提炼团队 CLAUDE.md
+
+当你在个人 memory 中积累了足够多的项目约定后，可以把稳定的部分提炼到项目级 CLAUDE.md，让整个团队受益：
+
+```
+个人 Memory 中的发现                    团队 CLAUDE.md
+┌──────────────────────┐           ┌──────────────────────┐
+│ - API 都用 zod 验证    │           │ ## API 约定            │
+│ - 错误用 AppError 类   │  ──提炼──→ │ - 参数验证：zod         │
+│ - 路由命名用 kebab-case │           │ - 错误处理：AppError    │
+│ - 个人调试技巧（不提炼） │           │ - 路由命名：kebab-case  │
+└──────────────────────┘           └──────────────────────┘
+```
+
+工作流：
+1. 日常使用中，auto-memory 和 `/memory` 积累个人发现
+2. 每隔一段时间，review 个人 memory
+3. 把**稳定的、团队通用的**约定提炼到项目根目录的 CLAUDE.md
+4. 提交到 Git，团队共享
+5. 从个人 memory 中删除已提炼的内容（避免重复）
+
+---
+
+## 六、实战模式
+
+### 6.1 新项目冷启动
+
+刚创建一个新项目时，Memory 是空的。推荐的冷启动流程：
+
+**第一步：创建项目级 CLAUDE.md**
+```markdown
+# 项目名称
+
+## 技术栈
+- 框架：Next.js 15
+- 语言：TypeScript
+- 样式：Tailwind CSS
+- 数据库：PostgreSQL + Prisma
+
+## 开发命令
+- 启动：pnpm dev
+- 测试：pnpm test
+- 构建：pnpm build
+
+## 代码约定
+- 组件目录：src/components/
+- API 路由：src/app/api/
+- 使用 named export
+```
+
+**第二步：设置用户级偏好**（如果还没有）
+```
+你：/memory
+# 添加你的全局偏好
+```
+
+**第三步：让 Claude 探索项目**
+```
+你：请浏览这个项目的结构，了解主要的代码模式和约定
+```
+
+Claude 会在探索过程中发现模式，并可能通过 auto-memory 建议保存。
+
+### 6.2 接手他人项目
+
+接手一个不熟悉的项目时，Memory 系统可以加速你的理解：
+
+```
+你：请帮我分析这个项目的架构，包括：
+1. 目录结构和各模块的职责
+2. 主要的设计模式
+3. 数据流向
+4. 测试策略
+把关键发现保存到 memory 中。
+```
+
+然后逐步补充：
+```
+你：/memory
+# 添加你在阅读代码过程中发现的重要信息
+# 比如：哪些模块是核心的、哪些代码比较脆弱、
+# 哪些地方有技术债务
+```
+
+### 6.3 长期维护项目
+
+对于维护了很久的项目，Memory 的重点是**保持更新**：
+
+- 技术栈升级后，更新 memory 中的版本信息
+- 架构变更后，更新架构相关的记忆
+- 团队成员变动后，更新协作相关的约定
+- 定期清理已完成功能的临时记忆
+
+一个常见的反模式是：memory 中还写着"正在从 Jest 迁移到 Vitest"，但迁移早就完成了。这种过时信息会误导 Claude。
+
+### 6.4 多人协作
+
+在团队项目中，Memory 的边界很重要：
+
+| 内容 | 放哪里 | 原因 |
+|------|--------|------|
+| 团队编码规范 | 项目级 CLAUDE.md | 所有人共享 |
+| CI/CD 流程 | 项目级 CLAUDE.md | 所有人需要知道 |
+| 个人调试技巧 | 个人 memory | 不影响他人 |
+| 个人工具偏好 | 用户级 CLAUDE.md | 跨项目通用 |
+| "我负责的模块" | 个人 memory | 个人上下文 |
+
+核心原则：**项目级 CLAUDE.md 是团队的共识文档，个人 memory 是你的私人笔记。不要把个人偏好写进团队文档，也不要把团队约定只存在个人 memory 里。**
+
+---
+
+## 七、常见问题
+
+### Memory 会被提交到 Git 吗？
+
+**不会。** 个人 memory 存储在 `~/.claude/` 目录下，不在项目目录中，不会被 Git 追踪。
+
+项目级 CLAUDE.md（在项目根目录）**会**被提交到 Git——这是设计如此，因为它是团队共享的。
+
+### /memory 和直接编辑 CLAUDE.md 的区别？
+
+`/memory` 命令编辑的是**项目用户级** CLAUDE.md（`~/.claude/projects/<hash>/CLAUDE.md`）。
+
+如果你想编辑：
+- 用户级 CLAUDE.md → 手动编辑 `~/.claude/CLAUDE.md`
+- 项目级 CLAUDE.md → 手动编辑项目根目录的 `CLAUDE.md`
+- Auto-Memory → 手动编辑 `~/.claude/projects/<hash>/memory/MEMORY.md`
+
+### Memory 太多影响性能吗？
+
+**会。** 所有 CLAUDE.md 文件和 MEMORY.md 的前 200 行在每次会话启动时都会加载到上下文中。过多的 memory 内容会：
+- 消耗 context window 的 token 配额
+- 增加每次请求的 token 消耗（= 更高的成本）
+- 挤压实际工作可用的上下文空间
+
+建议总 memory 内容控制在 300-500 行以内（所有层级加起来）。
+
+### 换电脑后怎么迁移？
+
+Memory 文件存储在 `~/.claude/` 目录下。迁移方法：
+
+```bash
+# 在旧电脑上
+cp -r ~/.claude/ ~/claude-backup/
+
+# 在新电脑上
+cp -r ~/claude-backup/.claude/ ~/
+```
+
+注意：项目用户级 memory 的路径包含项目路径的 hash。如果新电脑上的项目路径不同，hash 会变，需要手动移动对应的目录。
+
+### 怎么让 Claude 忘记某条记忆？
+
+三种方式：
+
+1. **对话中要求**："忘记关于 xxx 的记忆"——Claude 会从 memory 文件中删除
+2. **手动编辑**：直接编辑对应的 memory 文件，删除不需要的内容
+3. **`/memory` 命令**：打开编辑器，删除对应的行
+
+### Auto-Memory 建议太频繁怎么办？
+
+目前没有全局开关来禁用 auto-memory 建议。但你可以：
+
+- 在用户级 CLAUDE.md 中添加："不要主动建议保存 memory，除非我明确要求"
+- 每次拒绝不需要的建议（Claude 会学习你的偏好）
+
+---
+
+## 八、总结
+
+### 3 个核心要点
+
+1. **分层存储**：用户级放全局偏好，项目用户级放个人笔记，项目级放团队约定。不要混淆层级。
+
+2. **控制大小**：MEMORY.md 控制在 150 行以内，详细内容放��题文件。Memory 不是越多越好——每一行都在消耗 token。
+
+3. **定期维护**：Memory 不是写了就不管的。过时的记忆比没有记忆更糟糕，因为它会误导 Claude。养成定期清理的习惯。
+
+### 推荐阅读
+
+- [CLAUDE.md 指南](/zh/blog/claude-code-claude-md)——Memory 系统的基础，三层 CLAUDE.md 体系
+- [上下文管理指南](/zh/blog/claude-code-context)——如何高效管理 Claude Code 的上下文窗口
+- [性能优化指南](/zh/blog/claude-code-performance)——token 消耗优化和成本控制

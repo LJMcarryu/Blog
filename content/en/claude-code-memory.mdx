@@ -1,0 +1,612 @@
+---
+title: "Claude Code Memory System Deep Dive: Cross-Session Memory, Auto-Memory, and Best Practices"
+date: "2026-03-19"
+description: A comprehensive guide to Claude Code's Memory system — covering the three-layer memory architecture, advanced /memory usage, auto-memory triggers, file management strategies, cross-project organization, and real-world patterns.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In the [CLAUDE.md Guide](/en/blog/claude-code-claude-md), we covered the basics of the `/memory` command, the three-layer CLAUDE.md hierarchy, and the workflow from Memory to CLAUDE.md. In the [Context Management Guide](/en/blog/claude-code-context), we covered how to efficiently manage Claude Code's context window.
+
+But the Memory system is much more than the `/memory` command.
+
+Claude Code has a complete **cross-session persistent memory mechanism** — including manual memory, auto-memory, topic files, and multi-layer storage. Understanding this system lets Claude "remember" your project conventions, personal preferences, and historical decisions across every new session, instead of starting from scratch each time.
+
+One-line summary: **The CLAUDE.md Guide covered the basics — this post covers the full capabilities and best practices of the Memory system.**
+
+---
+
+## 1. Memory System Overview
+
+### 1.1 What Memory Really Is
+
+The Memory system's core goal: **give Claude cross-session context in new conversations.**
+
+Every time you start a new Claude Code session, Claude doesn't remember the previous conversation. But through the Memory system, you can persist important information to files that Claude automatically loads at startup, effectively "remembering" key information.
+
+This mirrors how human memory works:
+- **Working memory** (current session context): limited capacity, gone when the session ends
+- **Long-term memory** (Memory files): persistent storage, auto-loaded every session
+
+### 1.2 Three-Layer Memory Architecture
+
+```
+┌─────────────────────────────────────────────────┐
+│              User-Level Memory                   │
+│         ~/.claude/CLAUDE.md                      │
+│         Shared across all projects               │
+├─────────────────────────────────────────────────┤
+│          Project-User-Level Memory               │
+│    ~/.claude/projects/<hash>/CLAUDE.md           │
+│    ~/.claude/projects/<hash>/memory/MEMORY.md    │
+│    ~/.claude/projects/<hash>/memory/*.md          │
+│    Personal notes for a specific project         │
+├─────────────────────────────────────────────────┤
+│           Project-Level CLAUDE.md                │
+│         <project>/.claude/CLAUDE.md              │
+│         <project>/CLAUDE.md                      │
+│         Shared with the team, committed to Git   │
+└─────────────────────────────────────────────────┘
+```
+
+Each layer serves a different purpose:
+
+| Layer | Location | Who Sees It | Typical Content |
+|-------|----------|-------------|-----------------|
+| User-level | `~/.claude/CLAUDE.md` | Only you | Global preferences (language, style, toolchain) |
+| Project-user | `~/.claude/projects/<hash>/` | Only you | Personal notes, debugging insights |
+| Project-level | Project root | Entire team | Project conventions, architecture, coding standards |
+
+### 1.3 The Auto-Memory Directory
+
+Beyond CLAUDE.md files, Claude Code has an **auto-memory directory**:
+
+```
+~/.claude/projects/<hash>/memory/
+├── MEMORY.md          # Main memory file (auto-loaded into context)
+├── debugging.md       # Topic file: debugging experience
+├── patterns.md        # Topic file: project patterns
+└── api-notes.md       # Topic file: API-related notes
+```
+
+Key rules:
+- `MEMORY.md` is **auto-loaded every session** — the first 200 lines are injected into context
+- Topic files are **not auto-loaded**, but Claude can read them on demand
+- This directory is managed by Claude (auto-memory feature), but you can also edit it manually
+
+### 1.4 Loading Order and Priority
+
+When Claude Code starts, it loads Memory in this order:
+
+1. **User-level** `~/.claude/CLAUDE.md`
+2. **Project-user-level** `~/.claude/projects/<hash>/CLAUDE.md`
+3. **Project-level** `CLAUDE.md` and `.claude/CLAUDE.md` in the project root
+4. **Subdirectory-level** `CLAUDE.md` in the current working directory (if not at root)
+5. **Auto-Memory** `~/.claude/projects/<hash>/memory/MEMORY.md`
+
+All layers are loaded — there's no override. They're **additive**. If different layers have conflicting instructions, Claude tends to follow the more specific layer (project-level > user-level).
+
+---
+
+## 2. Deep Dive into /memory
+
+### 2.1 Quick Recap
+
+> For detailed basics, see [CLAUDE.md Guide Section 6](/en/blog/claude-code-claude-md). Here's a brief recap.
+
+The `/memory` command opens an editor for the **project-user-level** CLAUDE.md file:
+
+```
+You: /memory
+# Opens editor for ~/.claude/projects/<hash>/CLAUDE.md
+```
+
+After saving, the content takes effect in the current session and all future sessions.
+
+### 2.2 Advanced Usage
+
+#### Structured Memory
+
+Don't use `/memory` as a scratch pad. Organize information with structure:
+
+```markdown
+# Project Conventions
+
+## Testing
+- Start Docker before running tests: docker compose up -d
+- Integration tests use the test database, not dev
+- Test files go in __tests__, not in src
+
+## Deployment
+- staging branch auto-deploys to staging environment
+- Production deploy requires npm run build:check first
+
+## Code Style
+- Use named exports, not default exports
+- React components use function declarations, not arrow functions
+```
+
+#### Negative Memory ("Don't Do This")
+
+Negative memory is especially useful — telling Claude what NOT to do:
+
+```markdown
+## Prohibited
+- Don't auto-add console.log debug statements
+- Don't modify .env files
+- Don't use emoji in PR descriptions
+- Don't auto-run npm install
+```
+
+#### Conditional Memory
+
+Set different behaviors for different scenarios:
+
+```markdown
+## Scenario Rules
+- After modifying database schema: run npx prisma generate && npx prisma db push
+- After modifying API routes: update the corresponding docs in docs/api.md
+- After creating a new component: add export in components/index.ts
+```
+
+### 2.3 /memory vs Manual Editing
+
+| Scenario | Recommended | Why |
+|----------|-------------|-----|
+| Quick single rule | `/memory` | Convenient, auto-locates the file |
+| Large-scale reorganization | Manual edit | Editor is better for bulk operations |
+| Edit auto-memory | Manual edit | `/memory` only edits CLAUDE.md, not the memory directory |
+| Edit user-level CLAUDE.md | Manual edit | `/memory` only edits project-user-level |
+
+Manual editing paths:
+```bash
+# Project-user-level CLAUDE.md
+~/.claude/projects/<hash>/CLAUDE.md
+
+# Auto-Memory directory
+~/.claude/projects/<hash>/memory/MEMORY.md
+
+# User-level CLAUDE.md
+~/.claude/CLAUDE.md
+```
+
+> **Tip**: Don't know the hash? Ask Claude Code "where are my project memory files" — it'll give you the full path.
+
+---
+
+## 3. Auto-Memory Mechanism
+
+### 3.1 What Is Auto-Memory
+
+Auto-Memory is Claude Code's **automatic memory suggestion** feature. When Claude discovers information worth remembering during a conversation, it proactively proposes saving it to the memory directory.
+
+The difference from `/memory`:
+- `/memory`: You tell Claude what to remember
+- Auto-Memory: Claude suggests what to remember
+
+### 3.2 Trigger Conditions
+
+Auto-Memory typically triggers in these scenarios:
+
+**1. You correct Claude's mistake**
+```
+You: No, this project uses pnpm, not npm
+Claude: Got it. I'd suggest saving this to memory
+so future sessions remember this preference.
+[Save to memory? Yes / No]
+```
+
+**2. You repeatedly express a preference**
+```
+You: (third time) Use TypeScript interface, not type
+Claude: I've noticed you've mentioned this preference
+multiple times. Suggest saving to memory.
+```
+
+**3. Claude discovers a project convention**
+```
+Claude: I notice all API routes in this project use
+zod for parameter validation. Want to save this
+pattern to memory?
+```
+
+**4. You explicitly ask to remember**
+```
+You: Remember, tests in this project use vitest --run, not watch mode
+Claude: Got it, I'll save this to memory.
+```
+
+### 3.3 The 200-Line Truncation Rule
+
+This is a critical technical detail:
+
+**Only the first 200 lines of `MEMORY.md` are loaded into context.** Content beyond line 200 is truncated — Claude can't see it.
+
+This means:
+- Put the most important information at the top
+- Regularly clean up outdated memories
+- Put detailed content in topic files, keep only summaries and links in MEMORY.md
+
+```markdown
+# MEMORY.md (keep under 200 lines)
+
+## Project Overview
+- Framework: Next.js 14 + TypeScript
+- Package manager: pnpm
+- Detailed architecture: see [architecture.md](./architecture.md)
+
+## Key Conventions
+- Test framework: Vitest
+- Code style details: see [patterns.md](./patterns.md)
+```
+
+### 3.4 Topic Files
+
+When a topic has too much information, create a dedicated topic file:
+
+```
+~/.claude/projects/<hash>/memory/
+├── MEMORY.md              # Index + high-frequency info
+├── architecture.md        # Project architecture details
+├── debugging.md           # Debugging experience and known issues
+├── api-patterns.md        # API design patterns
+└── deployment.md          # Deployment process and gotchas
+```
+
+Topic files aren't auto-loaded into context, but Claude can read them when needed. Reference topic files in MEMORY.md so Claude knows where to find detailed information.
+
+### 3.5 Accept vs Reject Suggestions
+
+Not all auto-memory suggestions should be accepted. Decision criteria:
+
+**Accept:**
+- Stable project-level conventions (package manager, test framework, code style)
+- Repeated corrections (Claude genuinely needs to remember)
+- Important architectural decisions
+
+**Reject:**
+- Temporary information ("this bug is on the feature-x branch")
+- Overly specific implementation details ("UserService line 42 has a TODO")
+- Information that may become outdated quickly
+
+### 3.6 Limitations
+
+Auto-Memory has several important limitations:
+
+- **No auto-cleanup**: Outdated memories aren't automatically deleted — you need to maintain them manually
+- **No auto-merging**: Duplicate memories may be saved multiple times
+- **No cross-project sync**: Project A's memories don't automatically apply to Project B
+- **Unpredictable triggers**: You can't precisely control when suggestions appear
+
+---
+
+## 4. Memory File Management
+
+### 4.1 Viewing All Memory Files
+
+```bash
+# View the project's auto-memory directory
+ls ~/.claude/projects/
+
+# Find the current project's hash
+# Ask Claude Code: "where are my memory files"
+
+# View memory directory contents
+ls ~/.claude/projects/<hash>/memory/
+
+# View MEMORY.md
+cat ~/.claude/projects/<hash>/memory/MEMORY.md
+```
+
+Or directly in Claude Code:
+```
+You: List all my memory files
+You: Show my MEMORY.md contents
+```
+
+### 4.2 Organizing and Cleaning
+
+Memory files need regular maintenance, just like organizing notes:
+
+**Merge duplicates:**
+```markdown
+# Before
+- Use pnpm not npm
+- Package manager is pnpm
+- Remember to use pnpm
+
+# After
+- Package manager: pnpm (not npm/yarn)
+```
+
+**Remove outdated entries:**
+```markdown
+# Delete these (project already migrated to Vitest)
+- ❌ Test framework is Jest
+- ❌ Jest config is in jest.config.ts
+```
+
+**Recategorize:** Split mixed information into topic files.
+
+### 4.3 Recommended File Structure
+
+```
+memory/
+├── MEMORY.md              # Index file (< 200 lines)
+│   ├── Project overview (5-10 lines)
+│   ├── Key conventions (20-30 lines)
+│   ├── Topic file index (5-10 lines)
+│   └── Recent important changes (5-10 lines)
+├── patterns.md            # Code patterns and conventions
+├── debugging.md           # Debugging experience
+└── decisions.md           # Architecture decision records
+```
+
+Principles:
+- MEMORY.md is an **index**, not a **warehouse**
+- High-frequency info in MEMORY.md, low-frequency details in topic files
+- Keep each topic file under 100 lines
+
+### 4.4 Size Control
+
+Memory file size directly impacts performance:
+
+- The first 200 lines of MEMORY.md are **loaded every session**
+- Loaded content consumes context window tokens
+- Oversized memory squeezes the context space available for actual work
+
+> For detailed discussion on token consumption and context management, see the [Context Management Guide](/en/blog/claude-code-context) and [Performance Guide](/en/blog/claude-code-performance).
+
+Recommended size limits:
+- MEMORY.md: 100-150 lines (leave buffer, don't max out 200 lines)
+- Individual topic files: 50-100 lines
+- Total memory files: no more than 5-8
+
+### 4.5 Maintenance Cadence
+
+Recommended maintenance frequency:
+
+| Frequency | Action |
+|-----------|--------|
+| Weekly | Quick scan of MEMORY.md, remove outdated entries |
+| Monthly | Full cleanup: merge duplicates, update stale info, recategorize |
+| After project milestones | Major cleanup: remove temporary memories for completed features |
+| When switching project phases | Extract valuable patterns to user-level CLAUDE.md |
+
+---
+
+## 5. Cross-Project Memory Strategy
+
+### 5.1 User-Level vs Project-User-Level
+
+The core principle: **Put cross-project universals at user-level, project-specific info at project-user-level.**
+
+```markdown
+# ~/.claude/CLAUDE.md (user-level)
+## Global Preferences
+- Response language: English
+- Code comments: English
+- Commit format: Conventional Commits
+- Prefer TypeScript over JavaScript
+- Use function declarations for components, not arrow functions
+```
+
+```markdown
+# ~/.claude/projects/<hash>/CLAUDE.md (project-user-level)
+## Project-Specific
+- Package manager: pnpm
+- Test command: pnpm test
+- Database: PostgreSQL + Prisma
+- Deployment: Vercel
+```
+
+### 5.2 Multi-Project Developer Strategy
+
+If you maintain multiple projects, user-level CLAUDE.md is key for unified preferences:
+
+```markdown
+# ~/.claude/CLAUDE.md
+
+## Universal Coding Preferences
+- TypeScript strict mode
+- ESLint + Prettier
+- Conventional Commits
+
+## Universal Tool Preferences
+- Terminal: use bash syntax
+- Git: don't auto-push, only commit
+- Testing: prefer Vitest
+
+## Universal Communication Preferences
+- Respond in English
+- Code comments in English
+- No emoji in code
+```
+
+This way every project inherits these preferences without repeating them in each project's memory.
+
+### 5.3 From Personal Memory to Team CLAUDE.md
+
+Once you've accumulated enough project conventions in personal memory, extract the stable parts into the project-level CLAUDE.md for the whole team:
+
+```
+Personal Memory Discoveries              Team CLAUDE.md
+┌──────────────────────────┐           ┌──────────────────────────┐
+│ - APIs all use zod        │           │ ## API Conventions        │
+│ - Errors use AppError     │  ─extract─→ │ - Validation: zod        │
+│ - Routes use kebab-case   │           │ - Error handling: AppError│
+│ - Personal debug tips     │           │ - Route naming: kebab-case│
+│   (don't extract)         │           │                          │
+└──────────────────────────┘           └──────────────────────────┘
+```
+
+Workflow:
+1. During daily use, auto-memory and `/memory` accumulate personal discoveries
+2. Periodically review personal memory
+3. Extract **stable, team-universal** conventions to the project root CLAUDE.md
+4. Commit to Git for team sharing
+5. Remove extracted content from personal memory (avoid duplication)
+
+---
+
+## 6. Real-World Patterns
+
+### 6.1 New Project Cold Start
+
+When you create a new project, Memory is empty. Recommended cold-start flow:
+
+**Step 1: Create project-level CLAUDE.md**
+```markdown
+# Project Name
+
+## Tech Stack
+- Framework: Next.js 15
+- Language: TypeScript
+- Styling: Tailwind CSS
+- Database: PostgreSQL + Prisma
+
+## Dev Commands
+- Start: pnpm dev
+- Test: pnpm test
+- Build: pnpm build
+
+## Code Conventions
+- Components: src/components/
+- API routes: src/app/api/
+- Use named exports
+```
+
+**Step 2: Set user-level preferences** (if not already done)
+```
+You: /memory
+# Add your global preferences
+```
+
+**Step 3: Let Claude explore the project**
+```
+You: Please explore this project's structure and identify the main code patterns and conventions
+```
+
+Claude will discover patterns during exploration and may suggest saving them via auto-memory.
+
+### 6.2 Taking Over Someone Else's Project
+
+When inheriting an unfamiliar project, the Memory system accelerates your understanding:
+
+```
+You: Please analyze this project's architecture, including:
+1. Directory structure and module responsibilities
+2. Main design patterns
+3. Data flow
+4. Testing strategy
+Save key findings to memory.
+```
+
+Then gradually supplement:
+```
+You: /memory
+# Add important findings from reading the code
+# e.g., which modules are core, which code is fragile,
+# where the tech debt lives
+```
+
+### 6.3 Long-Term Maintenance Projects
+
+For projects you've maintained for a long time, the focus is **keeping memory current**:
+
+- After tech stack upgrades, update version info in memory
+- After architecture changes, update architecture-related memories
+- After team changes, update collaboration conventions
+- Regularly clean up temporary memories for completed features
+
+A common anti-pattern: memory still says "migrating from Jest to Vitest" when the migration finished months ago. Stale information misleads Claude.
+
+### 6.4 Team Collaboration
+
+In team projects, Memory boundaries matter:
+
+| Content | Where | Why |
+|---------|-------|-----|
+| Team coding standards | Project-level CLAUDE.md | Shared by everyone |
+| CI/CD processes | Project-level CLAUDE.md | Everyone needs to know |
+| Personal debugging tips | Personal memory | Doesn't affect others |
+| Personal tool preferences | User-level CLAUDE.md | Universal across projects |
+| "Modules I own" | Personal memory | Personal context |
+
+Core principle: **Project-level CLAUDE.md is the team's consensus document. Personal memory is your private notebook. Don't put personal preferences in team docs, and don't keep team conventions only in personal memory.**
+
+---
+
+## 7. FAQ
+
+### Will Memory be committed to Git?
+
+**No.** Personal memory is stored under `~/.claude/`, not in the project directory, so Git won't track it.
+
+Project-level CLAUDE.md (in the project root) **will** be committed to Git — this is by design, as it's meant to be shared with the team.
+
+### What's the difference between /memory and directly editing CLAUDE.md?
+
+The `/memory` command edits the **project-user-level** CLAUDE.md (`~/.claude/projects/<hash>/CLAUDE.md`).
+
+If you want to edit:
+- User-level CLAUDE.md → manually edit `~/.claude/CLAUDE.md`
+- Project-level CLAUDE.md → manually edit `CLAUDE.md` in the project root
+- Auto-Memory → manually edit `~/.claude/projects/<hash>/memory/MEMORY.md`
+
+### Does too much Memory affect performance?
+
+**Yes.** All CLAUDE.md files and the first 200 lines of MEMORY.md are loaded into context at every session start. Too much memory content will:
+- Consume context window token quota
+- Increase token consumption per request (= higher cost)
+- Squeeze the context space available for actual work
+
+Keep total memory content under 300-500 lines (across all layers).
+
+### How do I migrate Memory to a new computer?
+
+Memory files are stored under `~/.claude/`. Migration method:
+
+```bash
+# On the old computer
+cp -r ~/.claude/ ~/claude-backup/
+
+# On the new computer
+cp -r ~/claude-backup/.claude/ ~/
+```
+
+Note: Project-user-level memory paths include a hash of the project path. If the project path differs on the new computer, the hash will change, and you'll need to manually move the corresponding directory.
+
+### How do I make Claude forget something?
+
+Three ways:
+
+1. **Ask in conversation**: "Forget the memory about xxx" — Claude will remove it from memory files
+2. **Manual edit**: Directly edit the corresponding memory file and delete the content
+3. **`/memory` command**: Open the editor and delete the relevant lines
+
+### Auto-Memory suggestions are too frequent?
+
+There's currently no global toggle to disable auto-memory suggestions. But you can:
+
+- Add to your user-level CLAUDE.md: "Don't proactively suggest saving to memory unless I explicitly ask"
+- Reject unwanted suggestions each time (Claude will learn your preferences)
+
+---
+
+## 8. Summary
+
+### 3 Core Takeaways
+
+1. **Layered storage**: User-level for global preferences, project-user-level for personal notes, project-level for team conventions. Don't mix up the layers.
+
+2. **Control size**: Keep MEMORY.md under 150 lines, put details in topic files. More memory isn't better — every line consumes tokens.
+
+3. **Regular maintenance**: Memory isn't write-and-forget. Stale memory is worse than no memory because it misleads Claude. Build a habit of periodic cleanup.
+
+### Recommended Reading
+
+- [CLAUDE.md Guide](/en/blog/claude-code-claude-md) — Memory system basics, three-layer CLAUDE.md hierarchy
+- [Context Management Guide](/en/blog/claude-code-context) — How to efficiently manage Claude Code's context window
+- [Performance Guide](/en/blog/claude-code-performance) — Token consumption optimization and cost control
