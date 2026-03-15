@@ -4,7 +4,8 @@
     "blog": "Blog",
     "projects": "Projects",
     "photos": "Photos",
-    "about": "About"
+    "about": "About",
+    "series": "Series"
   },
   "home": {
     "name": "刘佳明(Jimmy)",
@@ -69,6 +70,16 @@
   "links": {
     "title": "Links",
     "subtitle": "A curated collection of websites, tools, and resources"
+  },
+  "series": {
+    "title": "Series",
+    "description": "Curated article collections, organized by topic and reading order",
+    "backToList": "Back to Series",
+    "postCount": "{count} posts",
+    "seriesNav": "In this series",
+    "prevInSeries": "Previous",
+    "nextInSeries": "Next",
+    "partOf": "Part {current} of {total}"
   },
   "notFound": {
     "title": "Page not found",

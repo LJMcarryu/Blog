@@ -4,7 +4,8 @@
     "blog": "博客",
     "projects": "项目",
     "photos": "摄影",
-    "about": "关于"
+    "about": "关于",
+    "series": "专题"
   },
   "home": {
     "name": "刘佳明(Jimmy)",
@@ -69,6 +70,16 @@
   "links": {
     "title": "链接收藏",
     "subtitle": "精选的网站、工具和资源"
+  },
+  "series": {
+    "title": "专题",
+    "description": "系统化的文章合集，按主题和阅读顺序组织",
+    "backToList": "返回专题",
+    "postCount": "{count} 篇文章",
+    "seriesNav": "本专题",
+    "prevInSeries": "上一篇",
+    "nextInSeries": "下一篇",
+    "partOf": "第 {current} 篇，共 {total} 篇"
   },
   "notFound": {
     "title": "页面未找到",

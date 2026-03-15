@@ -12,6 +12,7 @@ import TableOfContents from "@/components/TableOfContents";
 import CodeCopyButton from "@/components/CodeCopyButton";
 import { getSiteUrl } from "@/lib/env";
 import { routing, type Locale } from "@/i18n/routing";
+import { getSeriesForPost, getSeriesNavigation } from "@/lib/series";
 
 export async function generateMetadata({
   params,
@@ -81,6 +82,7 @@ export default async function PostPage({
 }) {
   const { locale, slug } = await params;
   const t = await getTranslations({ locale, namespace: "blog" });
+  const ts = await getTranslations({ locale, namespace: "series" });
   const post = getPostBySlug(slug, locale as Locale);
 
   if (!post) notFound();
@@ -176,6 +178,59 @@ export default async function PostPage({
         />
         <CodeCopyButton />
       </div>
+
+      {/* Series navigation */}
+      {(() => {
+        const seriesList = getSeriesForPost(slug);
+        if (seriesList.length === 0) return null;
+        return seriesList.map((series) => {
+          const nav = getSeriesNavigation(series.id, slug);
+          if (!nav) return null;
+          const prevSlug = nav.prev;
+          const nextSlug = nav.next;
+          const prevSeriesPost = prevSlug ? getPostBySlug(prevSlug, locale as Locale) : null;
+          const nextSeriesPost = nextSlug ? getPostBySlug(nextSlug, locale as Locale) : null;
+          return (
+            <nav key={series.id} className="prose m-auto mt-10 not-prose" aria-label={ts("seriesNav")}>
+              <div
+                className="rounded-lg p-4"
+                style={{ backgroundColor: "var(--search-bg)" }}
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <Link
+                    href={`/series/${series.id}`}
+                    className="text-sm font-medium transition-opacity hover:opacity-100"
+                    style={{ color: "var(--fg)", opacity: 0.85, textDecoration: "none" }}
+                  >
+                    {ts("seriesNav")}: {series.title[locale as Locale]}
+                  </Link>
+                  <span className="text-xs" style={{ color: "var(--fg-light)" }}>
+                    {ts("partOf", { current: nav.index + 1, total: nav.total })}
+                  </span>
+                </div>
+                <div className="flex justify-between gap-4 text-sm">
+                  <div className="flex-1">
+                    {prevSeriesPost && (
+                      <Link href={`/blog/${prevSlug}`} className="post-nav-link">
+                        <span className="post-nav-label">← {ts("prevInSeries")}</span>
+                        <span className="post-nav-title">{prevSeriesPost.title}</span>
+                      </Link>
+                    )}
+                  </div>
+                  <div className="flex-1 text-right">
+                    {nextSeriesPost && (
+                      <Link href={`/blog/${nextSlug}`} className="post-nav-link">
+                        <span className="post-nav-label">{ts("nextInSeries")} →</span>
+                        <span className="post-nav-title">{nextSeriesPost.title}</span>
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </nav>
+          );
+        });
+      })()}
 
       {/* Prev / Next navigation */}
       {(prevPost || nextPost) && (
