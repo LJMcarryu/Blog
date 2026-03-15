@@ -1,0 +1,395 @@
+---
+title: "Claude Code IDE Integration Guide: VS Code Extension, JetBrains Plugin, and Hybrid Workflows"
+date: "2026-03-18"
+description: A deep dive into Claude Code's integration with VS Code and JetBrains IDEs — covering Inline Diff, Checkpoint, Selection Context, and the best hybrid workflows between terminal and IDE.
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In the [Advanced Guide](/en/blog/claude-code-overview), we covered Claude Code's terminal usage in depth. In the [Agent SDK Guide](/en/blog/claude-code-agent-sdk), we covered how to build custom agents using Claude Code's engine.
+
+But Claude Code is more than a terminal tool.
+
+It's deeply integrated into two major IDEs — **VS Code** (official extension, 2M+ installs) and **JetBrains** (official plugin). For many developers, IDE integration is the primary way they use Claude Code daily.
+
+One-line summary: **This post covers the core features of the VS Code extension and JetBrains plugin, plus the best hybrid workflows between terminal and IDE.**
+
+---
+
+## 1. Why IDE Integration Matters
+
+### 1.1 Terminal Mode Limitations
+
+Terminal mode is Claude Code's foundation, but it has pain points in daily development:
+
+- **Diffs are hard to read**: Text-based diffs in the terminal aren't great for large-scale changes
+- **No automatic snapshots**: If something goes wrong, you rely on Git — no fine-grained checkpoints
+- **Manual context passing**: To show Claude specific code, you manually copy or describe file paths
+- **No visualization**: Plan Mode execution is plain text in the terminal
+
+### 1.2 Terminal vs IDE Mode Comparison
+
+| Dimension | Terminal CLI | VS Code Extension | JetBrains Plugin |
+|-----------|------------|-------------------|-----------------|
+| Diff View | Text diff | Graphical Inline Diff, accept/reject per change | Native Diff viewer |
+| Code Selection | Manually describe file/line | Select code → right-click → send | Select code → right-click → send |
+| State Rollback | Git only | Checkpoint auto-snapshots | Git only |
+| Context Awareness | Manual @file | Auto-aware of open files | Auto-aware of open files |
+| Startup Speed | Fastest (direct terminal) | Requires VS Code open | Requires IDE open |
+| Remote Dev | Native SSH | Remote SSH extension | Gateway support |
+| Batch Tasks | Strongest (scripts, pipes) | Limited | Limited |
+| Multi-Agent | Native support | Supported (multi-panel) | Supported |
+
+### 1.3 Positioning the Three Modes
+
+- **Terminal CLI**: Best for scripting, CI/CD, SSH remote, and batch tasks
+- **VS Code Extension**: Daily development workhorse — Inline Diff + Checkpoint are killer features
+- **JetBrains Plugin**: Native integration for IntelliJ/WebStorm/PyCharm users
+
+They're not mutually exclusive — they're complementary. We'll cover hybrid workflows later.
+
+---
+
+## 2. VS Code Extension
+
+### 2.1 Installation
+
+**Option 1: VS Code Marketplace**
+
+Search for `Claude Code` in the Extensions panel, find the official Anthropic extension, and install.
+
+**Option 2: Command Line**
+
+```bash
+code --install-extension anthropic.claude-code
+```
+
+> **Prerequisite:** You need Claude Code CLI installed first (`npm install -g @anthropic-ai/claude-code`). The VS Code extension is essentially a graphical frontend for the CLI.
+
+### 2.2 Opening the Panel
+
+After installation, two ways to open the Claude Code panel:
+
+- Click the Claude Code icon in the sidebar
+- `Ctrl+Shift+P` (macOS: `Cmd+Shift+P`) → type `Claude Code: Open`
+
+You'll see a chat-like interface integrated with VS Code's full graphical capabilities.
+
+### 2.3 Core Features
+
+#### Inline Diff View
+
+This is the most visible upgrade in the VS Code extension. When Claude modifies files:
+
+- Changes appear as **graphical diffs**, not terminal text diffs
+- You can **accept or reject each change individually** (Accept / Reject buttons)
+- **Multi-file diffs** are supported — see all changes at a glance in the file tree
+
+This is especially valuable for large refactors — reviewing hundreds of lines of diff in a terminal is painful, but graphical diffs make it manageable.
+
+#### Checkpoint Auto-Snapshots
+
+Checkpoint is the killer feature of the VS Code extension:
+
+- Claude **automatically creates a checkpoint** before each file modification
+- If you're not happy with a change, press `Esc` twice or use `/rewind` to **roll back to any checkpoint**
+- Checkpoints are **independent of Git** — no need to commit before rolling back
+
+**Checkpoint vs Git:**
+
+| Dimension | Checkpoint | Git |
+|-----------|-----------|-----|
+| Granularity | Every Claude operation | Every manual commit |
+| Persistence | Within session | Permanent |
+| Purpose | Quick experimentation, undo unwanted changes | Version control, collaboration |
+| Operation | Esc×2 or /rewind | git checkout / git reset |
+
+Best practice: Use Checkpoint for fine-grained experimentation, then Git commit when satisfied.
+
+#### Selection Context
+
+Select code → right-click → `Send to Claude Code`. The selected code is sent as context to Claude.
+
+This is far more efficient than manually describing "please look at src/utils.ts lines 42-58" in the terminal. You can also:
+
+- Select code and ask questions: "What's wrong with this code?"
+- Select code and request changes: "Make this function async"
+- Select multiple code sections and send them together
+
+#### Terminal Integration
+
+The VS Code extension includes an enhanced terminal:
+
+- **Shares session** with the sidebar panel — commands you run in the terminal are visible to Claude
+- Supports all Claude Code commands (`/help`, `/compact`, etc.)
+- Terminal output can be directly passed as context to Claude
+
+#### Plan Mode Visualization
+
+In the terminal, Plan Mode output is plain text. In VS Code:
+
+- Plan steps are displayed as a **structured list**
+- Each step's status (pending, in progress, completed) has **visual indicators**
+- You can **review and modify** the plan before execution
+
+#### File Change Notifications
+
+When Claude modifies files, VS Code will:
+
+- Show **change indicators** on file tabs
+- Display a **change list** in the Source Control panel
+- Support one-click diff viewing for each file
+
+### 2.4 Keyboard Shortcuts
+
+| Shortcut | Function |
+|----------|----------|
+| `Ctrl+Shift+P` → Claude Code | Open command palette |
+| Sidebar icon | Toggle Claude panel |
+| `Esc` × 2 | Roll back to previous Checkpoint |
+| Right-click → Send to Claude | Send selected code |
+| `Ctrl+Enter` | Send message (in panel) |
+
+---
+
+## 3. JetBrains Plugin
+
+### 3.1 Installation
+
+`Settings` → `Plugins` → search `Claude Code` → install the official Anthropic plugin.
+
+Or via command line:
+
+```bash
+claude install-jetbrains
+```
+
+> Also requires Claude Code CLI to be installed first.
+
+### 3.2 Supported IDEs
+
+The JetBrains plugin supports all IntelliJ platform IDEs:
+
+- IntelliJ IDEA (Community / Ultimate)
+- WebStorm
+- PyCharm
+- GoLand
+- PhpStorm
+- Rider
+- CLion
+- RubyMine
+- DataGrip
+
+### 3.3 Core Features
+
+**Native Diff Viewer:** Claude's changes are displayed in JetBrains' native diff tool, supporting line-by-line review and accept/reject.
+
+**Selection Context:** Similar to VS Code — select code, right-click, send to Claude.
+
+**Integrated Terminal:** The Claude Code panel includes a built-in terminal that shares the IDE's environment.
+
+**Tool Window:** Claude Code integrates as a tool window at the bottom or side of the IDE, without disrupting your normal workflow.
+
+### 3.4 VS Code vs JetBrains Feature Comparison
+
+| Feature | VS Code Extension | JetBrains Plugin |
+|---------|------------------|-----------------|
+| Inline Diff | Graphical, per-change accept/reject | Native Diff viewer |
+| Checkpoint | Auto-snapshot + rollback | Not yet supported |
+| Selection Context | Yes | Yes |
+| Terminal Integration | Shared session | Integrated terminal |
+| Plan Mode Visualization | Yes | Yes |
+| File Change Notifications | Yes | Yes |
+| Remote Development | Remote SSH | Gateway |
+| Multi-Panel | Yes | Yes |
+
+Key difference: **Checkpoint is currently VS Code exclusive**. JetBrains users rely on Git for version rollback.
+
+---
+
+## 4. Configuration Sync and IDE-Specific Settings
+
+### 4.1 Shared Configuration
+
+Good news: **CLI, VS Code, and JetBrains share the same configuration system.**
+
+```
+~/.claude/settings.json              # Global config (shared across all three)
+project-root/.claude/settings.json   # Project config (shared across all three)
+project-root/CLAUDE.md               # Project instructions (shared across all three)
+~/.claude/CLAUDE.md                  # Global instructions (shared across all three)
+```
+
+This means:
+- `settings.json` configured in the terminal works in VS Code and JetBrains too
+- `CLAUDE.md` files are read regardless of which entry point you use
+- Permission settings (`allowedTools`, `blockedTools`) are consistent across all three
+
+For detailed configuration, see the [settings.json Guide](/en/blog/claude-code-settings) and [CLAUDE.md Guide](/en/blog/claude-code-claude-md).
+
+### 4.2 IDE-Specific Settings
+
+The VS Code extension has some exclusive settings, configured in VS Code Settings:
+
+```json
+{
+  "claudeCode.terminalFontSize": 14,
+  "claudeCode.autoOpenPanel": true,
+  "claudeCode.diffViewStyle": "inline"
+}
+```
+
+These settings only affect the VS Code extension's UI behavior, not Claude Code's core functionality.
+
+### 4.3 Hooks in IDE Mode
+
+[Hooks](/en/blog/claude-code-hooks) behave **identically in IDE mode** — whether you launch Claude Code from the terminal, VS Code, or JetBrains, configured hooks fire normally.
+
+```json
+// .claude/settings.json — shared across all three
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "echo 'Tool about to run: $TOOL_NAME'"
+      }
+    ]
+  }
+}
+```
+
+Similarly, [MCP Server](/en/blog/claude-code-mcp) configurations are shared across all three.
+
+---
+
+## 5. Workflow Patterns
+
+### 5.1 Terminal-Only Workflow
+
+Best for:
+- **SSH remote development**: No GUI on the server
+- **CI/CD integration**: Calling Claude Code in automation pipelines
+- **Batch tasks**: Script-driven large-scale code modifications
+- **Multi-agent parallelism**: Running multiple Claude instances on different tasks
+
+```bash
+# Typical terminal-only workflow
+claude "Fix all TypeScript type errors" --allowedTools "Edit,Read,Bash"
+```
+
+### 5.2 IDE-Only Workflow
+
+Best for:
+- **Daily feature development**: Writing new features, fixing bugs
+- **Code review**: Using Inline Diff to review changes one by one
+- **Learning and exploration**: Selecting unfamiliar code and asking Claude to explain
+
+### 5.3 Hybrid Workflow (Recommended)
+
+**This is the recommended approach: terminal for batch tasks, IDE for visual review.**
+
+```
+┌─────────────────────────────────────────────────┐
+│                Hybrid Workflow                   │
+├──────────────────┬──────────────────────────────┤
+│   Terminal CLI   │     VS Code / JetBrains      │
+│                  │                              │
+│  • Batch refactor│  • Daily feature dev         │
+│  • CI/CD         │  • Inline Diff review        │
+│  • Multi-agent   │  • Checkpoint experimentation│
+│  • Scripting     │  • Selection Context         │
+│  • SSH remote    │  • Plan Mode visualization   │
+└──────────────────┴──────────────────────────────┘
+```
+
+### 5.4 Practical Scenarios
+
+**Scenario 1: Bug Fix**
+
+1. In VS Code, select the problematic code, right-click and send to Claude
+2. Claude analyzes the issue and proposes a fix
+3. Review the fix via Inline Diff, accepting changes one by one
+4. If unsatisfied, Checkpoint rollback and try again
+
+**Scenario 2: Large-Scale Refactoring**
+
+1. Use Claude Code in the terminal for batch refactoring:
+   ```bash
+   claude "Convert all class components to function components"
+   ```
+2. Switch to VS Code, review changes via Inline Diff
+3. Accept good changes, reject problematic ones
+4. For problematic parts, select the code in VS Code and have Claude reprocess
+
+**Scenario 3: New Feature Development**
+
+1. In VS Code, use Plan Mode to have Claude create a development plan
+2. Review the plan, confirm, and let Claude execute
+3. Use Checkpoint for fine-grained experimentation
+4. Git commit when satisfied
+
+---
+
+## 6. FAQ
+
+### Are the VS Code extension and terminal the same session?
+
+No. The VS Code extension and terminal CLI are **independent sessions**. But they share:
+- Configuration files (settings.json, CLAUDE.md)
+- Project context (same working directory)
+- MCP Server and Hooks configuration
+
+### What's the relationship between Checkpoint and Git?
+
+Checkpoint is a **session-level feature** of the VS Code extension, independent of Git:
+- Checkpoints are created automatically within a session and disappear when VS Code closes
+- Git is persistent version control
+- Recommended flow: Checkpoint for experimentation → Git commit when satisfied
+
+### Does JetBrains support Checkpoint?
+
+Not currently. JetBrains users can use the IDE's built-in Local History feature as an alternative, or rely on Git for version rollback.
+
+### Can I use IDE integration with remote development?
+
+Yes:
+- **VS Code**: Connect to remote servers via the Remote SSH extension — the Claude Code extension runs in the remote environment
+- **JetBrains**: Connect via Gateway
+
+### Do Hooks and MCP work in IDE mode?
+
+Absolutely. Hooks and MCP configurations are shared across all three modes, behaving identically in IDE mode as in the terminal. See the [Hooks Guide](/en/blog/claude-code-hooks) and [MCP Guide](/en/blog/claude-code-mcp).
+
+### Does the VS Code extension conflict with Cursor/Windsurf?
+
+The Claude Code VS Code extension can coexist with Cursor, Windsurf, and other AI editors, but it's recommended to **use only one AI assistant at a time** to avoid conflicts from multiple AIs modifying files simultaneously.
+
+### Installed the extension but no sidebar icon?
+
+Check these:
+1. Confirm Claude Code CLI is installed: `claude --version`
+2. Reload the VS Code window: `Ctrl+Shift+P` → `Reload Window`
+3. Verify the extension is enabled (not disabled)
+4. Check the VS Code Output panel for Claude Code logs
+
+---
+
+## 7. Summary
+
+Three key takeaways:
+
+1. **VS Code's Inline Diff + Checkpoint are the standout features** — graphical change review + fine-grained rollback dramatically improve code review efficiency
+2. **Configuration is shared across all three modes** — settings.json, CLAUDE.md, Hooks, and MCP work identically in terminal/VS Code/JetBrains, no duplicate setup needed
+3. **Hybrid workflow is the best practice** — terminal for batch tasks and automation, IDE for daily development and visual review
+
+### Recommended Reading
+
+- [Claude Code Advanced Guide](/en/blog/claude-code-overview) — Complete terminal mode usage
+- [settings.json Configuration Guide](/en/blog/claude-code-settings) — Detailed configuration reference
+- [CLAUDE.md Guide](/en/blog/claude-code-claude-md) — Best practices for project instructions
+- [Context Management Guide](/en/blog/claude-code-context) — Efficiently managing Claude's context
+- [Git Workflow Guide](/en/blog/claude-code-git) — Claude Code and Git collaboration
+- [Multi-Agent Parallelism Guide](/en/blog/claude-code-multi-agent) — Multi-instance parallel development
+- [Agent SDK Guide](/en/blog/claude-code-agent-sdk) — Building custom agents with Claude Code's engine

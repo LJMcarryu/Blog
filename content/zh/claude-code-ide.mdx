@@ -1,0 +1,395 @@
+---
+title: "Claude Code IDE 集成指南：VS Code 扩展、JetBrains 插件与混合工作流"
+date: "2026-03-18"
+description: 深入讲解 Claude Code 在 VS Code 和 JetBrains IDE 中的集成方式，涵盖 Inline Diff、Checkpoint、Selection Context 等核心功能，以及终端与 IDE 的最佳混合工作流。
+tags: ["AI", "教程"]
+---
+
+## ��言
+
+在[进阶指南](/zh/blog/claude-code-overview)里，我们系统讲了 Claude Code 的终端用法。在 [Agent SDK 指南](/zh/blog/claude-code-agent-sdk)里，我们讲了如何用 Claude Code 的引擎构建自定义 Agent。
+
+但 Claude Code 不只是终端工具。
+
+它已经深度集成到了两大主流 IDE——**VS Code**（官方扩展，200 万+ 安装）和 **JetBrains**（官方插件）。对很多开发者来说，IDE 集成才是日常使用 Claude Code 的主要入口。
+
+一句话定位：**这篇讲透 VS Code 扩展和 JetBrains 插件的核心功能，以及终端与 IDE 的最佳混合工作流。**
+
+---
+
+## 一、为什么需要 IDE 集成
+
+### 1.1 终端模式的局限
+
+终端模式是 Claude Code 的根基，但在日常开发中有几个痛点：
+
+- **Diff 查看不直观**：终端里的文本 diff 对大规模改动不够友好
+- **没有自动存档**：改错了只能靠 Git 回滚，没有细粒度的 checkpoint
+- **上下文需要手动传递**：想让 Claude 看某段代码，得手动复制或描述文件路径
+- **缺少可视化**：Plan Mode 的执行过程在终端里是纯文本
+
+### 1.2 终端 vs IDE 模式对比
+
+| 维度 | 终端 CLI | VS Code 扩展 | JetBrains 插件 |
+|------|---------|-------------|---------------|
+| Diff 查看 | 文本 diff | 图形化 Inline Diff，逐个接受/拒绝 | 原生 Diff 查看器 |
+| 代码选择 | 手动描述文件/行号 | 选中代码右键发送 | 选中代码右键发送 |
+| 状态回滚 | 依赖 Git | Checkpoint 自动存档 | 依赖 Git |
+| 上下文感知 | 手动 @file | 自动感知打开的文件 | 自动感知打开的文件 |
+| 启动速度 | 最快（直接终端） | 需要打开 VS Code | 需要打开 IDE |
+| 远程开发 | SSH 原生支持 | Remote SSH 扩展支持 | Gateway 支持 |
+| 批量任务 | 最强（脚本、管道） | 一般 | 一般 |
+| 多 Agent 并行 | 原生支持 | 支持（多面板） | 支持 |
+
+### 1.3 三种模式的定位
+
+- **终端 CLI**：脚本自动化、CI/CD、SSH 远程、批量任务的首选
+- **VS Code 扩展**：日常开发的主力，Inline Diff + Checkpoint 是杀手级功能
+- **JetBrains 插件**：IntelliJ/WebStorm/PyCharm 用户的原生集成方案
+
+它们不是互斥的，而是互补的。后面会讲混合工作流。
+
+---
+
+## 二、VS Code 扩展
+
+### 2.1 安装
+
+**方式一：VS Code Marketplace**
+
+在扩展面板搜索 `Claude Code`，找到 Anthropic 官方发布的扩展，点击安装。
+
+**方式二：命令行安装**
+
+```bash
+code --install-extension anthropic.claude-code
+```
+
+> **前置条件：** 需要先安装 Claude Code CLI（`npm install -g @anthropic-ai/claude-code`）。VS Code 扩展本质上是 CLI 的图形化前端，底层调用的还是 CLI。
+
+### 2.2 打开面板
+
+安装后，有两种方式打开 Claude Code 面板：
+
+- 点击侧边栏的 Claude Code 图标
+- `Ctrl+Shift+P`（macOS: `Cmd+Shift+P`）→ 输入 `Claude Code: Open`
+
+面板打开后，你会看到一个类似终端的对话界面，但集成了 VS Code 的全部图形化能力。
+
+### 2.3 核心功能
+
+#### Inline Diff 查看
+
+这是 VS Code 扩展最直观的升级。当 Claude 修改文件时：
+
+- 改动会以**图形化 diff** 的形式展示，而不是终端里的文本 diff
+- 你可以**逐个接受或拒绝**每一处改动（Accept / Reject 按钮）
+- 支持**多文件 diff**，在文件树中一目了然地看到所有变更
+
+这对大规模重构特别有用——终端里几百行 diff 很难审查，图形化 diff 一目了然。
+
+#### Checkpoint 自动存档
+
+Checkpoint 是 VS Code 扩展的杀手级功能：
+
+- Claude 每次修改文件前，会**自动创建一个 checkpoint**
+- 如果改动不满意，按 `Esc` 两次或使用 `/rewind` 命令，可以**回滚到任意 checkpoint**
+- Checkpoint 是**独立于 Git 的**——你不需要提交就能回滚
+
+**Checkpoint vs Git 的关系：**
+
+| 维度 | Checkpoint | Git |
+|------|-----------|-----|
+| 粒度 | 每次 Claude 操作 | 每次手动提交 |
+| 持久性 | 会话内有效 | 永久 |
+| 用途 | 快速试错、回滚不满意的改动 | 版本管理、协作 |
+| 操作 | Esc×2 或 /rewind | git checkout / git reset |
+
+最佳实践：用 Checkpoint 做细粒度试错，满意后再 Git 提交。
+
+#### Selection Context
+
+选中代码 → 右键 → `Send to Claude Code`，选中的代码会作为上下文发送给 Claude。
+
+这比在终端里手动描述"请看 src/utils.ts 的第 42-58 行"高效得多。你还可以：
+
+- 选中代码后直接提问："这段代码有什么问题？"
+- 选中代码后要求修改："把这个函数改成 async"
+- 选中多段代码，一起发送
+
+#### Terminal 集成
+
+VS Code 扩展内置了增强终端：
+
+- 与侧边栏面板**共享会话**——在终端里执行的命令，Claude 能看到输出
+- 支持终端里的所有 Claude Code 命令（`/help`、`/compact` 等）
+- 终端输出可以直接作为上下文传递给 Claude
+
+#### Plan Mode 可视化
+
+在终端里，Plan Mode 的输出是纯文本。在 VS Code 里：
+
+- 计划步骤以**结构化列表**展示
+- 每个步骤的状态（待执行、执行中、已完成）有**可视化标记**
+- 可以在执行前**审查和修改**计划
+
+#### 文件变更通知
+
+当 Claude 修改了文件，VS Code 会：
+
+- 在文件标签上显示**变更标记**
+- 在源代码管理面板中显示**变更列表**
+- 支持一键查看每个文件的 diff
+
+### 2.4 快捷键速查
+
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl+Shift+P` → Claude Code | 打开命令面板 |
+| 侧边栏图标 | 打开/关闭 Claude 面板 |
+| `Esc` × 2 | 回滚到上一个 Checkpoint |
+| 右键 → Send to Claude | 发送选中代码 |
+| `Ctrl+Enter` | 发送消息（面板内） |
+
+---
+
+## 三、JetBrains 插件
+
+### 3.1 安装
+
+`Settings` → `Plugins` → 搜索 `Claude Code` → 安装 Anthropic 官方插件。
+
+或者通过命令行：
+
+```bash
+claude install-jetbrains
+```
+
+> 同样需要先安装 Claude Code CLI。
+
+### 3.2 支持的 IDE
+
+JetBrains 插件支持所有基于 IntelliJ 平台的 IDE：
+
+- IntelliJ IDEA（Community / Ultimate）
+- WebStorm
+- PyCharm
+- GoLand
+- PhpStorm
+- Rider
+- CLion
+- RubyMine
+- DataGrip
+
+### 3.3 核心功能
+
+**原生 Diff 查看器：** Claude 的改动会在 JetBrains 原生的 diff 工具中展示，支持逐行审查和接受/拒绝。
+
+**Selection Context：** 与 VS Code 类似，选中代码右键发送给 Claude。
+
+**集成终端：** Claude Code 面板内置终端，与 IDE 的终端共享环境。
+
+**工具窗口：** Claude Code 作为一个工具窗口集成在 IDE 底部或侧边，不干扰正常开发流程。
+
+### 3.4 VS Code vs JetBrains 功能对比
+
+| 功能 | VS Code 扩展 | JetBrains 插件 |
+|------|-------------|---------------|
+| Inline Diff | ✅ 图形化，逐个接受/拒绝 | ✅ 原生 Diff 查看器 |
+| Checkpoint | ✅ 自动存档 + 回滚 | ❌ 暂不支持 |
+| Selection Context | ✅ | ✅ |
+| Terminal 集成 | ✅ 共享会话 | ✅ 集成终端 |
+| Plan Mode 可视化 | ✅ | ✅ |
+| 文件变更通知 | ✅ | ✅ |
+| 远程开发 | ✅ Remote SSH | ✅ Gateway |
+| 多面板 | ✅ | ✅ |
+
+主要差异：**Checkpoint 目前是 VS Code 独有功能**。JetBrains 用户需要依赖 Git 做版本回滚。
+
+---
+
+## 四、配置同步与 IDE 专属设置
+
+### 4.1 配置共享机制
+
+好消息：**CLI、VS Code、JetBrains 共享同一套配置体系。**
+
+```
+~/.claude/settings.json          # 全局配置（三端共享）
+项目根目录/.claude/settings.json  # 项目配置（三端共享）
+项目根目录/CLAUDE.md              # 项目指令（三端共享）
+~/.claude/CLAUDE.md              # 全局指令（三端共享）
+```
+
+这意味着：
+- 你在终端里配置的 `settings.json`，在 VS Code 和 JetBrains 里同样生效
+- 你写的 `CLAUDE.md`，无论从哪个入口启动 Claude Code 都会被读取
+- 权限设置（`allowedTools`、`blockedTools`）三端一致
+
+详细的配置说明参考 [settings.json 指南](/zh/blog/claude-code-settings)和 [CLAUDE.md 指南](/zh/blog/claude-code-claude-md)。
+
+### 4.2 IDE 专属配置
+
+VS Code 扩展有一些专属设置，在 VS Code 的 Settings 中配置：
+
+```json
+{
+  "claudeCode.terminalFontSize": 14,
+  "claudeCode.autoOpenPanel": true,
+  "claudeCode.diffViewStyle": "inline"
+}
+```
+
+这些设置只影响 VS Code 扩展的 UI 行为，不影响 Claude Code 的核心功能。
+
+### 4.3 Hooks 在 IDE 模式下的行为
+
+[Hooks](/zh/blog/claude-code-hooks) 在 IDE 模式下**完全一致**——无论你从终端、VS Code 还是 JetBrains 启动 Claude Code，配置的 hooks 都会正常触发。
+
+```json
+// .claude/settings.json — 三端共享
+{
+  "hooks": {
+    "preToolUse": [
+      {
+        "matcher": "Bash",
+        "command": "echo 'Tool about to run: $TOOL_NAME'"
+      }
+    ]
+  }
+}
+```
+
+同样，[MCP Server](/zh/blog/claude-code-mcp) 配置也是三端共享的。
+
+---
+
+## 五、工作流模式
+
+### 5.1 纯终端工作流
+
+适用场景：
+- **SSH 远程开发**：服务器上没有 GUI
+- **CI/CD 集成**：自动化流水线中调用 Claude Code
+- **批量任务**：脚本驱动的大规模代码修改
+- **多 Agent 并行**：同时启动多个 Claude 实例处理不同任务
+
+```bash
+# 典型的纯终端工作流
+claude "修复所有 TypeScript 类型错误" --allowedTools "Edit,Read,Bash"
+```
+
+### 5.2 纯 IDE 工作流
+
+适用场景：
+- **日常功能开发**：写新功能、改 bug
+- **代码审查**：利用 Inline Diff 逐个审查改动
+- **学习和探索**：选中不熟悉的代码，让 Claude 解释
+
+### 5.3 混合工作流（推荐）
+
+**这是我推荐的方式：终端处理批量任务，IDE 处理可视化审查。**
+
+```
+┌─────────────────────────────────────────────────┐
+│                  混合工作流                       │
+├──────────────────┬──────────────────────────────┤
+│    终端 CLI      │       VS Code / JetBrains    │
+│                  │                              │
+│  • 批量重构      │  • 日常功能开发               │
+│  • CI/CD 集成    │  • Inline Diff 审查           │
+│  • 多 Agent 并行 │  • Checkpoint 试错            │
+│  • 脚本自动化    │  • Selection Context          │
+│  • SSH 远程      │  • Plan Mode 可视化           │
+└──────────────────┴──────────────────────────────┘
+```
+
+### 5.4 实战场景
+
+**场景一：Bug 修复**
+
+1. 在 VS Code 中选中报错的代码，右键发送给 Claude
+2. Claude 分析问题，提出修复方案
+3. 通过 Inline Diff 审查修复，逐个接受改动
+4. 如果不满意，Checkpoint 回滚，重新尝试
+
+**场景二：大规模重构**
+
+1. 在终端用 Claude Code 做批量重构：
+   ```bash
+   claude "把所有 class 组件改成函数组件"
+   ```
+2. 切到 VS Code，用 Inline Diff 逐个审查改动
+3. 接受好的改动，拒绝有问题的
+4. 对有问题的部分，在 VS Code 里选中代码让 Claude 重新处理
+
+**场景三：新功能开发**
+
+1. 在 VS Code 里用 Plan Mode 让 Claude 制定开发计划
+2. 审查计划，确认后让 Claude 执行
+3. 通过 Checkpoint 做细粒度试错
+4. 满意后 Git 提交
+
+---
+
+## 六、常见问题
+
+### VS Code 扩展和终端是同一个会话吗？
+
+不是。VS Code 扩展和终端 CLI 是**独立的会话**。但它们共享：
+- 配置文件（settings.json、CLAUDE.md）
+- 项目上下文（同一个工作目录）
+- MCP Server 和 Hooks 配置
+
+### Checkpoint 和 Git 什么关系？
+
+Checkpoint 是 VS Code 扩展的**会话级功能**，独立于 Git：
+- Checkpoint 在会话内自动创建，关闭 VS Code 后消失
+- Git 是持久化的版本管理
+- 推荐流程：Checkpoint 试错 → 满意后 Git 提交
+
+### JetBrains 支持 Checkpoint 吗？
+
+目前不支持。JetBrains 用户可以用 IDE 自带的 Local History 功能作为替代，或者依赖 Git 做版本回滚。
+
+### 远程开发能用 IDE 集成吗？
+
+可以：
+- **VS Code**：通过 Remote SSH 扩展连接远程服务器，Claude Code 扩展在远程环境中运行
+- **JetBrains**：通过 Gateway 连接远程服务器
+
+### IDE 模式下 Hooks 和 MCP 还能用吗？
+
+完全可以。Hooks 和 MCP 的配置是三端共享的，在 IDE 模式下行为与终端完全一致。详见 [Hooks 指南](/zh/blog/claude-code-hooks)和 [MCP 指南](/zh/blog/claude-code-mcp)。
+
+### VS Code 扩展和 Cursor/Windsurf 冲突吗？
+
+Claude Code VS Code 扩展可以与 Cursor、Windsurf 等 AI 编辑器共存，但建议**同一时间只使用一个 AI 助手**，避免多个 AI 同时修改文件导致冲突。
+
+### 安装了扩展但侧边栏没图标？
+
+检查以下几点：
+1. 确认已安装 Claude Code CLI：`claude --version`
+2. 重新加载 VS Code 窗口：`Ctrl+Shift+P` → `Reload Window`
+3. 检查扩展是否启用（不是禁用状态）
+4. 查看 VS Code 输出面板（Output）中的 Claude Code 日志
+
+---
+
+## 七、总结
+
+3 个核心要点：
+
+1. **VS Code 扩展的 Inline Diff + Checkpoint 是最大亮点**——图形化审查改动 + 细粒度回滚，大幅提升代码审查效率
+2. **配置三端共享**——settings.json、CLAUDE.md、Hooks、MCP 在终端/VS Code/JetBrains 间完全一致，无需重复配置
+3. **混合工作流是最佳实践**——终端处理批量任务和自动化，IDE 处理日常开发和可视化审查
+
+### 推荐阅读
+
+- [Claude Code 进阶指南](/zh/blog/claude-code-overview) — 终端模式的完整用法
+- [settings.json 配置指南](/zh/blog/claude-code-settings) — 详细的配置项说明
+- [CLAUDE.md 指南](/zh/blog/claude-code-claude-md) — 项目指令的最佳实践
+- [上下文管理指南](/zh/blog/claude-code-context) — 高效管理 Claude 的上下文
+- [Git 工作流指南](/zh/blog/claude-code-git) — Claude Code 与 Git 的协作
+- [多 Agent 并行指南](/zh/blog/claude-code-multi-agent) — 多实例并行开发
+- [Agent SDK 指南](/zh/blog/claude-code-agent-sdk) — 用 Claude Code 引擎构建自定义 Agent

@@ -33,6 +33,7 @@ export const SERIES: Series[] = [
       "claude-code-performance",
       "claude-code-security",
       "claude-code-agent-sdk",
+      "claude-code-ide",
     ],
   },
   {
