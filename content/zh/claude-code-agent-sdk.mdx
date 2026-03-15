@@ -1,0 +1,705 @@
+---
+title: "Claude Code Agent SDK 完全指南：用 Claude 的引擎构建你自己的 AI Agent"
+date: "2026-03-17"
+description: 深入解析 Claude Code Agent SDK 的核心概念、API 设计、权限模型、MCP 工具扩展与实战案例，从"使用 Claude Code"到"用 Claude Code 的引擎构建自定义 Agent"的完整跨越。
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+在[多 Agent 并行指南](/zh/blog/claude-code-multi-agent)里，我们讲了如何让多个 Claude 实例协同工作。在 [MCP 指南](/zh/blog/claude-code-mcp)里，我们讲了如何通过 MCP Server 扩展 Claude Code 的能力边界。
+
+但这些都还是在**使用** Claude Code。
+
+如果你想更进一步——**用 Claude Code 的引擎构建你自己的 AI Agent**——那就需要 Agent SDK。
+
+一句话定位：**Agent SDK 就是 Claude Code 的底层引擎，打包成了可编程的库。** Claude Code CLI 能做的一切——agent loop、工具调用、上下文管理、权限控制——你都可以通过 SDK 在自己的程序里实现。
+
+---
+
+## 一、Agent SDK 是什么
+
+### 1.1 核心概念
+
+Claude Code 不只是一个终端应用。它的底层是一套完整的 agent 系统：
+
+```
+┌─────────────────────────────────────────┐
+│              Claude Code CLI            │
+├─────────────────────────────────────────┤
+│  Agent Loop  │  工具系统  │  上下文管理  │
+│  (推理循环)   │  (Bash,    │  (对话历史,  │
+│              │   Read,    │   文件缓存,  │
+│              │   Edit...) │   压缩策略)  │
+├─────────────────────────────────────────┤
+│           Anthropic API (Claude)        │
+└─────────────────────────────────────────┘
+```
+
+Agent SDK 做的事情就是把中间那一层——agent loop + 工具系统 + 上下文管理——暴露为可编程接口。
+
+### 1.2 三种方式对比
+
+| 维度 | Claude Code CLI | Anthropic API | Agent SDK |
+|------|----------------|---------------|-----------|
+| 交互方式 | 终端对话 | HTTP 请求 | 编程调用 |
+| 工具系统 | 内置 Bash/Read/Edit 等 | 需自行实现 | 继承 CLI 全部工具 |
+| Agent Loop | 内置 | 需自行实现 | 内置 |
+| 上下文管理 | 自动 | 需自行管理 | 自动 |
+| 权限控制 | 交互式审批 | 无 | 可编程审批 |
+| 适用场景 | 日常开发 | 通用 AI 应用 | 自定义 Agent |
+| MCP 支持 | ✅ | ❌ | ✅ |
+
+简单说：
+- **Anthropic API** 给你一个大脑（Claude 模型），但手脚要自己接
+- **Agent SDK** 给你一个完整的身体（大脑 + 手脚 + 协调系统），你只需要告诉它做什么
+- **Claude Code CLI** 是这个身体穿上了终端界面的外衣
+
+### 1.3 历史沿革
+
+Agent SDK 最初叫 **Claude Code SDK**（2025 年初发布），因为它本质上就是 Claude Code 的 SDK。2025 年 9 月，Anthropic 将其更名为 **Claude Agent SDK**，更准确地反映了它的定位——不只是 Claude Code 的附属品，而是一个独立的 Agent 构建框架。
+
+包名也随之变化：
+- TypeScript: `@anthropic-ai/claude-code`（保持不变，向后兼容）
+- Python: `claude-code-sdk`（保持不变）
+
+### 1.4 支持语言
+
+| 语言 | 包名 | 状态 |
+|------|------|------|
+| TypeScript | `@anthropic-ai/claude-code` | 主力，功能最完整 |
+| Python | `claude-code-sdk` | 完整支持，API 风格 Pythonic |
+
+两个版本的 API 设计高度一致，本文会同时给出双语言示例。
+
+---
+
+## 二、快速开始
+
+### 2.1 安装
+
+**TypeScript:**
+
+```bash
+npm install @anthropic-ai/claude-code
+```
+
+**Python:**
+
+```bash
+pip install claude-code-sdk
+```
+
+> **前置条件：** Agent SDK 依赖 Claude Code CLI 运行时。确保你已经安装了 Claude Code CLI（`npm install -g @anthropic-ai/claude-code`），并且设置了 `ANTHROPIC_API_KEY` 环境变量。Node.js 18+ / Python 3.10+。
+
+### 2.2 最简示例
+
+**TypeScript:**
+
+```typescript
+import { query, type Message } from "@anthropic-ai/claude-code";
+
+const messages: Message[] = [];
+
+for await (const message of query({
+  prompt: "解释一下什么是 Agent Loop",
+  options: {
+    maxTurns: 3,
+  },
+})) {
+  if (message.type === "assistant") {
+    // 流式输出助手回复
+    for (const block of message.message.content) {
+      if (block.type === "text") {
+        process.stdout.write(block.text);
+      }
+    }
+  }
+  messages.push(message);
+}
+```
+
+**Python:**
+
+```python
+from claude_code_sdk import query, ClaudeCodeOptions, Message
+
+messages: list[Message] = []
+
+async for message in query(
+    prompt="解释一下什么是 Agent Loop",
+    options=ClaudeCodeOptions(max_turns=3),
+):
+    if message.type == "assistant":
+        for block in message.message.content:
+            if hasattr(block, "text"):
+                print(block.text, end="")
+    messages.append(message)
+```
+
+核心就一个函数：`query()`。传入 prompt，返回一个异步迭代器，逐条产出消息。就这么简单。
+
+---
+
+## 三、核心 API
+
+### 3.1 `query()` 参数详解
+
+`query()` 是 Agent SDK 的核心函数，所有交互都通过它完成：
+
+```typescript
+query({
+  prompt: string,           // 用户输入
+  options: {
+    model?: string,         // 模型选择，默认 claude-sonnet-4-20250514
+    systemPrompt?: string,  // 完全替换默认系统提示
+    appendSystemPrompt?: string, // 追加到默认系统提示末尾
+    allowedTools?: string[], // 工具白名单
+    disallowedTools?: string[], // 工具黑名单
+    permissionMode?: string, // 权限模式
+    cwd?: string,           // 工作目录
+    mcpServers?: Record<string, McpServerConfig>, // MCP 服务器
+    maxTurns?: number,      // 最大轮次
+  },
+})
+```
+
+几个关键参数说明：
+
+**`systemPrompt` vs `appendSystemPrompt`：**
+- `systemPrompt` 完全替换 Claude Code 的默认系统提示。你会失去所有内置行为指导
+- `appendSystemPrompt` 在默认提示末尾追加内容。推荐用这个，保留 Claude Code 的核心能力
+
+**`allowedTools` 工具白名单：**
+
+```typescript
+// 只允许读文件和搜索，禁止任何写操作
+options: {
+  allowedTools: ["Read", "Glob", "Grep"],
+}
+```
+
+**`permissionMode` 权限模式：**
+
+与 CLI 的权限模式完全一致（详见[安全指南](/zh/blog/claude-code-security)）：
+
+| 模式 | 说明 |
+|------|------|
+| `"default"` | 默认，危险操作需审批 |
+| `"plan"` | 只读，不执行任何写操作 |
+| `"autoEdit"` | 自动批准文件编辑，Shell 仍需审批 |
+| `"fullAuto"` | 自动批准所有操作 |
+| `"bypassPermissions"` | 跳过所有权限检查（⚠️ 危险） |
+
+### 3.2 消息类型
+
+`query()` 返回的消息流包含多种类型：
+
+```typescript
+type Message =
+  | { type: "assistant"; message: AssistantMessage }  // Claude 的回复
+  | { type: "user"; message: UserMessage }            // 工具结果（自动生成）
+  | { type: "result"; result: ResultMessage }          // 最终结果
+```
+
+一个典型的消息流：
+
+```
+assistant → "我来读一下这个文件"
+assistant → [tool_use: Read("src/index.ts")]
+user      → [tool_result: 文件内容...]
+assistant → "这个文件的作用是..."
+result    → { 最终输出 }
+```
+
+### 3.3 多轮对话
+
+`query()` 支持通过 `messages` 参数传入历史消息，实现多轮对话：
+
+```typescript
+import { query, type Message } from "@anthropic-ai/claude-code";
+
+// 第一轮
+const history: Message[] = [];
+for await (const msg of query({ prompt: "读一下 package.json" })) {
+  history.push(msg);
+}
+
+// 第二轮，带上历史
+for await (const msg of query({
+  prompt: "把 name 字段改成 my-app",
+  options: { messages: history },
+})) {
+  history.push(msg);
+}
+```
+
+### 3.4 V2 Session API（预览）
+
+V1 的 `query()` 每次调用都是独立的。V2 引入了 Session 概念，简化多轮对话：
+
+```typescript
+import { createSession } from "@anthropic-ai/claude-code";
+
+const session = await createSession({
+  model: "claude-sonnet-4-20250514",
+  systemPrompt: "你是一个代码审查助手",
+});
+
+// 多轮对话，session 自动管理上下文
+const response1 = await session.send("分析 src/auth.ts 的安全性");
+const response2 = await session.send("刚才发现的问题，给出修复方案");
+
+// 流式输出
+for await (const chunk of session.stream("总结所有发现")) {
+  process.stdout.write(chunk);
+}
+```
+
+> V2 API 目前处于预览阶段，接口可能变化。生产环境建议使用 V1 的 `query()`。
+
+---
+
+## 四、权限与安全
+
+### 4.1 权限模式
+
+Agent SDK 的权限模式与 CLI 完全一致（详见[安全指南](/zh/blog/claude-code-security)），但在 SDK 场景下有不同的考量：
+
+| 场景 | 推荐模式 | 原因 |
+|------|---------|------|
+| 开发调试 | `default` | 保留人工审批，安全第一 |
+| 只读分析 | `plan` | 确保不会修改任何文件 |
+| CI/CD 流水线 | `autoEdit` + `allowedTools` | 自动化但限制工具范围 |
+| 受控批处理 | `fullAuto` + `allowedTools` | 全自动但严格限制可用工具 |
+
+### 4.2 `allowedTools` 白名单
+
+这是 SDK 场景下最重要的安全机制。通过白名单精确控制 Agent 可以使用的工具：
+
+```typescript
+// 代码审查 Agent：只读，不能修改任何东西
+const reviewAgent = query({
+  prompt: "审查这个 PR 的代码质量",
+  options: {
+    allowedTools: ["Read", "Glob", "Grep", "Bash(git diff)"],
+    permissionMode: "plan",
+  },
+});
+
+// 文档生成 Agent：可以读代码、写 Markdown
+const docAgent = query({
+  prompt: "为 src/api/ 目录生成 API 文档",
+  options: {
+    allowedTools: ["Read", "Glob", "Grep", "Write", "Edit"],
+    permissionMode: "autoEdit",
+  },
+});
+```
+
+`Bash` 工具支持更细粒度的控制：
+
+```typescript
+allowedTools: [
+  "Bash(npm test)",      // 只允许运行测试
+  "Bash(git diff)",      // 只允许查看 diff
+  "Bash(git log)",       // 只允许查看日志
+]
+```
+
+### 4.3 最佳实践
+
+1. **永远不要在生产环境使用 `bypassPermissions`** — 这会跳过所有安全检查
+2. **始终设置 `allowedTools`** — 最小权限原则
+3. **设置 `maxTurns`** — 防止 Agent 陷入无限循环
+4. **使用 `cwd` 限制工作目录** — 防止 Agent 访问不该访问的文件
+
+```typescript
+// 生产环境推荐配置
+query({
+  prompt: userInput,
+  options: {
+    allowedTools: ["Read", "Glob", "Grep"],
+    permissionMode: "plan",
+    maxTurns: 10,
+    cwd: "/app/workspace",
+  },
+});
+```
+
+---
+
+## 五、自定义工具（MCP）
+
+### 5.1 内置工具
+
+Agent SDK 继承了 Claude Code 的全部内置工具：
+
+| 工具 | 功能 | 说明 |
+|------|------|------|
+| `Bash` | 执行 Shell 命令 | 支持细粒度命令白名单 |
+| `Read` | 读取文件 | 支持行范围 |
+| `Write` | 写入文件 | 创建或覆盖 |
+| `Edit` | 编辑文件 | 精确替换 |
+| `Glob` | 文件搜索 | 支持 glob 模式 |
+| `Grep` | 内容搜索 | 支持正则 |
+| `Agent` | 子 Agent | 启动子 Agent 处理子任务 |
+
+### 5.2 通过 MCP 扩展工具
+
+和 CLI 一样（详见 [MCP 指南](/zh/blog/claude-code-mcp)），SDK 也支持通过 MCP Server 扩展工具：
+
+```typescript
+query({
+  prompt: "查看最近的 GitHub Issues",
+  options: {
+    mcpServers: {
+      github: {
+        command: "npx",
+        args: ["-y", "@modelcontextprotocol/server-github"],
+        env: {
+          GITHUB_TOKEN: process.env.GITHUB_TOKEN,
+        },
+      },
+    },
+  },
+});
+```
+
+### 5.3 实战：带数据库查询能力的 Agent
+
+结合 MCP，我们可以构建一个能查询数据库的 Agent：
+
+```typescript
+import { query } from "@anthropic-ai/claude-code";
+
+async function dbQueryAgent(question: string) {
+  const messages = [];
+
+  for await (const message of query({
+    prompt: question,
+    options: {
+      appendSystemPrompt:
+        "你是一个数据库分析助手。用户会问关于数据的问题，" +
+        "你可以通过 MCP 工具查询 PostgreSQL 数据库来回答。" +
+        "查询前先了解表结构，避免全表扫描。",
+      mcpServers: {
+        postgres: {
+          command: "npx",
+          args: ["-y", "@modelcontextprotocol/server-postgres"],
+          env: {
+            POSTGRES_CONNECTION_STRING: process.env.DATABASE_URL,
+          },
+        },
+      },
+      allowedTools: [
+        "mcp__postgres__query",
+        "mcp__postgres__list_tables",
+        "mcp__postgres__describe_table",
+      ],
+      maxTurns: 10,
+    },
+  })) {
+    messages.push(message);
+  }
+
+  // 提取最终结果
+  const result = messages.find((m) => m.type === "result");
+  return result?.result;
+}
+
+// 使用
+const answer = await dbQueryAgent("上个月新增了多少用户？按周统计");
+```
+
+---
+
+## 六、实战：构建自定义 Agent
+
+### 6.1 代码审查 Agent
+
+一个读取 git diff 并输出结构化审查意见的 Agent：
+
+```typescript
+import { query, type Message } from "@anthropic-ai/claude-code";
+
+interface ReviewResult {
+  summary: string;
+  issues: Array<{
+    severity: "error" | "warning" | "info";
+    file: string;
+    line?: number;
+    message: string;
+  }>;
+}
+
+async function codeReviewAgent(baseBranch = "main"): Promise<ReviewResult> {
+  const messages: Message[] = [];
+
+  for await (const message of query({
+    prompt: `请审查当前分支相对于 ${baseBranch} 的所有代码变更。
+
+要求：
+1. 先运行 git diff ${baseBranch}...HEAD 查看变更
+2. 逐文件分析，关注：安全漏洞、性能问题、逻辑错误、代码风格
+3. 最后以 JSON 格式输出审查结果，格式如下：
+{
+  "summary": "总体评价",
+  "issues": [
+    { "severity": "error|warning|info", "file": "文件路径", "line": 行号, "message": "问题描述" }
+  ]
+}
+只输出 JSON，不要其他内容。`,
+    options: {
+      allowedTools: ["Bash(git diff)", "Bash(git log)", "Read", "Glob", "Grep"],
+      permissionMode: "plan",
+      maxTurns: 15,
+    },
+  })) {
+    messages.push(message);
+  }
+
+  const result = messages.find((m) => m.type === "result");
+  return JSON.parse(result?.result?.text ?? "{}");
+}
+```
+
+### 6.2 文档生成 Agent
+
+扫描代码库，自动生成 API 文档：
+
+```typescript
+import { query, type Message } from "@anthropic-ai/claude-code";
+
+async function generateApiDocs(sourceDir: string, outputFile: string) {
+  const messages: Message[] = [];
+
+  for await (const message of query({
+    prompt: `请为 ${sourceDir} 目录下的所有 TypeScript 文件生成 API 文档。
+
+步骤：
+1. 用 Glob 找到所有 .ts 文件
+2. 逐个读取，提取导出的函数、类、接口
+3. 为每个导出项生成文档，包含：描述、参数、返回值、使用示例
+4. 将完整文档写入 ${outputFile}，使用 Markdown 格式`,
+    options: {
+      allowedTools: ["Read", "Glob", "Grep", "Write"],
+      permissionMode: "autoEdit",
+      maxTurns: 30,
+    },
+  })) {
+    messages.push(message);
+  }
+
+  console.log(`文档已生成: ${outputFile}`);
+}
+
+// 使用
+await generateApiDocs("src/api", "docs/API.md");
+```
+
+---
+
+## 七、进阶话题
+
+### 7.1 Hooks：拦截工具调用
+
+和 CLI 一样（详见 [Hooks 指南](/zh/blog/claude-code-hooks)），SDK 也支持 Hooks 来拦截工具调用：
+
+```typescript
+query({
+  prompt: "重构 src/utils.ts",
+  options: {
+    hooks: {
+      preToolUse: [
+        {
+          matcher: "Write|Edit",
+          command: "echo 'File modification detected' >> /tmp/agent.log",
+        },
+      ],
+      postToolUse: [
+        {
+          matcher: "Bash",
+          command: "echo 'Command executed' >> /tmp/agent.log",
+        },
+      ],
+    },
+  },
+});
+```
+
+### 7.2 子 Agent 模式
+
+Agent 内部可以启动子 Agent，实现任务分解：
+
+```typescript
+query({
+  prompt: `你需要完成以下任务：
+1. 审查 src/auth/ 目录的安全性
+2. 审查 src/api/ 目录的 API 设计
+3. 汇总两个审查结果
+
+请使用子 Agent 并行处理前两个任务，然后汇总。`,
+  options: {
+    allowedTools: ["Read", "Glob", "Grep", "Agent"],
+    maxTurns: 20,
+  },
+});
+```
+
+当 `allowedTools` 包含 `Agent` 时，Claude 可以自动创建子 Agent 来并行处理子任务——和你在 CLI 里看到的[多 Agent 并行](/zh/blog/claude-code-multi-agent)行为完全一致。
+
+### 7.3 流式处理与中断
+
+SDK 的流式输出天然支持中断：
+
+```typescript
+const controller = new AbortController();
+
+// 5 秒后中断
+setTimeout(() => controller.abort(), 5000);
+
+try {
+  for await (const message of query({
+    prompt: "分析整个代码库的架构",
+    options: { signal: controller.signal },
+  })) {
+    // 处理消息...
+  }
+} catch (err) {
+  if (err.name === "AbortError") {
+    console.log("任务已中断");
+  }
+}
+```
+
+### 7.4 与 CI/CD 集成
+
+Agent SDK 非常适合集成到 CI/CD 流水线中（详见 [CI/CD 指南](/zh/blog/claude-code-cicd)）：
+
+```typescript
+// ci-review.ts — 在 PR 上自动运行代码审查
+import { query } from "@anthropic-ai/claude-code";
+
+async function ciReview() {
+  const messages = [];
+
+  for await (const msg of query({
+    prompt: "审查当前 PR ���代码变更，输出 Markdown 格式的审查报告",
+    options: {
+      allowedTools: [
+        "Bash(git diff)",
+        "Bash(git log)",
+        "Read",
+        "Glob",
+        "Grep",
+      ],
+      permissionMode: "plan", // 只读，不修改任何文件
+      maxTurns: 15,
+    },
+  })) {
+    messages.push(msg);
+  }
+
+  const result = messages.find((m) => m.type === "result");
+  return result?.result?.text ?? "审查完成，未发现问题。";
+}
+```
+
+在 GitHub Actions 中使用：
+
+```yaml
+# .github/workflows/ai-review.yml
+name: AI Code Review
+on: [pull_request]
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: npm install @anthropic-ai/claude-code
+      - run: npx tsx ci-review.ts
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+```
+
+---
+
+## 八、常见问题
+
+### Agent SDK vs 直接调 Anthropic API，什么时候用哪个？
+
+- **用 Anthropic API：** 你需要完全控制 prompt、工具定义、消息格式，或者你的场景不涉及文件系统操作（比如聊天机器人、内容生成）
+- **用 Agent SDK：** 你需要 Agent 与文件系统交互（读写文件、执行命令），或者你想复用 Claude Code 的工具系统和 agent loop
+
+经验法则：如果你发现自己在用 Anthropic API 重新实现 Bash 执行、文件读写、错误重试这些逻辑，那就该用 Agent SDK 了。
+
+### 需要安装 Claude Code CLI 吗？
+
+**需要。** Agent SDK 依赖 Claude Code CLI 运行时。SDK 本质上是 CLI 的编程接口，底层调用的是同一套引擎。
+
+```bash
+# 先安装 CLI
+npm install -g @anthropic-ai/claude-code
+
+# 再安装 SDK
+npm install @anthropic-ai/claude-code
+```
+
+### 支持哪些模型？
+
+Agent SDK 支持所有 Claude 模型。通过 `options.model` 指定：
+
+```typescript
+query({
+  prompt: "...",
+  options: {
+    model: "claude-opus-4-20250918",    // 最强推理
+    // model: "claude-sonnet-4-20250514", // 默认，平衡性能和成本
+    // model: "claude-haiku-4-5-20251001", // 最快，适合简单任务
+  },
+});
+```
+
+### 如何控制成本？
+
+1. **设置 `maxTurns`** — 限制 Agent 的最大推理轮次
+2. **选择合适的模型** — 简单任务用 Haiku，复杂任务用 Sonnet/Opus
+3. **限制工具范围** — 减少不必要的工具调用
+4. **使用 `plan` 模式做只读分析** — 避免写操作带来的额外轮次
+
+### 能在浏览器里用吗？
+
+**不能。** Agent SDK 需要访问文件系统和执行 Shell 命令，只能在 Node.js 或 Python 服务端环境运行。如果你需要在浏览器中使用 Claude，请直接使用 Anthropic API。
+
+### V1 和 V2 接口怎么选？
+
+- **V1 `query()`：** 稳定，生产就绪，适合大多数场景
+- **V2 `createSession()`：** 预览阶段，API 可能变化，但多轮对话体验更好
+
+建议：新项目先用 V1，等 V2 稳定后再迁移。
+
+---
+
+## 九、总结
+
+三个核心要点：
+
+1. **Agent SDK = Claude Code 的引擎** — 它不是一个新东西，而是把你每天在终端里用的 Claude Code 底层能力开放为可编程接口
+2. **安全第一** — `allowedTools` + `permissionMode` + `maxTurns` 是生产环境的三道防线
+3. **从使用到构建** — 掌握了 SDK，你就从 Claude Code 的用户变成了 Claude Code 的开发者
+
+### 推荐阅读
+
+- [多 Agent 并行指南](/zh/blog/claude-code-multi-agent) — 理解 Agent 协作模式
+- [MCP 深度指南](/zh/blog/claude-code-mcp) — 通过 MCP 扩展 Agent 能力
+- [Hooks 指南](/zh/blog/claude-code-hooks) — 拦截和控制工具调用
+- [安全实践指南](/zh/blog/claude-code-security) — 权限模型与安全防线
+- [CI/CD 指南](/zh/blog/claude-code-cicd) — Agent 在流水线中的应用
+- [Anthropic 官方文档：Agent SDK](https://docs.anthropic.com/en/docs/agents-and-tools/claude-code/sdk) — 最新 API 参考
