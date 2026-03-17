@@ -1,0 +1,492 @@
+---
+title: "AI Prompt Engineering Playbook: From Usable to Excellent Output"
+date: "2026-03-27"
+description: "A systematic guide to core prompt engineering techniques — role setting, template constraints, chain of thought, few-shot examples, and iterative refinement — each with real-world demos across the product development pipeline."
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In previous articles, I mentioned prompt techniques scattered across each stage: use template constraints for PRD generation, describe structure not pixels for UI design, set an architect role for technical specs.
+
+But there is a unified methodology behind these techniques. Master it, and no matter what you use AI for — writing docs, generating code, designing UI, analyzing data — your output quality will improve dramatically.
+
+This article systematically covers core prompt engineering techniques. Not a theoretical survey, but a practical playbook: each technique paired with a real scenario, showing "bad prompt" vs "good prompt" comparisons so you can see exactly where the difference lies.
+
+## 1. Why Prompt Quality Matters So Much
+
+The same model can produce vastly different results from different prompts. This is not magic — it is because large language models predict the most likely output based on input context. The more precise and structured your context, the more accurate the prediction.
+
+An analogy: a prompt is like a task brief for an intern. Say "write me a document" and they do not know what to write, for whom, or in what format. Say "write a PRD for a ticket system, for the dev team, using this template, focusing on status transition logic" and they can deliver a useful first draft.
+
+AI works the same way. The difference is that AI will not proactively ask "what exactly do you want" — it will just guess, and guesses tend to produce generic, mediocre output.
+
+## 2. Six Core Techniques
+
+### Technique 1: Role Setting
+
+**Principle**: Give AI a specific professional role to activate domain knowledge and expression patterns.
+
+**Bad prompt**:
+```
+Help me design a database for a ticket system.
+```
+
+**Good prompt**:
+```
+You are a backend architect with 10 years of experience, specializing in PostgreSQL database design.
+Please design a data model for an internal ticket system that supports:
+- Ticket creation, assignment, and status transitions
+- Multiple priority levels
+- Comments and attachments
+- Audit logging
+
+Please output: table structures (with field types and constraints), index recommendations, and analysis of key query scenarios.
+```
+
+**Why it works**: Role setting is not "making AI act." It narrows the output search space. When you say "backend architect," the model tends to output normalized table structures, consider index optimization, mention foreign key constraints — things an architect would focus on.
+
+**Use cases**:
+- Technical spec design → "senior backend architect"
+- PRD writing → "experienced product manager"
+- Code review → "security engineer"
+- Content writing → "technical blog author"
+
+**Note**: Role setting is a supplement, not a silver bullet. If your requirement description is vague, no role can save it.
+
+### Technique 2: Template Constraints
+
+**Principle**: Give AI an explicit output structure, having it fill a template rather than free-form.
+
+**Bad prompt**:
+```
+Help me write API documentation.
+```
+
+**Good prompt**:
+```
+Please write API documentation for the ticket system's "Create Ticket" endpoint using this template:
+
+## Endpoint Name
+[fill in]
+
+## Request
+- Method: [GET/POST/PUT/DELETE]
+- Path: [fill in]
+- Headers: [list required headers]
+- Body:
+```json
+{
+  // list all fields with types and required/optional
+}
+```
+
+## Response
+- Success (200):
+```json
+{
+  // response structure
+}
+```
+- Errors:
+  - 400: [scenario description]
+  - 401: [scenario description]
+  - 403: [scenario description]
+
+## Example
+[complete curl command example]
+
+## Notes
+[edge cases, limitations, caveats]
+```
+
+**Why it works**: Templates eliminate uncertainty about output format, letting AI focus entirely on content. The template itself acts as a checklist — reminding AI not to skip error codes, examples, and caveats.
+
+**Use cases**:
+- PRD documents (covered in detail in the [deep dive](/en/blog/ai-prd))
+- API documentation
+- Test cases
+- Code review reports
+- Meeting notes
+
+**Advanced**: Save your team's common document templates and reuse them. This is the highest-ROI prompt investment.
+
+### Technique 3: Chain of Thought
+
+**Principle**: Ask AI to show its reasoning process rather than jumping to conclusions. This significantly improves output quality for complex problems.
+
+**Bad prompt**:
+```
+What's wrong with this code?
+[code snippet]
+```
+
+**Good prompt**:
+```
+Please analyze potential issues in this code step by step:
+
+1. First understand the code's intent and logic flow
+2. Check input validation and edge cases for each function
+3. Check if error handling is comprehensive
+4. Check for security vulnerabilities (injection, XSS, etc.)
+5. Check for performance issues (N+1 queries, memory leaks, etc.)
+6. Finally, provide fix recommendations sorted by severity
+
+[code snippet]
+```
+
+**Why it works**: LLMs tend to skip intermediate reasoning when asked to answer directly, leading to omissions. Requiring step-by-step thinking forces the model through the complete analysis process.
+
+**Use cases**:
+- Code review and bug analysis
+- Architecture decisions (list options → analyze each → recommend)
+- Complex requirement breakdown
+- Technology comparison
+
+**Variant**: If you do not want verbose reasoning, say "Please reason step by step internally, only output the final conclusion and key evidence."
+
+### Technique 4: Few-Shot Examples
+
+**Principle**: Give AI a few input-output examples so it learns the pattern you expect.
+
+**Bad prompt**:
+```
+Convert these user stories into test cases.
+```
+
+**Good prompt**:
+```
+Please convert user stories into test cases. Here is a format example:
+
+User story: As a regular employee, I want to submit a ticket so IT can handle my issue.
+Test cases:
+| ID | Scenario | Precondition | Steps | Expected Result |
+|----|----------|-------------|-------|-----------------|
+| TC-001 | Normal submit | User logged in | 1. Click "New Ticket" 2. Fill title and description 3. Select priority 4. Click submit | Ticket created, status "Pending", user receives confirmation |
+| TC-002 | Empty title | User logged in | 1. Click "New Ticket" 2. Leave title empty 3. Click submit | Error: "Title is required", ticket not created |
+| TC-003 | Oversized attachment | User logged in | 1. New ticket 2. Upload file over 10MB | Error: "Attachment must be under 10MB" |
+
+Now generate test cases in the same format for these user stories:
+- As an IT admin, I want to assign a ticket to a specific handler
+- As a regular employee, I want to add comments to a ticket
+```
+
+**Why it works**: Examples are more precise than descriptions. You could use a thousand words to describe the format you want, or just show one example. AI will precisely mimic the example's structure, granularity, and style.
+
+**Use cases**:
+- Strictly formatted output (test cases, data transformation, document generation)
+- Style imitation (writing new docs matching existing team doc style)
+- Classification tasks (give classification examples, have AI classify new data)
+
+**Note**: 2-3 examples are usually sufficient. Too many examples consume context window and can actually reduce effectiveness.
+
+### Technique 5: Constraints and Boundaries
+
+**Principle**: Explicitly tell AI what to do, what not to do, and where the output boundaries are.
+
+**Bad prompt**:
+```
+Help me refactor this code.
+```
+
+**Good prompt**:
+```
+Please refactor the following code with these constraints:
+
+Must do:
+- Extract repeated logic into separate functions
+- Add TypeScript type annotations
+- Use early returns to reduce nesting
+
+Do not:
+- Do not change the function's external interface (parameters and return values)
+- Do not introduce new dependencies
+- Do not add comments (code should be self-explanatory)
+- Do not change business logic
+
+Output requirements:
+- Only output the modified code, no explanations needed
+- If a refactoring might affect behavior, mark with // TODO
+
+[code snippet]
+```
+
+**Why it works**: AI tends to be "overly helpful" — ask it to refactor and it might change business logic, add excessive comments, introduce new libraries. Explicit constraints keep it within the scope you actually want.
+
+**Use cases**:
+- Code refactoring (scope limitation)
+- Document writing (length, style, terminology limits)
+- Design generation (component library, color scheme limits)
+- Any scenario where you do not want AI to "freestyle"
+
+**Key words**:
+- "Do not", "never", "avoid" → exclude unwanted behavior
+- "Only", "just" → limit output scope
+- "Must", "ensure" → enforce requirements
+
+### Technique 6: Multi-Turn Iteration
+
+**Principle**: Do not expect perfect results from a single prompt. Break complex tasks into multiple conversation turns, each focusing on one aspect.
+
+**Bad approach**: Write an extremely long prompt trying to get perfect output in one shot.
+
+**Good approach**:
+
+```
+Turn 1: Generate framework
+"Generate an outline for the ticket system notification module tech spec. List the key topics to cover."
+
+Turn 2: Expand sections
+"Expand section 2 'Notification Channel Design' with detailed implementation plans for email, in-app, and webhook channels."
+
+Turn 3: Fill gaps
+"The retry mechanism for notifications wasn't covered. Please add: failure retry strategy, dead letter queue handling, monitoring alerts."
+
+Turn 4: Review and refine
+"Review the entire spec for omissions or inconsistencies. Pay special attention to: performance under high concurrency, notification deduplication, user preference settings."
+```
+
+**Why it works**:
+1. Each turn has more focused context, producing higher quality output
+2. You can review and course-correct between turns, preventing error accumulation
+3. After decomposition, each subtask is within AI's capability range
+
+**Use cases**: All complex tasks. Rule of thumb — if your prompt exceeds 500 words, consider splitting into multiple turns.
+
+## 3. Combining Techniques: A Real Example
+
+Individual techniques are useful; combinations are powerful. Here is a complete example.
+
+### Scenario: Designing a Notification System for Tickets
+
+**Turn 1: Role Setting + Template Constraints**
+
+```
+You are a senior backend architect specializing in messaging system design.
+
+Please design a notification system for a ticket system, structured as follows:
+
+## 1. Notification Trigger Scenarios
+[List all business events requiring notifications]
+
+## 2. Notification Channels
+[Technical approach for each channel]
+
+## 3. Data Model
+[Notification-related table structures]
+
+## 4. Technology Choices
+[Message queue, template engine, etc.]
+
+## 5. Key Design Decisions
+[Technical trade-offs with options and recommendations]
+
+Context:
+- User base: 500 people
+- Ticket statuses: Pending → In Progress → Awaiting Verification → Completed/Closed
+- Current stack: Node.js + PostgreSQL + Redis
+```
+
+**Turn 2: Chain of Thought + Constraints**
+
+```
+Please analyze the "real-time vs batch notifications" decision from section 5 step by step:
+
+1. List implementation complexity for both approaches
+2. Analyze performance impact at 500-user scale
+3. Consider user experience differences
+4. Give recommended approach with reasoning
+
+Constraint: Do not recommend real-time solutions other than WebSocket (team only knows WebSocket).
+```
+
+**Turn 3: Few-Shot + Iteration**
+
+```
+Please write test cases for the notification module. Reference this format:
+
+| Scenario | Trigger | Expected Notification | Recipients |
+|----------|---------|----------------------|------------|
+| Ticket created | Employee submits new ticket | Email + in-app | All IT admins |
+| Ticket assigned | Admin assigns handler | Email + in-app | Assigned handler |
+
+Please complete all remaining scenario test cases, paying special attention to:
+- Every status transition node
+- Comments and @mentions
+- Overdue reminders
+```
+
+Three turns produce a well-structured, detailed, reviewed notification spec. Each turn uses different technique combinations, and you have review opportunities between each.
+
+## 4. Prompt Strategies by Stage
+
+### PRD Writing
+
+**Core techniques**: Template constraints + multi-turn iteration
+
+```
+Turn 1: Generate PRD framework using template
+Turn 2: Refine section by section, add edge cases
+Turn 3: Mark uncertain parts with [TBD]
+```
+
+See the [PRD deep dive](/en/blog/ai-prd) for details.
+
+### UI Design
+
+**Core techniques**: Constraints (describe structure not pixels) + few-shot (reference images)
+
+```
+Describe layout regions → specify component library → provide example data → generate per page
+```
+
+See the [UI design deep dive](/en/blog/ai-ui-design) for details.
+
+### Code Generation
+
+**Core techniques**: Role setting + constraints + multi-turn iteration
+
+```
+Turn 1: Define interfaces and types
+Turn 2: Implement core logic
+Turn 3: Add error handling
+Turn 4: Generate tests
+```
+
+Key constraints: specify language version, framework, code style, no new dependencies.
+
+### Code Review
+
+**Core techniques**: Chain of thought + role setting
+
+```
+You are a security engineer. Please review this code step by step:
+1. Input validation
+2. SQL injection risks
+3. XSS risks
+4. Authentication and authorization
+5. Sensitive data handling
+```
+
+### Technical Architecture
+
+**Core techniques**: Role setting + template constraints + chain of thought
+
+```
+Role: Senior architect
+Template: Data model → API design → tech choices → deployment plan
+Chain of thought: For each decision, list options, analyze each, recommend
+```
+
+## 5. Common Pitfalls
+
+### Pitfall 1: Longer Prompts Are Better
+
+**Misconception**: Pack every possible requirement into the prompt.
+
+**Reality**: Overly long prompts cause AI "attention dilution," actually missing key requirements. Rule of thumb: keep single-turn prompts to 200-500 words. Beyond that, split into multiple turns.
+
+### Pitfall 2: Over-Relying on Role Setting
+
+**Misconception**: Setting a "world-class expert" role automatically improves output.
+
+**Reality**: Role setting is icing on the cake, not a lifeline. If your requirement description is vague, a "world-class expert" will still give you generic output. Write clear requirements first, then add role setting.
+
+### Pitfall 3: Using Output Without Review
+
+**Misconception**: Good prompts guarantee correct output.
+
+**Reality**: No prompt eliminates AI hallucination and errors. Prompt engineering improves "average quality," but every output still needs human review. Especially:
+- Numbers and dates (AI frequently fabricates these)
+- Technical details (API parameters, library usage)
+- Edge cases (AI tends to ignore these)
+
+### Pitfall 4: Ignoring Context Window
+
+**Misconception**: Dumping the entire codebase gives AI better results.
+
+**Reality**: Context windows are limited. Too much irrelevant information dilutes key information. Only provide context directly relevant to the current task.
+
+### Pitfall 5: One-Off Prompts
+
+**Misconception**: Writing prompts from scratch every time.
+
+**Reality**: Good prompts should be saved and reused. Build a team prompt template library, categorized by scenario, continuously optimized. This is the highest-ROI investment.
+
+## 6. Building Your Prompt Template Library
+
+### Suggested Structure
+
+```
+prompts/
+├── prd/
+│   ├── feature-prd.md        # Feature PRD template
+│   └── api-prd.md             # API PRD template
+├── code/
+│   ├── code-review.md         # Code review template
+│   ├── refactor.md            # Refactoring template
+│   └── test-generation.md     # Test generation template
+├── design/
+│   ├── page-ui.md             # Page UI generation template
+│   └── component-ui.md        # Component UI generation template
+└── architecture/
+    ├── tech-spec.md           # Technical spec template
+    └── api-design.md          # API design template
+```
+
+### Template Maintenance Principles
+
+1. **Extract from actual usage**: Do not design templates in a vacuum — extract from prompts that actually worked well
+2. **Iterate continuously**: Record effectiveness after each use, optimize regularly
+3. **Share with team**: Put in team knowledge base or code repository for everyone to use
+4. **Version control**: Manage template changes with Git, document why changes were made
+
+### A Practical Code Review Template
+
+```markdown
+# Code Review Prompt Template
+
+## Role
+You are a senior software engineer specializing in [language/framework] development.
+
+## Task
+Please review the following code changes, focusing on:
+
+### Required checks
+- [ ] Correctness: Does the code implement intended functionality
+- [ ] Error handling: Are exceptions properly handled
+- [ ] Security: Any injection, XSS, or other vulnerabilities
+
+### Optional checks (select based on change type)
+- [ ] Performance: N+1 queries, memory leaks, etc.
+- [ ] Maintainability: Clear naming, reasonable structure
+- [ ] Test coverage: Are critical paths tested
+
+## Output format
+Categorized by severity:
+- 🔴 Must fix: [issue description + fix suggestion]
+- 🟡 Should fix: [issue description + fix suggestion]
+- 🟢 Nice to have: [issue description + optimization suggestion]
+
+## Code changes
+[paste code]
+```
+
+## 7. Summary
+
+Prompt engineering is not magic — it is a learnable, reusable methodology. Six core techniques:
+
+1. **Role setting**: Narrow the output search space
+2. **Template constraints**: Eliminate format uncertainty, act as checklist
+3. **Chain of thought**: Force complete reasoning, reduce omissions
+4. **Few-shot examples**: Use examples instead of descriptions for precise expectations
+5. **Constraints and boundaries**: Prevent AI from overreaching
+6. **Multi-turn iteration**: Decompose complex tasks, focus each turn on one aspect
+
+The most important point: **Prompts are means, not ends**. Good prompts lift AI output from 60 to 85 points, but going from 85 to 95 still requires your professional judgment and human review.
+
+### Recommended Reading
+
+- [How to Use LLMs to Convert Requirements into PRDs](/en/blog/ai-prd) — Template constraint technique in depth
+- [AI-Assisted UI Design in Practice](/en/blog/ai-ui-design) — Constraint techniques applied to design
+- [AI-Assisted Product Development Pipeline Guide](/en/blog/ai-product-dev-pipeline) — Full pipeline overview
