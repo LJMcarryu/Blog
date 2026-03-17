@@ -1,0 +1,441 @@
+---
+title: "AI-Assisted UI Design in Practice: From PRD to Interactive Prototype"
+date: "2026-03-24"
+description: "A hands-on guide to generating UI prototypes from PRD descriptions using v0, Figma AI, screenshot-to-code, and more. Covers three design paths, prompt techniques, a ticket system case study, and practical tips."
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In the previous [full pipeline guide](/en/blog/ai-product-dev-pipeline), we briefly covered the "PRD → UI/Design" stage — introducing three paths and mainstream tools. This article is the deep dive for that stage.
+
+The traditional UI design workflow looks like this: PM writes a PRD, hands it to a designer, designer creates wireframes in Figma, review, revise, create high-fidelity mockups, review again, revise again. A moderately complex page typically takes 3-5 days from PRD to design sign-off.
+
+AI design tools are compressing this cycle. You can generate an interactive UI prototype from a text description, getting an "80-point" starting point in 10 minutes, then spend your energy on the refinement from 80 to 95.
+
+This article covers:
+
+- **Three AI design paths** with detailed comparison and use cases
+- **v0 hands-on demo**: Generating a complete ticket system interface from PRD
+- **Prompt engineering**: How to write descriptions that produce good UI output
+- **Tool comparison**: Pros and cons of v0, Figma AI, Galileo AI
+- **Limitations and best practices**
+
+We continue with the ticket system case from the [PRD deep dive](/en/blog/ai-prd), showing the complete journey from requirements to interface.
+
+## 1. What AI Design Tools Can (and Cannot) Do
+
+Let's calibrate expectations. In 2026, AI design tools can:
+
+**Can do**:
+- Generate well-laid-out UI from text descriptions
+- Produce runnable frontend code (React/Vue/HTML)
+- Recreate interfaces from screenshots and generate code
+- Quickly generate multiple design options to choose from
+- Understand common UI patterns (tables, forms, dashboards, card lists)
+
+**Cannot do**:
+- Automatically match your brand design system (colors, typography, spacing)
+- Handle complex interaction logic (multi-step forms, drag-and-drop, animations)
+- Generate pixel-perfect design mockups
+- Understand business context (why this button should be here)
+- Guarantee accessibility compliance
+
+The positioning is clear: **AI is a prototype generator, not a designer replacement**. It helps you skip the blank canvas stage, but final design decisions still need humans.
+
+## 2. Three Paths in Detail
+
+### Path 1: Text Description → UI
+
+The most direct approach. Describe the interface in natural language, AI generates code and preview.
+
+**Use cases**:
+- Quickly validating product ideas
+- Internal tools and admin dashboards
+- Solo developers without designer resources
+- Needing a visual reference before tech review
+
+**Key tools**:
+
+| Tool | Output | Component Library | Strengths |
+|------|--------|-------------------|-----------|
+| v0 (Vercel) | React + Tailwind | shadcn/ui | High code quality, production-ready |
+| Galileo AI | Design mockup | Custom | High-fidelity visuals, Figma export |
+| bolt.new | React/Vue/Svelte | Multiple | Full-stack app generation with backend |
+
+**v0's advantage** is that it generates real React code, not images. You can directly `npx shadcn add` to integrate components into your project.
+
+### Path 2: Wireframe/Sketch → High-Fidelity
+
+Draw a rough wireframe first (hand-drawn, whiteboard, or simple tools), then let AI convert it to high-fidelity design.
+
+**Use cases**:
+- Designers wanting to accelerate sketch-to-high-fidelity
+- Quick prototyping after team whiteboard sessions
+- Having a rough layout idea, needing visual polish
+
+**Key tools**:
+
+| Tool | Input | Output | Strengths |
+|------|-------|--------|-----------|
+| Figma AI | In-Figma operations | Figma design | Understands design context, integrates with design systems |
+| Motiff | Upload sketch | Design mockup | AI-native design tool |
+
+This path's advantage is **preserving the designer's layout intent** — AI only handles visual polish and detail refinement.
+
+### Path 3: Screenshot → Code
+
+Convert existing designs, competitor interfaces, or any screenshot into frontend code.
+
+**Use cases**:
+- Quickly replicating reference designs
+- Converting Figma mockups to code
+- Rapid prototyping during competitor analysis
+
+**Key tools**:
+
+| Tool | Output | Strengths |
+|------|--------|-----------|
+| screenshot-to-code | HTML/React/Vue | Open source, multi-framework |
+| v0 | React + Tailwind | Image upload to code |
+| Claude/GPT-4o | Any | Multimodal models directly recognize and generate code |
+
+**Note**: Code from this path is typically "visual reproduction" level — it looks right, but code structure, semantics, and responsive adaptation all need significant cleanup. Good for prototypes, not for production.
+
+### Path Comparison
+
+| | Text → UI | Sketch → High-Fi | Screenshot → Code |
+|---|----------|-----------------|-------------------|
+| Speed | Fastest (minutes) | Medium | Fast |
+| Design quality | Medium | Higher | Depends on source |
+| Code quality | High (v0) | No code output | Low |
+| Controllability | Low | High | Low |
+| Best for | Developers, PMs | Designers | Everyone |
+
+## 3. v0 Hands-On: From Ticket System PRD to Interface
+
+Continuing the ticket system case from the [PRD deep dive](/en/blog/ai-prd). Assume we have the PRD and now need to generate UI.
+
+### Step 1: Extract UI Requirements from PRD
+
+Pull UI-relevant information from the PRD:
+
+```
+Ticket system UI requirements summary:
+
+User roles:
+- Regular employee: Submit tickets, view own tickets
+- IT admin: View all tickets, assign tickets, handle tickets
+- Super admin: All above + user management + system settings
+
+Core pages:
+1. Ticket list page (filtering, search, pagination)
+2. Ticket detail page (status transitions, comments, attachments)
+3. Submit ticket page (form)
+4. Dashboard (statistics, pending tickets)
+
+Ticket status: Pending → In Progress → Awaiting Verification → Completed / Closed
+Priority: Low, Medium, High, Urgent
+```
+
+### Step 2: Generate Page by Page
+
+Do not ask v0 to generate the entire system at once. Break it down by page.
+
+**Ticket list page prompt**:
+
+```
+Generate a ticket management system list page using React + Tailwind + shadcn/ui:
+
+Layout:
+- Top: Page title "Ticket Management", "New Ticket" button on the right
+- Filter bar: Status dropdown (All/Pending/In Progress/Awaiting Verification/
+  Completed/Closed), Priority dropdown (All/Low/Medium/High/Urgent), Search box
+- Main area: Table with columns:
+  - Ticket ID (#001 format)
+  - Title (clickable to detail)
+  - Submitter (avatar + name)
+  - Status (colored badge: Pending=gray, In Progress=blue,
+    Awaiting Verification=orange, Completed=green, Closed=red)
+  - Priority (Urgent=red, High=orange, Medium=yellow, Low=gray)
+  - Created (relative time, e.g. "2 hours ago")
+  - Assignee (avatar, show "—" if unassigned)
+- Bottom: Pagination
+
+Design requirements:
+- Support dark mode
+- Responsive layout (mobile: table becomes card list)
+```
+
+### Step 3: Iterate and Refine
+
+v0's first output is typically 70-80 points. Refine with follow-up instructions:
+
+```
+Improvements:
+1. Add hover effect on table rows with full-row click navigation
+2. Use Badge component with icons for status labels
+3. Add left red border for urgent priority rows
+4. Add bulk actions: select multiple tickets for batch assignment
+5. Empty state: show illustration and guidance text when no tickets
+```
+
+### Step 4: Other Pages
+
+Generate other pages the same way. The key is **maintaining consistency** — same component library, same color scheme, same layout patterns.
+
+**Ticket detail page prompt highlights**:
+
+```
+Generate a ticket detail page, consistent design style with the list page:
+
+Layout:
+- Breadcrumb: Ticket Management > #001 Network Connection Issue
+- Left main area (70%):
+  - Ticket title, status badge, priority badge
+  - Description (Markdown rendering)
+  - Attachment list (filename, size, download button)
+  - Comments section (timeline style, supports @mentions)
+- Right sidebar (30%):
+  - Status transition buttons (show available actions based on current status)
+  - Ticket info: submitter, assignee, created, updated
+  - Assign handler (dropdown select)
+```
+
+### Lessons Learned
+
+After extensive v0 usage, key takeaways:
+
+1. **Describe layout with "regions" not "pixels"**: "Left 70%, right 30%" works better than "left 840px" — AI understands semantic layout descriptions better
+2. **Specify component library**: Explicitly saying "use shadcn/ui Badge component" produces much better code than "use colored labels"
+3. **Provide concrete data**: Do not say "some tickets" — give specific example data (ticket IDs, titles, statuses), AI will use them to populate the interface
+4. **Generate per page, maintain style consistency**: Reference "consistent design style with the list page" in each page's prompt
+
+## 4. Prompt Engineering: Writing Descriptions That Produce Good UI
+
+### Good Prompt Structure
+
+```
+[Page name and purpose]
+
+Layout:
+- [Region breakdown, top-to-bottom, left-to-right]
+- [Specific content for each region]
+
+Data:
+- [Concrete example data]
+- [States and enum values]
+
+Design requirements:
+- [Component library]
+- [Color scheme/theme]
+- [Responsive requirements]
+- [Special interactions]
+```
+
+### Common Mistakes
+
+**Mistake 1: Too vague**
+
+```
+❌ "Generate a nice-looking ticket management page"
+✅ "Generate a ticket list page with filter bar (status, priority), data table (7 columns), pagination, using shadcn/ui"
+```
+
+**Mistake 2: Too much at once**
+
+```
+❌ "Generate all pages for the entire ticket management system"
+✅ "Generate the ticket list page" (then generate other pages one by one)
+```
+
+**Mistake 3: Describing visuals instead of structure**
+
+```
+❌ "Title in 24px bold blue font, with a 1px gray divider line below"
+✅ "Page title using h1 style, with divider below"
+```
+
+**Mistake 4: Ignoring states and edge cases**
+
+```
+❌ Only describing the normal state
+✅ "Empty state shows guidance text, loading shows skeleton screen, error state shows retry button"
+```
+
+### Advanced Tips
+
+**1. Combine reference images with text descriptions**
+
+If you have reference designs (competitor screenshots, Dribbble inspiration), upload images alongside text. v0 supports image input:
+
+```
+Reference this screenshot's layout style to generate a ticket list page.
+Keep the overall layout structure, but use shadcn/ui components with neutral gray color scheme.
+```
+
+**2. Specify design system variables**
+
+```
+Use these design variables:
+- Primary color: slate (shadcn default)
+- Border radius: rounded-lg
+- Spacing: Tailwind space-y-4 and gap-4
+- Font sizes: headings text-2xl, body text-sm
+```
+
+**3. Describe interaction behavior**
+
+```
+Interaction requirements:
+- Table row hover changes background to muted
+- Clicking a row expands detail preview (no page navigation)
+- Filter changes auto-refresh table with loading state
+- Support keyboard navigation (Tab to switch rows, Enter to open detail)
+```
+
+## 5. Tool Comparison
+
+### v0 (Vercel)
+
+**Strengths**:
+- Highest code quality currently — uses shadcn/ui + Tailwind, clean structure, production-integrable
+- Multi-turn conversation for iterative refinement
+- Image input support (screenshot to code)
+- Generated components support dark mode and responsive design
+
+**Weaknesses**:
+- React ecosystem only
+- Complex interactions (drag-and-drop, animations) handled poorly
+- Limited free tier
+
+**Best for**: React developers and solo developers
+
+### Figma AI
+
+**Strengths**:
+- Native Figma integration, no tool switching
+- Understands existing design context, works with your design system
+- Designer-friendly, outputs design files not code
+
+**Weaknesses**:
+- Features still rapidly iterating, stability varies
+- Requires paid Figma plan
+- No direct code output
+
+**Best for**: Design teams already using Figma
+
+### Galileo AI
+
+**Strengths**:
+- Great visual quality, high-fidelity design output
+- Figma export support
+- Understands complex layout descriptions
+
+**Weaknesses**:
+- Waitlist/invite-only access
+- No code output
+- Limited brand customization
+
+**Best for**: Product teams needing high-fidelity prototypes
+
+### Selection Guide
+
+```
+You're a developer wanting usable code? → v0
+You're a designer working in Figma? → Figma AI
+You need high-fidelity visual prototypes? → Galileo AI
+You want to generate a full-stack app? → bolt.new
+```
+
+## 6. From Prototype to Production: Bridging the Gap
+
+There is a gap between AI-generated prototypes and production-ready UI. Here is how to bridge it.
+
+### 1. Design System Adaptation
+
+AI-generated components use default styles. To fit your project:
+
+```tsx
+// AI-generated (default shadcn theme)
+<Badge variant="default">In Progress</Badge>
+
+// After adapting to your design system
+<Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+  In Progress
+</Badge>
+```
+
+**Tip**: Specify your design variables in the prompt upfront to reduce adaptation work.
+
+### 2. Responsive Refinement
+
+AI usually generates basic responsive layouts, but details need adjustment:
+
+- Mobile tables typically need to become card lists
+- Sidebars need to become drawers or bottom navigation
+- Touch targets must be at least 44x44px
+
+### 3. Accessibility Additions
+
+AI-generated code is typically incomplete on accessibility:
+
+- Add `aria-label` to icon buttons
+- Ensure color contrast meets WCAG AA standards
+- Add keyboard navigation support
+- Add `aria-live` regions for state changes
+
+### 4. Real Data Integration
+
+AI uses example data. After connecting real APIs, handle:
+
+- Loading states (skeleton screens)
+- Empty states
+- Error states
+- Performance with large datasets (virtual scrolling)
+- Edge cases with inconsistent data formats
+
+## 7. Best Practices Checklist
+
+A ready-to-use checklist:
+
+**Prompt writing**:
+- ✅ Describe layout structure, not pixel values
+- ✅ Specify component library and design system
+- ✅ Provide concrete example data
+- ✅ Generate one page at a time
+- ✅ Describe empty, loading, and error states
+- ❌ Do not generate the entire system at once
+- ❌ Do not only describe the happy path
+
+**Tool usage**:
+- ✅ Use v0 for code prototypes, Figma AI for design mockups
+- ✅ Iterate in multiple rounds, each focusing on one aspect (layout → style → interaction → states)
+- ✅ Save effective prompt templates, share with team
+- ❌ Do not expect perfect results on first try
+- ❌ Do not skip human review for production use
+
+**Prototype to production**:
+- ✅ Adapt to design system (colors, typography, spacing)
+- ✅ Refine responsive layout
+- ✅ Add accessibility support
+- ✅ Handle all data states (loading, empty, error)
+- ✅ Replace example data with real data
+
+## 8. Summary
+
+AI design tools in 2026 have a clear role: **rapid prototype generators**.
+
+The core problem they solve is the "blank canvas" — starting a page design from scratch is the most time-consuming part. AI gets you an 80-point starting point in 10 minutes, then you spend your energy where human judgment truly matters: brand consistency, UX details, accessibility, complex interaction logic.
+
+Three key takeaways:
+
+1. **Choose the right path**: Developers use "text → code" (v0), designers use "sketch → high-fidelity" (Figma AI), quick replication uses "screenshot → code"
+2. **Prompts determine quality**: Describe structure not pixels, specify component libraries, provide example data, generate per page
+3. **Prototype ≠ Production**: AI prototypes need design system adaptation, responsive refinement, accessibility additions, and real data handling
+
+### Recommended Reading
+
+- [How to Use LLMs to Convert Requirements into PRDs](/en/blog/ai-prd) — The upstream stage
+- [AI-Assisted Product Development Pipeline Guide](/en/blog/ai-product-dev-pipeline) — Full pipeline overview
+- [The Complete Claude Code Guide](/en/blog/claude-code-overview) — Downstream stage: AI-assisted coding
