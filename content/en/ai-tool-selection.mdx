@@ -1,0 +1,335 @@
+---
+title: "AI Tool Selection Guide: Pick the Right Tool for the Job"
+date: "2026-04-02"
+description: "A side-by-side comparison of mainstream AI tools — LLMs (Claude/ChatGPT/Gemini), coding tools (Claude Code/Cursor/Copilot), and design tools (v0/Figma AI) — with recommendations by role and scenario."
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+Previous articles covered AI-assisted product development across the [full pipeline](/en/blog/ai-product-dev-pipeline), [PRD writing](/en/blog/ai-prd), [UI design](/en/blog/ai-ui-design), [prompt techniques](/en/blog/ai-prompt-engineering), and [common pitfalls](/en/blog/ai-dev-pitfalls).
+
+The most natural follow-up question: **which tool should I use?**
+
+There are too many AI tools. LLMs include Claude, ChatGPT, Gemini, DeepSeek. Coding tools include Claude Code, Cursor, GitHub Copilot, Windsurf. Design tools include v0, Figma AI, Galileo AI. Each claims to be the best, each has advocates.
+
+This article does not rank "who is strongest" — because there is no strongest, only most suitable. I will compare tools by use case, helping you choose based on your role, workflow, and budget.
+
+## 1. LLM Comparison: Claude vs ChatGPT vs Gemini vs DeepSeek
+
+### Quick Pick
+
+```
+Long document processing (PRD, tech specs, analysis) → Claude
+General chat, creative writing, quick Q&A → ChatGPT
+Web search needed, multimodal (video understanding) → Gemini
+Budget-sensitive, heavy Chinese usage → DeepSeek
+```
+
+### Detailed Comparison
+
+| Dimension | Claude | ChatGPT | Gemini | DeepSeek |
+|-----------|--------|---------|--------|----------|
+| Long text understanding | Strong (200K context) | Medium (128K) | Strong (1M+) | Medium |
+| Code generation | Strong | Strong | Medium | Strong |
+| Chinese ability | Strong | Strong | Medium | Strong |
+| Instruction following | Strong (precise formatting) | Medium | Medium | Medium |
+| Web search | Yes | Yes | Native integration | Yes |
+| Multimodal | Image understanding | Image + audio | Image + video + audio | Image understanding |
+| API pricing | Medium | Medium | Lower | Low |
+| Subscription | $20/month | $20/month | $20/month | Free/low cost |
+
+### Scenario Recommendations
+
+**Writing PRDs and technical docs**: Claude
+
+Claude performs best at structured output. Give it a template and it fills it precisely, with clean formatting and minimal drift. The 200K context window means you can feed the entire PRD template + requirements + reference docs in one go.
+
+**Daily coding Q&A**: ChatGPT or Claude
+
+Both are strong for code questions. ChatGPT has a larger ecosystem (plugins, GPTs); Claude's code output is more precise. Use whichever you are comfortable with.
+
+**Tasks requiring real data**: Gemini
+
+Competitor analysis, market research, tech trends — tasks needing real data work best with Gemini's search integration. It can directly cite search results, reducing hallucinations.
+
+**Budget-sensitive**: DeepSeek
+
+If you are a solo developer or small team, DeepSeek offers great value. Strong Chinese ability, decent code generation, low API pricing.
+
+### My Actual Usage
+
+Honestly, I do not use just one model. My daily workflow:
+
+- **Claude**: PRDs, tech specs, long documents, code review
+- **ChatGPT**: Quick Q&A, brainstorming, tasks not requiring precise formatting
+- **Gemini**: Tasks requiring real-world data search
+- **DeepSeek**: High-volume API automation tasks (cost consideration)
+
+Do not be loyal to one tool. Use whichever fits the current task best.
+
+## 2. Coding Tool Comparison: Claude Code vs Cursor vs Copilot vs Windsurf
+
+This is the most agonizing category. Four tools, each with distinct strengths, all rapidly iterating.
+
+### Quick Pick
+
+```
+Want Agent mode (give task, AI handles end-to-end) → Claude Code
+Want deep IDE integration + chat → Cursor
+Want lightweight completion, no workflow change → GitHub Copilot
+Want Cursor-like experience but cheaper → Windsurf
+```
+
+### Detailed Comparison
+
+| Dimension | Claude Code | Cursor | GitHub Copilot | Windsurf |
+|-----------|------------|--------|----------------|----------|
+| Form factor | CLI + IDE plugin | Standalone IDE (VS Code fork) | IDE plugin | Standalone IDE (VS Code fork) |
+| Core mode | Agent (chat + execute) | Chat + completion + Agent | Completion + chat | Chat + completion + Agent |
+| Codebase understanding | Strong (reads entire project) | Strong (indexes project) | Medium (current + adjacent files) | Strong (indexes project) |
+| Command execution | Can run terminal commands | Can run terminal commands | Cannot | Can run terminal commands |
+| Multi-file editing | Strong | Strong | Weak | Strong |
+| Custom rules | CLAUDE.md | .cursorrules | Limited | Limited |
+| Price | $20/month (Pro) | $20/month (Pro) | $10/month | $15/month (Pro) |
+| Underlying model | Claude | Multiple models | GPT-4o + Claude | Multiple models |
+
+### Scenario Recommendations
+
+**Greenfield projects**: Claude Code or Cursor
+
+Both understand entire project structures and generate multi-file code. Claude Code's Agent mode is better for "give a task description, let it handle everything." Cursor is better for interactive "code and chat" development.
+
+**Daily coding (existing projects)**: Cursor or Copilot
+
+If your work is mainly adding features and fixing bugs in existing projects, Cursor's chat + completion combo is smooth. Copilot is lighter, does not change your editor habits — ideal for "I know what to write, just want to type faster."
+
+**Large-scale refactoring**: Claude Code
+
+Tasks requiring cross-file modifications and understanding of global project structure — Claude Code's Agent mode is strongest. It reads the entire codebase, understands inter-file dependencies, and modifies all related files at once.
+
+**Team collaboration**: Cursor
+
+Cursor's .cursorrules file can be committed to the repository, sharing AI behavior conventions across the team. Valuable for teams needing unified AI usage patterns.
+
+### Can You Use Multiple?
+
+Yes, and I recommend it. My combination:
+
+- **Claude Code**: Big tasks (new features, refactoring, complex bug investigation)
+- **Copilot**: Daily code completion (always on)
+- **Cursor**: Development sessions requiring frequent conversation
+
+They do not conflict. Copilot is passive (you write, it completes). Claude Code and Cursor are active (you give tasks, they execute).
+
+## 3. Design Tool Comparison: v0 vs Figma AI vs Galileo AI vs bolt.new
+
+### Quick Pick
+
+```
+Developer wanting usable code → v0
+Designer working in Figma → Figma AI
+Need high-fidelity visual prototypes → Galileo AI
+Want full-stack app (with backend) → bolt.new
+```
+
+### Detailed Comparison
+
+| Dimension | v0 | Figma AI | Galileo AI | bolt.new |
+|-----------|-----|----------|------------|----------|
+| Output | React code | Figma design files | Design mockups | Full-stack app code |
+| Component library | shadcn/ui | Figma components | Custom | Multiple |
+| Code quality | High | No code output | No code output | Medium |
+| Iteration | Multi-turn chat | Edit in Figma | Limited | Multi-turn chat |
+| Image input | Yes | Yes | Limited | Yes |
+| Price | Free tier + $20/month | Within Figma subscription | Waitlist | Free tier + paid |
+
+### Scenario Recommendations
+
+**Quick prototype validation**: v0
+
+You have an idea and want to see it in 10 minutes. v0 is the fastest path — input a description, get an interactive React component. Code quality is good enough to integrate directly into projects.
+
+**Design team workflow**: Figma AI
+
+If your team already uses Figma, Figma AI is the most natural choice. It works within Figma, understands your design system, outputs design files not code — designers can modify directly.
+
+**Full-stack prototypes**: bolt.new
+
+If you need not just UI but also backend logic (database, API, auth), bolt.new generates complete full-stack applications. Good for quick product idea validation, but code quality is lower than v0 and typically needs significant refactoring for production.
+
+For detailed design tool usage, see [AI-Assisted UI Design in Practice](/en/blog/ai-ui-design).
+
+## 4. Recommendations by Role
+
+### Solo Developer
+
+You do everything yourself and need maximum efficiency.
+
+```
+Essential: Claude Pro ($20/month) + GitHub Copilot ($10/month)
+Recommended add: v0 (quick prototypes)
+Total cost: $30-50/month
+```
+
+**Workflow**:
+1. Use Claude for PRDs and tech specs
+2. Use v0 to generate UI prototypes
+3. Use Claude Code for implementation
+4. Use Copilot for daily code completion
+
+### Frontend Developer
+
+You mainly write frontend code, occasionally need design prototypes.
+
+```
+Essential: Cursor Pro ($20/month)
+Recommended add: v0 (UI prototypes)
+Total cost: $20-40/month
+```
+
+**Workflow**:
+1. Use v0 to generate components from designs or descriptions
+2. Use Cursor to integrate and modify in your project
+3. Cursor's built-in completion handles daily coding
+
+### Backend Developer
+
+You mainly write backend code, focused on architecture and performance.
+
+```
+Essential: Claude Code ($20/month)
+Recommended add: GitHub Copilot ($10/month)
+Total cost: $20-30/month
+```
+
+**Workflow**:
+1. Use Claude for data model and API design
+2. Use Claude Code for code and test generation
+3. Use Copilot for daily code completion
+
+### Product Manager
+
+You do not write code but need to write documents and create prototypes.
+
+```
+Essential: Claude Pro ($20/month) or ChatGPT Plus ($20/month)
+Recommended add: v0 or bolt.new (visual prototypes)
+Total cost: $20-40/month
+```
+
+**Workflow**:
+1. Use Claude/ChatGPT for PRDs, competitor analysis, user stories
+2. Use v0 to generate interactive prototypes for the dev team
+3. Use Gemini for research tasks requiring search
+
+### Tech Lead
+
+You make architecture decisions, review code, and manage the team.
+
+```
+Essential: Claude Pro ($20/month) + Claude Code (included in Pro)
+Recommended add: Cursor Pro ($20/month, unified team tool)
+Total cost: $20-40/month
+```
+
+**Workflow**:
+1. Use Claude for architecture design and tech selection
+2. Use Claude Code for code review and refactoring
+3. Establish team CLAUDE.md / .cursorrules conventions
+
+## 5. Budget Plans
+
+### Zero Cost
+
+```
+- Claude Free (limited quota)
+- ChatGPT Free (limited quota)
+- GitHub Copilot Free (limited quota)
+- v0 Free (limited quota)
+- DeepSeek (free or very low API cost)
+```
+
+Usable but limited. Suitable for personal learning and small projects.
+
+### Basic ($20/month)
+
+```
+- Claude Pro $20/month (includes Claude Code)
+```
+
+One subscription covers LLM chat + coding tool. Best value for solo developers.
+
+### Standard ($30-40/month)
+
+```
+- Claude Pro $20/month
+- GitHub Copilot $10/month
+or
+- Cursor Pro $20/month
+- GitHub Copilot $10/month
+```
+
+LLM + coding tool combo covering most development scenarios.
+
+### Full Suite ($50-60/month)
+
+```
+- Claude Pro $20/month
+- Cursor Pro $20/month
+- GitHub Copilot $10/month
+- v0 Pro $20/month (if you frequently need UI prototypes)
+```
+
+Full pipeline coverage. Suitable for full-stack developers or teams needing frequent prototyping.
+
+## 6. Decision Framework
+
+If you are still unsure, use this decision flow:
+
+### Step 1: Identify Your Primary Scenario
+
+```
+Mainly writing code? → Coding tools first
+Mainly writing documents? → LLM first
+Mainly doing design? → Design tools first
+Doing everything? → Start with LLM, gradually add coding tools
+```
+
+### Step 2: Identify Your Work Style
+
+```
+Prefer giving tasks and letting AI handle it? → Agent mode (Claude Code)
+Prefer coding and chatting interactively? → IDE integration (Cursor)
+Prefer writing yourself with AI assistance? → Completion mode (Copilot)
+```
+
+### Step 3: Try Before You Decide
+
+All tools have free tiers or trial periods. Do not decide based on reviews alone — **try it yourself for a week** with your real work scenarios.
+
+I have seen too many people spend hours researching "which tool is best" without spending time actually using one. The gap between tools is far smaller than the gap between "using AI" and "not using AI."
+
+## 7. Dealing with Tool Evolution
+
+AI tools iterate extremely fast. Today's comparison may be outdated in three months. Some strategies:
+
+1. **Do not go all-in on one tool**: Stay flexible. Do not build core workflows around a single tool's unique features
+2. **Focus on capabilities, not brands**: Choose tools by what problems they solve, not what they are called
+3. **Re-evaluate quarterly**: Spend half a day trying new tools or new features of existing tools
+4. **Invest in transferable skills**: Prompt engineering, requirements analysis, code review — these skills do not change with tools
+
+## 8. Summary
+
+Three core recommendations:
+
+1. **There is no best tool, only the most suitable tool**. Choose based on your role, scenario, and budget. Do not chase "having everything"
+2. **Start with one tool, add more once proficient**. Recommended starting point: Claude Pro ($20/month), covering LLM chat and Claude Code
+3. **Tools are means, skills are fundamentals**. Investing in [prompt engineering](/en/blog/ai-prompt-engineering) pays off more than switching tools
+
+### Recommended Reading
+
+- [AI-Assisted Product Development Pipeline Guide](/en/blog/ai-product-dev-pipeline) — Understand what tools each stage needs
+- [AI Prompt Engineering Playbook](/en/blog/ai-prompt-engineering) — Core skill needed regardless of tool choice
+- [AI-Assisted UI Design in Practice](/en/blog/ai-ui-design) — Detailed design tool usage
+- [AI-Assisted Development Pitfalls](/en/blog/ai-dev-pitfalls) — Pitfalls to avoid when using tools
