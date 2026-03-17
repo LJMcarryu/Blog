@@ -1,0 +1,326 @@
+---
+title: "AI 辅助开发踩坑指南：那些 AI 不会告诉你的事"
+date: "2026-03-30"
+description: "AI 辅助产品开发中最常见的坑——幻觉、安全漏洞、过度依赖、上下文丢失、设计不可用，每个坑配真实案例和修复方法。"
+tags: ["AI", "教程"]
+---
+
+## 前言
+
+前面几篇文章我一直在讲"怎么用好 AI"——[怎么写 PRD](/zh/blog/ai-prd)、[怎么做设计](/zh/blog/ai-ui-design)、[怎么写 Prompt](/zh/blog/ai-prompt-engineering)、[怎么串联全链路](/zh/blog/ai-product-dev-pipeline)。
+
+这篇讲反面：**怎么会用坏**。
+
+过去一年，我自己和身边团队在 AI 辅助开发中踩过不少坑。有些坑浪费了几小时，有些差点上了生产。把这些经验整理出来，希望你能绕过去。
+
+每个坑我会给出：发生了什么、为什么会发生、怎么避免。
+
+## 一、幻觉：AI 一本正经地胡说八道
+
+### 坑 1：PRD 里的虚假数据
+
+**发生了什么**：让 AI 写竞品分析，它生成了一段看起来很专业的分析——引用了具体的市场份额数据、用户增长率、融资金额。问题是，这些数字全是编的。
+
+```
+❌ AI 输出：
+"Zendesk 在 2025 年 Q3 的中小企业市场份额为 34.2%，
+同比增长 8.7%。Freshdesk 以 22.1% 位居第二..."
+
+实际情况：这些数字不存在于任何公开报告中。
+```
+
+**为什么会发生**：大模型不是数据库，它不"知道"事实。它根据训练数据中的模式生成最可能的文本。当你问它具体数字时，它会生成"看起来合理"的数字，而不是"真实"的数字。
+
+**怎么避免**：
+- 在 Prompt 中明确要求："如果你不确定具体数据，请标注 [需验证] 而不是编造"
+- 所有数字、日期、引用都必须人工核实
+- 竞品分析这类需要真实数据的任务，用搜索增强的工具（Perplexity、联网模式）而非纯对话模型
+
+### 坑 2：不存在的 API 和库
+
+**发生了什么**：让 AI 生成代码，它用了一个看起来很合理的 npm 包——包名、API 都很像真的，但 `npm install` 时发现这个包根本不存在。
+
+```typescript
+// ❌ AI 生成的代码
+import { createTicketRouter } from '@ticket-system/express-router';
+// 这个包不存在
+
+// ✅ 实际应该用的
+import { Router } from 'express';
+```
+
+更危险的情况：包名存在，但 API 用法是错的。AI 可能混淆了不同版本的 API，或者把多个库的 API 混在一起。
+
+**怎么避免**：
+- 生成代码后，先检查所有 import 的包是否存在
+- 对不熟悉的库，去官方文档验证 API 用法
+- 使用能读取项目 `package.json` 的工具（如 Claude Code），它会基于你已安装的依赖生成代码
+
+### 坑 3：过时的技术建议
+
+**发生了什么**：让 AI 推荐 React 的状态管理方案，它详细介绍了 Redux 的 `connect` 和 `mapStateToProps`——这是 2019 年的写法。现在应该用 Redux Toolkit 或者干脆用 Zustand。
+
+**怎么避免**：
+- 在 Prompt 中指定版本："使用 React 19 和 Next.js 16 的最新 API"
+- 对框架和库的建议保持警惕，特别是快速迭代的前端生态
+- 用 IDE 集成工具（能读取你的 `package.json` 和 lock 文件）而非独立对话
+
+## 二、安全漏洞：AI 写的代码可能有毒
+
+### 坑 4：SQL 注入
+
+**发生了什么**：让 AI 生成一个搜索功能，它直接把用户输入拼接到 SQL 查询中。
+
+```typescript
+// ❌ AI 生成的代码
+const query = `SELECT * FROM tickets WHERE title LIKE '%${searchTerm}%'`;
+
+// ✅ 应该用参数化查询
+const query = `SELECT * FROM tickets WHERE title LIKE $1`;
+const result = await db.query(query, [`%${searchTerm}%`]);
+```
+
+**为什么会发生**：AI 的训练数据中包含大量不安全的代码示例（教程、Stack Overflow 回答、老项目）。它会生成"最常见"的写法，而不是"最安全"的写法。
+
+### 坑 5：硬编码的密钥
+
+**发生了什么**：让 AI 生成一个完整的认证模块，它在代码里硬编码了 JWT secret。
+
+```typescript
+// ❌ AI 生成的代码
+const JWT_SECRET = 'super-secret-key-12345';
+
+// ✅ 应该从环境变量读取
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
+```
+
+### 坑 6：缺失的权限检查
+
+**发生了什么**：让 AI 生成工单系统的 API，它生成了完整的 CRUD 接口，但忘了检查权限——普通员工可以删除任何人的工单。
+
+```typescript
+// ❌ AI 生成的代码：任何人都能删除
+app.delete('/api/tickets/:id', async (req, res) => {
+  await db.tickets.delete(req.params.id);
+  res.json({ success: true });
+});
+
+// ✅ 应该检查权限
+app.delete('/api/tickets/:id', authenticate, async (req, res) => {
+  const ticket = await db.tickets.findById(req.params.id);
+  if (ticket.creatorId !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  await db.tickets.delete(req.params.id);
+  res.json({ success: true });
+});
+```
+
+**怎么避免安全问题**：
+- 在 Prompt 中明确要求安全实践："使用参数化查询、从环境变量读取密钥、每个接口都要检查权限"
+- 生成代码后，用安全审查的 Prompt 再过一遍（参考 [Prompt 手册](/zh/blog/ai-prompt-engineering) 中的代码审查模板）
+- 不要让 AI 生成认证和授权的核心逻辑——这部分用成熟的库（Passport、NextAuth、Lucia）
+- 把安全要求写进 CLAUDE.md 或项目规范，让 AI 工具每次都能看到
+
+## 三、过度依赖：AI 成了拐杖
+
+### 坑 7：不理解自己的代码
+
+**发生了什么**：用 AI 生成了整个后端 API，代码能跑，测试也过了。但当出了 bug，开发者完全不知道从哪里开始排查——因为他从来没有逐行理解过这些代码。
+
+**为什么危险**：AI 生成的代码是"别人的代码"。如果你不理解它，你就无法维护它。当 AI 不在的时候（上下文丢失、服务中断、场景超出 AI 能力），你就卡住了。
+
+**怎么避免**：
+- **逐步生成，逐步理解**：不要一次生成整个模块。每生成一段，花时间读懂它
+- **能解释才算懂**：如果你不能向同事解释这段代码为什么这样写，说明你还没理解
+- **手动修改一些代码**：不要所有代码都让 AI 写。关键的业务逻辑自己写，AI 负责脚手架和重复性代码
+
+### 坑 8：AI 说什么就信什么
+
+**发生了什么**：AI 建议用微服务架构来做一个内部工具（用户量 50 人）。开发者没有质疑，花了两周搭建 Kubernetes 集群、配置服务网格、写服务间通信逻辑。最后发现一个单体应用两天就能搞定。
+
+**为什么会发生**：AI 倾向于推荐"最佳实践"和"业界标准"方案，而不考虑你的具体场景。它不知道你的团队只有 3 个人、用户只有 50 个、预算有限。
+
+**怎么避免**：
+- 始终用自己的判断评估 AI 的建议
+- 问自己："如果没有 AI，我会怎么做？"
+- 对架构决策特别警惕——AI 的过度设计倾向在这里最明显
+
+### 坑 9：Prompt 调了一小时，手写只要五分钟
+
+**发生了什么**：花了一个小时调 Prompt，试图让 AI 生成一个特定格式的配置文件。反复修改、重试、微调，最后发现手写这个文件只需要五分钟。
+
+**怎么避免**：
+- **五分钟规则**：如果一个任务手动做只需要五分钟，不要用 AI
+- AI 最适合的是"重复性高、创造性低"的任务，不是"简单但格式特殊"的任务
+- 如果 Prompt 调了三次还没得到满意结果，停下来评估是否应该手动做
+
+## 四、上下文问题：AI 的记忆是金鱼级别的
+
+### 坑 10：长对话中的前后矛盾
+
+**发生了什么**：在一个长对话中，前面让 AI 用 PostgreSQL 设计数据模型，后面让它写查询代码时，它突然切换到了 MongoDB 的语法。
+
+```typescript
+// 前面设计的是 PostgreSQL 表结构
+// 后面生成的代码却是：
+const tickets = await db.collection('tickets').find({
+  status: 'pending'
+}).toArray();
+// 这是 MongoDB 的写法
+```
+
+**为什么会发生**：对话越长，早期的上下文权重越低。AI 可能"忘记"前面的决策，转而使用训练数据中更常见的模式。
+
+**怎么避免**：
+- 在关键决策点重复上下文："我们使用 PostgreSQL，请用 pg 库的参数化查询"
+- 长任务拆成多个短对话，每个对话开头重述关键约束
+- 使用能持久化上下文的工具（CLAUDE.md、Cursor 的 .cursorrules）
+
+### 坑 11：跨文件的不一致
+
+**发生了什么**：让 AI 分别生成前端和后端代码。前端发送的字段名是 `ticketId`，后端期望的是 `ticket_id`。前端用的是 camelCase，后端用的是 snake_case，两边对不上。
+
+```typescript
+// 前端发送
+fetch('/api/tickets', {
+  body: JSON.stringify({ ticketId: 1, assignedTo: 'user1' })
+});
+
+// 后端期望
+app.post('/api/tickets', (req, res) => {
+  const { ticket_id, assigned_to } = req.body; // undefined!
+});
+```
+
+**怎么避免**：
+- 先定义接口契约（TypeScript 类型或 OpenAPI schema），再让 AI 基于契约生成前后端代码
+- 使用能同时看到多个文件的工具（Claude Code、Cursor）
+- 在 Prompt 中明确命名规范："API 使用 snake_case，前端使用 camelCase，在 API 层做转换"
+
+### 坑 12：丢失的项目约定
+
+**发生了什么**：项目用的是 ESM（`import/export`），AI 生成的代码用了 CommonJS（`require/module.exports`）。项目用 Prettier 格式化，AI 生成的代码用了不同的缩进和引号风格。
+
+**怎么避免**：
+- 把项目约定写进 CLAUDE.md 或等效的配置文件
+- 使用 linter 和 formatter 自动修正风格问题
+- 在 Prompt 中引用项目约定："遵循项目现有的 ESM 模块风格和 Prettier 配置"
+
+## 五、设计陷阱：好看不等于好用
+
+### 坑 13：AI 设计的"演示陷阱"
+
+**发生了什么**：用 v0 生成了一个漂亮的仪表盘，截图发给老板，老板很满意。但实际使用时发现：数据加载要 5 秒（因为一次查询了所有数据）、移动端完全不可用、色盲用户分不清状态颜色。
+
+**为什么会发生**：AI 生成的 UI 是为"演示"优化的，不是为"使用"优化的。它用的是完美的示例数据、理想的屏幕尺寸、标准的视觉能力。
+
+**怎么避免**：
+- 生成原型后，立刻用真实数据测试（特别是大数据量和边界数据）
+- 在不同设备上测试（手机、平板、小屏笔记本）
+- 检查无障碍访问（颜色对比度、键盘导航、屏幕阅读器）
+- 不要把 AI 原型当作最终设计展示给利益相关者
+
+### 坑 14：组件库版本不匹配
+
+**发生了什么**：AI 生成的代码使用了 shadcn/ui 的某个组件 API，但你项目里安装的是旧版本，API 不兼容。或者 AI 用了一个组件库里不存在的组件。
+
+```tsx
+// ❌ AI 生成的（使用了不存在的 variant）
+<Badge variant="warning">高优先级</Badge>
+
+// ✅ 实际可用的
+<Badge variant="destructive">高优先级</Badge>
+```
+
+**怎么避免**：
+- 在 Prompt 中指定组件库版本
+- 生成后检查所有组件的 props 是否与你安装的版本匹配
+- 使用能读取 `node_modules` 的 IDE 工具，它会基于实际安装的版本生成代码
+
+## 六、流程陷阱：AI 改变了流程，但你没跟上
+
+### 坑 15：跳过了需求确认
+
+**发生了什么**：AI 生成 PRD 太快了，PM 觉得"反正 AI 写的挺全的"，没有和利益相关者确认就直接进入开发。结果做完了才发现，有三个核心需求理解错了。
+
+**怎么避免**：
+- AI 加速的是"写"的过程，不是"确认"的过程
+- PRD 生成后，仍然需要和利益相关者逐条确认
+- 用 `[待确认]` 标记强制自己审查每个不确定的点
+
+### 坑 16：测试覆盖的虚假安全感
+
+**发生了什么**：让 AI 生成了 50 个测试用例，覆盖率 90%，感觉很安全。但这些测试大部分在测试"AI 写的代码是否按 AI 的理解工作"，而不是"代码是否满足业务需求"。
+
+```typescript
+// ❌ AI 生成的测试：测试实现细节
+test('createTicket calls db.insert', async () => {
+  await createTicket({ title: 'test' });
+  expect(db.insert).toHaveBeenCalledWith('tickets', { title: 'test' });
+});
+
+// ✅ 应该测试业务行为
+test('creating a ticket sends notification to all admins', async () => {
+  await createTicket({ title: 'Network issue' });
+  const notifications = await getNotifications({ role: 'admin' });
+  expect(notifications).toHaveLength(adminCount);
+  expect(notifications[0].type).toBe('new_ticket');
+});
+```
+
+**怎么避免**：
+- 测试用例应该从业务需求推导，不是从代码实现推导
+- 先手动写关键的验收测试，再让 AI 补充边界情况
+- 覆盖率是参考指标，不是质量指标
+
+### 坑 17：版本控制混乱
+
+**发生了什么**：用 AI 大量生成代码，每次生成都直接覆盖文件，没有及时 commit。某次 AI 生成的代码有问题，想回滚时发现已经分不清哪些是 AI 改的、哪些是自己改的。
+
+**怎么避免**：
+- **小步提交**：每完成一个功能点就 commit，commit message 标注是否为 AI 生成
+- **分支开发**：AI 生成的大量代码在 feature 分支上操作，确认无误后再合并
+- **Code review**：AI 生成的代码和人写的代码一样需要 review
+
+## 七、一份自检清单
+
+每次使用 AI 辅助开发时，过一遍这份清单：
+
+**生成前**：
+- [ ] 任务适合用 AI 吗？（重复性高、有明确模式 → 适合；创造性高、需要深度理解 → 不适合）
+- [ ] Prompt 是否足够具体？（有模板、有约束、有示例数据）
+- [ ] 是否指定了技术栈和版本？
+
+**生成后**：
+- [ ] 所有数字、日期、引用是否已验证？
+- [ ] 所有 import 的包是否存在且版本正确？
+- [ ] 是否有安全隐患？（SQL 注入、XSS、硬编码密钥、缺失权限检查）
+- [ ] 代码风格是否与项目一致？（模块系统、命名规范、格式化）
+- [ ] 你能向同事解释这段代码吗？
+
+**上线前**：
+- [ ] 是否用真实数据测试过？（不只是示例数据）
+- [ ] 是否在不同设备上测试过？
+- [ ] 测试用例是否覆盖了业务需求（不只是代码实现）？
+- [ ] 是否有人 review 过 AI 生成的代码？
+
+## 八、总结
+
+AI 辅助开发的坑可以归为五类：
+
+1. **幻觉**：AI 编造数据、API、库。解法：验证一切，不确定的标注 `[需验证]`
+2. **安全**：AI 生成不安全的代码。解法：安全要求写进 Prompt 和项目规范，用成熟的安全库
+3. **过度依赖**：不理解代码、不质疑建议。解法：逐步生成逐步理解，保持独立判断
+4. **上下文**：前后矛盾、跨文件不一致。解法：重述关键约束，先定义接口契约
+5. **流程**：跳过确认、虚假安全感。解法：AI 加速的是执行，不是决策
+
+最后一句话：**AI 让你更快地到达目的地，但不能替你选择目的地**。用好它的前提是，你自己知道要去哪里。
+
+### 推荐阅读
+
+- [AI Prompt 工程实战手册](/zh/blog/ai-prompt-engineering) — 写好 Prompt 是避坑的第一步
+- [用大模型将需求转换成 PRD 文档](/zh/blog/ai-prd) — PRD 环节的正确做法
+- [AI 辅助 UI 设计实战](/zh/blog/ai-ui-design) — 设计环节的正确做法
+- [AI 辅助产品开发全链路指南](/zh/blog/ai-product-dev-pipeline) — 全链路概览

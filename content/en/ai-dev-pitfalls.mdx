@@ -1,0 +1,326 @@
+---
+title: "AI-Assisted Development Pitfalls: What AI Won't Tell You"
+date: "2026-03-30"
+description: "The most common pitfalls in AI-assisted product development — hallucinations, security vulnerabilities, over-reliance, context loss, unusable designs — each with real cases and fixes."
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+In previous articles, I have been covering "how to use AI well" — [writing PRDs](/en/blog/ai-prd), [designing UI](/en/blog/ai-ui-design), [crafting prompts](/en/blog/ai-prompt-engineering), [connecting the full pipeline](/en/blog/ai-product-dev-pipeline).
+
+This article covers the flip side: **how things go wrong**.
+
+Over the past year, my team and I have hit plenty of pitfalls in AI-assisted development. Some wasted hours, others nearly made it to production. I am sharing these experiences so you can avoid them.
+
+For each pitfall: what happened, why it happened, how to avoid it.
+
+## 1. Hallucinations: AI Confidently Making Things Up
+
+### Pitfall 1: Fabricated Data in PRDs
+
+**What happened**: Asked AI to write a competitor analysis. It generated professional-looking analysis — citing specific market share figures, user growth rates, funding amounts. Problem: every number was fabricated.
+
+```
+❌ AI output:
+"Zendesk held 34.2% market share in the SMB segment in Q3 2025,
+up 8.7% year-over-year. Freshdesk came second at 22.1%..."
+
+Reality: These numbers do not exist in any public report.
+```
+
+**Why it happens**: LLMs are not databases. They do not "know" facts. They generate the most likely text based on training data patterns. When you ask for specific numbers, they generate numbers that "look reasonable," not numbers that are "true."
+
+**How to avoid**:
+- Explicitly prompt: "If you are unsure about specific data, mark it [needs verification] rather than fabricating"
+- All numbers, dates, and citations must be manually verified
+- For tasks requiring real data (competitor analysis), use search-augmented tools (Perplexity, web-connected mode) rather than pure conversation models
+
+### Pitfall 2: Non-Existent APIs and Libraries
+
+**What happened**: Asked AI to generate code. It used a plausible-looking npm package — name and API looked real, but `npm install` revealed the package does not exist.
+
+```typescript
+// ❌ AI-generated code
+import { createTicketRouter } from '@ticket-system/express-router';
+// This package does not exist
+
+// ✅ What you should actually use
+import { Router } from 'express';
+```
+
+Even more dangerous: the package name exists but the API usage is wrong. AI may confuse APIs across different versions or mix APIs from multiple libraries.
+
+**How to avoid**:
+- After generation, verify all imported packages exist
+- For unfamiliar libraries, check official docs for API usage
+- Use tools that read your project's `package.json` (like Claude Code) — they generate code based on your installed dependencies
+
+### Pitfall 3: Outdated Technical Advice
+
+**What happened**: Asked AI to recommend a React state management solution. It detailed Redux's `connect` and `mapStateToProps` — that is 2019-era code. Today you should use Redux Toolkit or just Zustand.
+
+**How to avoid**:
+- Specify versions in prompts: "Use React 19 and Next.js 16 latest APIs"
+- Be skeptical of framework and library recommendations, especially in the fast-moving frontend ecosystem
+- Use IDE-integrated tools (that read your `package.json` and lock files) rather than standalone conversations
+
+## 2. Security Vulnerabilities: AI-Written Code Can Be Toxic
+
+### Pitfall 4: SQL Injection
+
+**What happened**: Asked AI to generate a search feature. It directly concatenated user input into the SQL query.
+
+```typescript
+// ❌ AI-generated code
+const query = `SELECT * FROM tickets WHERE title LIKE '%${searchTerm}%'`;
+
+// ✅ Should use parameterized queries
+const query = `SELECT * FROM tickets WHERE title LIKE $1`;
+const result = await db.query(query, [`%${searchTerm}%`]);
+```
+
+**Why it happens**: AI training data includes massive amounts of insecure code examples (tutorials, Stack Overflow answers, legacy projects). It generates the "most common" pattern, not the "most secure" one.
+
+### Pitfall 5: Hardcoded Secrets
+
+**What happened**: Asked AI to generate a complete auth module. It hardcoded the JWT secret in the source code.
+
+```typescript
+// ❌ AI-generated code
+const JWT_SECRET = 'super-secret-key-12345';
+
+// ✅ Should read from environment variables
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) throw new Error('JWT_SECRET is required');
+```
+
+### Pitfall 6: Missing Authorization Checks
+
+**What happened**: Asked AI to generate ticket system APIs. It produced complete CRUD endpoints but forgot authorization — any employee could delete anyone's tickets.
+
+```typescript
+// ❌ AI-generated: anyone can delete
+app.delete('/api/tickets/:id', async (req, res) => {
+  await db.tickets.delete(req.params.id);
+  res.json({ success: true });
+});
+
+// ✅ Should check authorization
+app.delete('/api/tickets/:id', authenticate, async (req, res) => {
+  const ticket = await db.tickets.findById(req.params.id);
+  if (ticket.creatorId !== req.user.id && req.user.role !== 'admin') {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  await db.tickets.delete(req.params.id);
+  res.json({ success: true });
+});
+```
+
+**How to avoid security issues**:
+- Explicitly require security practices in prompts: "Use parameterized queries, read secrets from environment variables, check authorization on every endpoint"
+- After generation, run a security review prompt (see the code review template in the [Prompt Playbook](/en/blog/ai-prompt-engineering))
+- Do not let AI generate core auth logic — use mature libraries (Passport, NextAuth, Lucia)
+- Write security requirements into CLAUDE.md or project conventions so AI tools see them every time
+
+## 3. Over-Reliance: AI Becomes a Crutch
+
+### Pitfall 7: Not Understanding Your Own Code
+
+**What happened**: Used AI to generate an entire backend API. Code ran, tests passed. But when a bug appeared, the developer had no idea where to start debugging — they had never read the code line by line.
+
+**Why it is dangerous**: AI-generated code is "someone else's code." If you do not understand it, you cannot maintain it. When AI is unavailable (context lost, service down, scenario beyond AI capability), you are stuck.
+
+**How to avoid**:
+- **Generate incrementally, understand incrementally**: Do not generate an entire module at once. After each generation, take time to read and understand it
+- **If you cannot explain it, you do not understand it**: If you cannot explain to a colleague why the code is written this way, you have not understood it
+- **Write some code manually**: Do not let AI write everything. Write critical business logic yourself; let AI handle scaffolding and repetitive code
+
+### Pitfall 8: Accepting AI Suggestions Without Question
+
+**What happened**: AI recommended microservices architecture for an internal tool (50 users). The developer did not question it, spent two weeks setting up a Kubernetes cluster, configuring service mesh, writing inter-service communication. Turned out a monolith could have been done in two days.
+
+**Why it happens**: AI tends to recommend "best practices" and "industry standard" solutions without considering your specific context. It does not know your team is 3 people, users are 50, and budget is limited.
+
+**How to avoid**:
+- Always evaluate AI suggestions with your own judgment
+- Ask yourself: "What would I do without AI?"
+- Be especially skeptical of architecture decisions — AI's over-engineering tendency is strongest here
+
+### Pitfall 9: One Hour of Prompt Tuning for a Five-Minute Task
+
+**What happened**: Spent an hour tuning a prompt to get AI to generate a specific config file format. Repeated modifications, retries, fine-tuning — only to realize writing the file manually would have taken five minutes.
+
+**How to avoid**:
+- **Five-minute rule**: If a task takes five minutes manually, do not use AI
+- AI is best for "high repetition, low creativity" tasks, not "simple but specially formatted" tasks
+- If a prompt has not produced satisfactory results after three attempts, stop and evaluate whether to do it manually
+
+## 4. Context Issues: AI Has Goldfish Memory
+
+### Pitfall 10: Contradictions in Long Conversations
+
+**What happened**: In a long conversation, earlier turns designed a PostgreSQL data model. Later, when generating query code, AI suddenly switched to MongoDB syntax.
+
+```typescript
+// Earlier: designed PostgreSQL table structures
+// Later: generated this code
+const tickets = await db.collection('tickets').find({
+  status: 'pending'
+}).toArray();
+// This is MongoDB syntax
+```
+
+**Why it happens**: The longer the conversation, the lower the weight of early context. AI may "forget" earlier decisions and default to more common patterns from training data.
+
+**How to avoid**:
+- Restate context at key decision points: "We are using PostgreSQL, please use pg library with parameterized queries"
+- Break long tasks into multiple short conversations, restating key constraints at the start of each
+- Use tools with persistent context (CLAUDE.md, Cursor's .cursorrules)
+
+### Pitfall 11: Cross-File Inconsistencies
+
+**What happened**: Had AI generate frontend and backend code separately. Frontend sent `ticketId`, backend expected `ticket_id`. Frontend used camelCase, backend used snake_case — they did not match.
+
+```typescript
+// Frontend sends
+fetch('/api/tickets', {
+  body: JSON.stringify({ ticketId: 1, assignedTo: 'user1' })
+});
+
+// Backend expects
+app.post('/api/tickets', (req, res) => {
+  const { ticket_id, assigned_to } = req.body; // undefined!
+});
+```
+
+**How to avoid**:
+- Define interface contracts first (TypeScript types or OpenAPI schema), then have AI generate frontend and backend code based on the contract
+- Use tools that can see multiple files simultaneously (Claude Code, Cursor)
+- Specify naming conventions in prompts: "API uses snake_case, frontend uses camelCase, convert at the API layer"
+
+### Pitfall 12: Lost Project Conventions
+
+**What happened**: Project uses ESM (`import/export`), AI generated CommonJS (`require/module.exports`). Project uses Prettier formatting, AI generated code with different indentation and quote styles.
+
+**How to avoid**:
+- Write project conventions into CLAUDE.md or equivalent config files
+- Use linters and formatters to auto-fix style issues
+- Reference project conventions in prompts: "Follow the project's existing ESM module style and Prettier config"
+
+## 5. Design Traps: Pretty Does Not Mean Usable
+
+### Pitfall 13: The "Demo Trap" of AI Design
+
+**What happened**: Generated a beautiful dashboard with v0, sent a screenshot to the boss, boss loved it. But in actual use: data loading took 5 seconds (queried all data at once), completely unusable on mobile, color-blind users could not distinguish status colors.
+
+**Why it happens**: AI-generated UI is optimized for "demos," not "usage." It uses perfect example data, ideal screen sizes, standard visual ability.
+
+**How to avoid**:
+- After generating a prototype, immediately test with real data (especially large datasets and edge cases)
+- Test on different devices (phone, tablet, small laptop)
+- Check accessibility (color contrast, keyboard navigation, screen readers)
+- Do not present AI prototypes as final designs to stakeholders
+
+### Pitfall 14: Component Library Version Mismatch
+
+**What happened**: AI-generated code used a shadcn/ui component API, but your project has an older version installed with incompatible APIs. Or AI used a component that does not exist in the library.
+
+```tsx
+// ❌ AI-generated (non-existent variant)
+<Badge variant="warning">High Priority</Badge>
+
+// ✅ Actually available
+<Badge variant="destructive">High Priority</Badge>
+```
+
+**How to avoid**:
+- Specify component library version in prompts
+- After generation, verify all component props match your installed version
+- Use IDE tools that read `node_modules` — they generate code based on actually installed versions
+
+## 6. Process Traps: AI Changed the Process, But You Did Not Adapt
+
+### Pitfall 15: Skipping Requirement Confirmation
+
+**What happened**: AI generated the PRD so fast that the PM thought "AI wrote it pretty thoroughly" and went straight to development without stakeholder confirmation. After building, discovered three core requirements were misunderstood.
+
+**How to avoid**:
+- AI accelerates the "writing" process, not the "confirmation" process
+- After PRD generation, still confirm with stakeholders item by item
+- Use `[TBD]` markers to force yourself to review every uncertain point
+
+### Pitfall 16: False Sense of Test Coverage Security
+
+**What happened**: Had AI generate 50 test cases, 90% coverage, felt safe. But most tests were testing "whether AI's code works as AI understood it," not "whether the code meets business requirements."
+
+```typescript
+// ❌ AI-generated test: testing implementation details
+test('createTicket calls db.insert', async () => {
+  await createTicket({ title: 'test' });
+  expect(db.insert).toHaveBeenCalledWith('tickets', { title: 'test' });
+});
+
+// ✅ Should test business behavior
+test('creating a ticket sends notification to all admins', async () => {
+  await createTicket({ title: 'Network issue' });
+  const notifications = await getNotifications({ role: 'admin' });
+  expect(notifications).toHaveLength(adminCount);
+  expect(notifications[0].type).toBe('new_ticket');
+});
+```
+
+**How to avoid**:
+- Test cases should derive from business requirements, not code implementation
+- Write key acceptance tests manually first, then have AI supplement edge cases
+- Coverage is a reference metric, not a quality metric
+
+### Pitfall 17: Version Control Chaos
+
+**What happened**: Generated large amounts of code with AI, each generation directly overwriting files without timely commits. When AI-generated code had issues and needed rollback, could not tell which changes were AI's and which were manual.
+
+**How to avoid**:
+- **Small commits**: Commit after each feature point, note in commit message whether AI-generated
+- **Branch development**: Work with AI-generated code on feature branches, merge after verification
+- **Code review**: AI-generated code needs review just like human-written code
+
+## 7. A Self-Check Checklist
+
+Run through this checklist every time you use AI-assisted development:
+
+**Before generation**:
+- [ ] Is this task suitable for AI? (High repetition, clear patterns → yes; High creativity, deep understanding needed → no)
+- [ ] Is the prompt specific enough? (Has template, constraints, example data)
+- [ ] Did you specify tech stack and versions?
+
+**After generation**:
+- [ ] Are all numbers, dates, and citations verified?
+- [ ] Do all imported packages exist with correct versions?
+- [ ] Any security issues? (SQL injection, XSS, hardcoded secrets, missing auth checks)
+- [ ] Does code style match the project? (Module system, naming conventions, formatting)
+- [ ] Can you explain this code to a colleague?
+
+**Before shipping**:
+- [ ] Tested with real data? (Not just example data)
+- [ ] Tested on different devices?
+- [ ] Do test cases cover business requirements (not just code implementation)?
+- [ ] Has someone reviewed the AI-generated code?
+
+## 8. Summary
+
+AI-assisted development pitfalls fall into five categories:
+
+1. **Hallucinations**: AI fabricates data, APIs, libraries. Fix: verify everything, mark uncertain items `[needs verification]`
+2. **Security**: AI generates insecure code. Fix: write security requirements into prompts and project conventions, use mature security libraries
+3. **Over-reliance**: Not understanding code, not questioning suggestions. Fix: generate and understand incrementally, maintain independent judgment
+4. **Context**: Contradictions, cross-file inconsistencies. Fix: restate key constraints, define interface contracts first
+5. **Process**: Skipping confirmation, false security from coverage. Fix: AI accelerates execution, not decisions
+
+One final thought: **AI gets you to the destination faster, but it cannot choose the destination for you**. Using it well requires knowing where you want to go.
+
+### Recommended Reading
+
+- [AI Prompt Engineering Playbook](/en/blog/ai-prompt-engineering) — Good prompts are the first step to avoiding pitfalls
+- [How to Use LLMs to Convert Requirements into PRDs](/en/blog/ai-prd) — The right way to handle the PRD stage
+- [AI-Assisted UI Design in Practice](/en/blog/ai-ui-design) — The right way to handle the design stage
+- [AI-Assisted Product Development Pipeline Guide](/en/blog/ai-product-dev-pipeline) — Full pipeline overview
