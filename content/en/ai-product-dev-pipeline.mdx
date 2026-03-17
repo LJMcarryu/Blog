@@ -1,0 +1,294 @@
+---
+title: "AI-Assisted Product Development: A Full Pipeline Guide"
+date: "2026-03-21"
+description: "A complete overview of AI's role across the product development pipeline — requirements, PRD, design, technical architecture, coding, testing, and deployment — with methods, tools, and limitations for each stage."
+tags: ["AI", "Tutorial"]
+---
+
+## Introduction
+
+Product development is a long pipeline: requirements → PRD → UI design → technical architecture → coding → testing → deployment. Every stage involves repetitive work — writing documents, drawing wireframes, scaffolding projects, writing test cases.
+
+AI is changing every stage of this pipeline. But most tutorials focus on a single tool or a single stage, missing the big picture.
+
+This article is that big picture. I will cover what AI can do at each stage, which tools to use, how to use them, and — equally important — what it cannot do. Each stage is covered at overview level; deep dives will follow as separate articles.
+
+If you are interested in the "requirements → PRD" stage specifically, I recommend reading [How to Use LLMs to Convert Requirements into PRDs](/en/blog/ai-prd) first — it is the deep dive for that stage in this series.
+
+## 1. Pipeline Overview
+
+```
+Requirements ──→ PRD ──→ UI/Design ──→ Tech Spec ──→ Coding ──→ Testing ──→ Deployment
+     │            │         │             │            │          │           │
+  AI involvement: High     High       Medium        High        High      Medium       Low
+```
+
+| Stage | What AI Can Do | Recommended Tools | What Humans Must Do |
+|-------|---------------|-------------------|-------------------|
+| Requirements | Competitor research, user story generation, requirement breakdown | ChatGPT, Claude, Perplexity | Business judgment, priority decisions |
+| PRD | Structured document generation, edge case identification | ChatGPT, Claude | Requirement validation, stakeholder alignment |
+| UI/Design | Prototype generation, wireframe to high-fidelity | v0, Figma AI, Galileo AI | Brand consistency, UX decisions |
+| Tech Spec | Data models, API design, architecture recommendations | Claude, ChatGPT, Claude Code | Final tech decisions, infrastructure assessment |
+| Coding | Code generation, refactoring, completion | Claude Code, Cursor, Copilot | Complex business logic, architecture decisions |
+| Testing | Unit test generation, edge case coverage | Claude Code, Copilot | Acceptance criteria, manual testing |
+| Deployment | CI/CD config, monitoring scripts | Claude Code, GitHub Actions | Production decisions, incident response |
+
+The core principle: **AI is an accelerator, not a replacement**. At every stage, AI handles repetitive work while humans own decisions and judgment.
+
+## 2. Requirements → PRD
+
+I covered this stage in detail in [How to Use LLMs to Convert Requirements into PRDs](/en/blog/ai-prd). Here are the key takeaways.
+
+**The most practical approach is template filling**: give AI a PRD template structure along with your requirement description, and have it fill in the template. This works much better than free-form generation because the template constrains the output structure and reduces omissions.
+
+**Key practices**:
+- Use `[TBD]` markers for parts AI is uncertain about, rather than letting it fabricate
+- Iterative refinement beats one-shot generation — generate the framework first, then refine section by section
+- Always review manually, especially edge cases and non-functional requirements
+
+For detailed method comparisons, prompt templates, and a full walkthrough, read the [deep dive →](/en/blog/ai-prd)
+
+## 3. PRD → UI/Design
+
+With a PRD in hand, the next step is turning feature descriptions into visual interfaces. AI design tools are evolving rapidly, and there are currently three main paths.
+
+### Path 1: Text Description → UI
+
+Describe the interface in natural language, and AI generates an interactive prototype.
+
+**Key tools**:
+- **v0** (Vercel): Input feature descriptions, get React component code and preview. Excels at modern web UI with shadcn/ui component library support
+- **Galileo AI**: Generate high-fidelity UI designs from text, with Figma export support
+
+**Prompt tips**: Describe layout structure, not pixel values. For example:
+
+```
+Generate a ticket management dashboard page:
+- Left sidebar: navigation menu (Dashboard, Tickets, Users, Settings)
+- Main area top: filter bar (status filter, priority filter, search box)
+- Main area: ticket list table (columns: ID, Title, Submitter, Status, Priority, Created)
+- Use shadcn/ui components, support dark mode
+```
+
+### Path 2: Wireframe → High-Fidelity
+
+Sketch a wireframe first, then let AI convert it to a polished design.
+
+**Key tools**:
+- **Figma AI**: Works within Figma, understands design context
+- **Motiff**: AI-powered design tool, supports sketch-to-design conversion
+
+### Path 3: Screenshot → Code
+
+Convert existing designs or competitor screenshots into frontend code.
+
+**Key tools**: screenshot-to-code, v0 (supports image upload)
+
+This path is good for quickly replicating reference designs, but the generated code typically needs significant cleanup.
+
+### Limitations
+
+- **Brand consistency**: AI-generated designs rarely match your brand guidelines (colors, typography, spacing system) automatically
+- **Complex interactions**: Multi-step forms, drag-and-drop, complex animations — AI handles these poorly
+- **Design system integration**: If your team has a mature design system, AI-generated components often need heavy modification to fit in
+
+**Practical advice**: Treat AI design tools as "rapid prototyping" tools, not "final design" tools. Use them to validate ideas quickly, then have designers refine.
+
+## 4. PRD → Technical Architecture
+
+With a PRD ready, tech leads need to produce a technical spec: data models, API design, architecture decisions. AI participation is high at this stage.
+
+### What AI Can Generate
+
+- **Data models**: Database schema based on entities and relationships in the PRD
+- **API design**: RESTful or GraphQL endpoint definitions with request/response formats
+- **Architecture recommendations**: Tech stack suggestions based on requirements (concurrency, real-time needs, data volume)
+- **Tech comparison tables**: Pros and cons of multiple approaches
+
+### Recommended Approach
+
+Use an "architect role" prompt with PRD context in Claude or ChatGPT:
+
+```
+You are a senior backend architect. Here is a ticket system PRD (summary):
+- User roles: Regular employee, IT admin, Super admin
+- Core features: Submit tickets, assign tickets, status transitions, comments, notifications
+- Non-functional: Support 500 concurrent users, 99.9% availability
+
+Please output:
+1. Data model design (ER diagram description)
+2. Core API list (RESTful, with path, method, brief description)
+3. Tech stack recommendation (compare 2 options)
+```
+
+### IDE Integration Advantage
+
+Tools like Claude Code and Cursor have a unique advantage: **they can read your existing codebase**. This means generated technical specs can stay consistent with your current architecture — using the same ORM, following the same directory structure, reusing existing utilities.
+
+This is far more practical than generating specs in a standalone conversation.
+
+### Limitations
+
+- **Unaware of team expertise**: AI does not know your team is more comfortable with Go than Rust
+- **Cannot assess infrastructure constraints**: Existing databases, message queues, deployment environments
+- **Over-engineering tendency**: AI tends to recommend "best practice" solutions when your project may only need the simplest approach
+
+**Practical advice**: Treat AI-generated tech specs as a starting point for discussion, not a final decision. Let it generate a draft quickly, then refine in team tech review.
+
+## 5. Technical Architecture → Code
+
+This is the stage with the highest AI participation and the most mature tooling.
+
+### Tool Landscape
+
+| Tool | Mode | Strengths |
+|------|------|-----------|
+| Claude Code | Conversational + Agent | Reads entire codebase, executes commands, end-to-end task completion |
+| Cursor | In-IDE chat + completion | Deep editor integration, multi-file editing |
+| GitHub Copilot | Completion | Real-time code suggestions, lightweight and non-intrusive |
+| Windsurf | In-IDE chat + completion | Similar to Cursor, emphasizes Flow mode |
+
+### Two Working Modes
+
+**Conversational (Agent mode)**: Hand the PRD and tech spec to AI, let it generate code step by step. Best for greenfield projects or large feature development.
+
+```bash
+# Claude Code example: given context, implement incrementally
+claude "Based on this tech spec, implement the data models and database migrations first"
+```
+
+**Completion mode**: AI provides real-time suggestions as you write code. Best for daily coding, reducing repetitive typing.
+
+### Key Practices
+
+1. **Define project conventions in CLAUDE.md**: Code style, directory structure, naming conventions. AI will follow these when generating code, reducing post-generation adjustments
+2. **Implement module by module**: Do not ask AI to generate an entire project at once. Break it into modules, implement one at a time, verify each step
+3. **Define interfaces before implementation**: Define types and interfaces first, then have AI fill in the implementation. This makes generated code more controllable
+
+For a deeper look at AI coding tools, check out the [Complete Claude Code Guide](/en/blog/claude-code-overview) series.
+
+### Limitations
+
+- **Context limits**: Large project codebases may exceed AI's context window, causing inconsistencies with existing code
+- **Complex business logic**: Scenarios involving complex state machines, concurrency control, or distributed transactions require careful human review
+- **Limited debugging ability**: AI can write code, but its ability to locate complex bugs is still limited
+
+## 6. Code → Testing
+
+Code is written, next comes testing. AI's value in testing is often underestimated.
+
+### AI Testing Capabilities
+
+- **Unit test generation**: Given a function, AI can generate test cases covering happy paths and edge cases
+- **Edge case discovery**: AI excels at thinking of edge cases you missed — null values, oversized inputs, concurrency scenarios
+- **E2E test scripts**: Generate Playwright or Cypress test scripts from user stories
+
+### Recommended Workflow: TDD with AI
+
+The most effective approach is not "write code then add tests" but the reverse:
+
+1. **Have AI generate test cases from requirements first**
+2. **Run tests, confirm they all fail** (red)
+3. **Have AI write implementation code until tests pass** (green)
+4. **Refactor**
+
+This TDD workflow gives AI output an objective verification standard, rather than relying on human eye review.
+
+For more on AI-assisted testing practices, see the [Claude Code Testing Guide](/en/blog/claude-code-testing).
+
+### Limitations
+
+- **Cannot replace manual testing**: User experience, visual regression, accessibility — these need human verification
+- **Unaware of business acceptance criteria**: AI can test code logic but does not know if "this feature is actually useful to users"
+- **Inconsistent test quality**: AI-generated tests may focus too much on implementation details rather than behavior, causing mass test failures during refactoring
+
+## 7. Deployment and Operations
+
+AI participation is relatively low at this stage, but still valuable.
+
+### What AI Can Help With
+
+- **CI/CD configuration**: Generate GitHub Actions / GitLab CI configs based on project tech stack
+- **Deployment scripts**: Docker configs, Kubernetes manifests, Terraform templates
+- **Monitoring and alerting**: Generate monitoring rules and alert configs based on SLA requirements
+- **PR review**: Automated code review to catch potential issues
+
+For specific applications of AI in CI/CD, see the [Claude Code CI/CD Guide](/en/blog/claude-code-cicd).
+
+### Limitations
+
+Deployment and operations involve production environments with minimal margin for error. AI-generated configs must go through rigorous review and staging environment validation — never deploy directly to production.
+
+## 8. End-to-End Example: From One Sentence to a Running App
+
+Let's use the ticket system example (continuing from the [PRD deep dive](/en/blog/ai-prd)) to walk through the entire pipeline.
+
+### Starting Point
+
+> "We need an internal ticket system where employees can submit IT issues and admins can assign and track them."
+
+### Input/Output at Each Stage
+
+| Stage | Input | AI Output (Summary) | Time |
+|-------|-------|---------------------|------|
+| Requirements → PRD | One-paragraph requirement | Structured PRD (user roles, feature list, status flow, non-functional requirements) | 30 min |
+| PRD → Design | PRD feature descriptions | UI prototypes for ticket list, detail page, dashboard | 1 hour |
+| PRD → Tech Spec | PRD + technical constraints | Data model (5 tables), API list (15 endpoints), tech stack recommendation | 1 hour |
+| Tech Spec → Code | Tech spec + design mockups | Backend API + frontend pages baseline implementation | 2-3 days |
+| Code → Testing | Code + requirements | Unit tests + E2E tests | 1 day |
+| Testing → Deployment | Code + tests | CI/CD config + deployment scripts | Half day |
+
+### Time Comparison
+
+| | Traditional | AI-Assisted |
+|---|------------|-------------|
+| PRD | 3-5 days | 0.5-1 day |
+| Design | 3-5 days | 1-2 days |
+| Tech Spec | 1-2 days | 0.5-1 day |
+| Coding | 2-3 weeks | 1-1.5 weeks |
+| Testing | 1 week | 2-3 days |
+| Deployment | 1-2 days | 0.5-1 day |
+| **Total** | **5-7 weeks** | **2-3 weeks** |
+
+Note: These are rough estimates. Actual results depend on project complexity, team proficiency, and tool fit. AI assistance does not simply cut time in half — it **eliminates blank-page time and repetitive work at each stage**.
+
+## 9. Getting Started
+
+### Which Stage to Start With
+
+If your team has not yet adopted AI-assisted development, I recommend this order:
+
+1. **PRD generation** (lowest barrier, most visible impact)
+2. **Code implementation** (most mature tooling, high developer acceptance)
+3. **Test generation** (natural extension of coding)
+4. **Design and tech specs** (requires more experience to use effectively)
+
+### Team Adoption Path
+
+1. **Find a champion**: Let 1-2 willing early adopters start using it
+2. **Build case studies**: Document before/after efficiency comparisons
+3. **Establish guidelines**: Which scenarios use AI, how to review output, shared prompt templates
+4. **Scale gradually**: Expand from one stage to multiple stages
+
+### Cost and ROI
+
+- **Tool costs**: Claude Pro $20/month, Cursor Pro $20/month, GitHub Copilot $10/month
+- **Learning curve**: 1-2 days to get started per tool, 1-2 weeks to become proficient
+- **ROI inflection point**: Most teams see noticeable efficiency gains after 2-4 weeks of use
+
+## 10. Summary
+
+Three core takeaways:
+
+1. **AI is an accelerator, not a replacement**. At every stage, AI handles repetitive work while humans own decisions and judgment. AI output that skips human review has uncontrollable quality.
+
+2. **Start with one stage, then connect the pipeline**. Do not try to introduce AI at every stage simultaneously. Start with PRD or coding, build experience, then expand.
+
+3. **Prompt quality determines output quality**. The more structured and specific your input to AI, the more useful the output. Templates, role-setting, context — these are not fancy tricks, they are fundamentals.
+
+### Recommended Reading
+
+- [How to Use LLMs to Convert Requirements into PRDs](/en/blog/ai-prd) — Deep dive on the requirements → PRD stage
+- [The Complete Claude Code Guide](/en/blog/claude-code-overview) — Systematic tutorial on AI coding tools
+- [Claude Code Testing Guide](/en/blog/claude-code-testing) — AI-assisted testing practices
+- [Claude Code CI/CD Guide](/en/blog/claude-code-cicd) — AI in continuous integration
