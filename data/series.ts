@@ -57,6 +57,6 @@ export const SERIES: Series[] = [
       zh: "大语言模型基础知识与 AI 辅助工作流。",
       en: "LLM fundamentals and AI-assisted workflows.",
     },
-    posts: ["llm-guide", "ai-prd", "ai-product-dev-pipeline", "ai-ui-design", "ai-prompt-engineering", "ai-dev-pitfalls", "ai-tool-selection"],
+    posts: ["llm-guide", "ai-prd", "ai-product-dev-pipeline", "ai-ui-design", "ai-prompt-engineering", "ai-dev-pitfalls", "ai-tool-selection", "ai-non-tech-guide"],
   },
 ];
