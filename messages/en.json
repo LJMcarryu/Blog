@@ -13,7 +13,8 @@
     "bio": "Passionate about coding and technical writing. Currently focused on mobile development, exploring new technologies and best practices. I believe code can change the world and words can connect minds.",
     "findMeOn": "Find me on",
     "latestPosts": "Featured Posts",
-    "viewAll": "All Posts →"
+    "viewAll": "All Posts →",
+    "scrollDown": "Scroll down"
   },
   "blog": {
     "title": "All Posts",
@@ -83,6 +84,7 @@
   },
   "notFound": {
     "title": "Page not found",
+    "subtitle": "Looks like you're lost",
     "backHome": "Back to home"
   },
   "error": {
@@ -100,5 +102,9 @@
     "toggleLang": "Toggle language",
     "openMenu": "Open menu",
     "closeMenu": "Close menu"
+  },
+  "footer": {
+    "getInTouch": "Want to collaborate or chat? Get in touch",
+    "madeWith": "Built with care"
   }
 }

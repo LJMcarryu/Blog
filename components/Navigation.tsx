@@ -38,6 +38,16 @@ export default function Navigation() {
     return () => document.removeEventListener("keydown", onKey);
   }, [open]);
 
+  // Body scroll lock when fullscreen menu is open (same pattern as Lightbox)
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "";
+    }
+    return () => { document.body.style.overflow = ""; };
+  }, [open]);
+
   return (
     <header className="relative z-40">
       {/* Site logo — absolute top-left (antfu.me style) */}
@@ -102,22 +112,50 @@ export default function Navigation() {
         </div>
       </div>
 
-      {/* Mobile dropdown menu */}
-      {open && (
-        <nav id="mobile-menu" ref={menuRef} className="nav-mobile-menu" aria-label="Mobile navigation">
-          {navLinks.map(({ href, label }) => (
-            <Link
-              key={href}
-              href={href}
-              className={`nav-mobile-link${isActive(href) ? " active" : ""}`}
-              aria-current={isActive(href) ? "page" : undefined}
-              onClick={() => setOpen(false)}
-            >
-              {label}
-            </Link>
-          ))}
-        </nav>
-      )}
+      {/* Fullscreen mobile menu */}
+      <nav
+        id="mobile-menu"
+        ref={menuRef}
+        className={`nav-fullscreen-menu${open ? " nav-fullscreen-open" : ""}`}
+        aria-label="Mobile navigation"
+        aria-hidden={!open}
+        inert={!open || undefined}
+      >
+        {/* Close button inside fullscreen menu */}
+        <button
+          onClick={() => setOpen(false)}
+          className="nav-fullscreen-close"
+          aria-label={ta("closeMenu")}
+        >
+          <svg
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+
+        {navLinks.map(({ href, label }, i) => (
+          <Link
+            key={href}
+            href={href}
+            className={`nav-fullscreen-link${isActive(href) ? " active" : ""}`}
+            style={{ "--menu-index": i } as React.CSSProperties}
+            aria-current={isActive(href) ? "page" : undefined}
+            onClick={() => setOpen(false)}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
     </header>
   );
 }

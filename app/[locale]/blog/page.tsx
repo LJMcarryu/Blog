@@ -4,6 +4,7 @@ import { getPostsByLocale } from "@/lib/posts";
 import PostCard from "@/components/PostCard";
 import SearchBar from "@/components/SearchBar";
 import Pagination from "@/components/Pagination";
+import ScrollReveal from "@/components/ScrollReveal";
 import type { Locale } from "@/i18n/routing";
 
 const POSTS_PER_PAGE = 10;
@@ -107,7 +108,7 @@ export default async function BlogPage({
         </div>
       )}
 
-      <div className="not-prose mt-8 flex flex-col gap-4 slide-enter-3">
+      <ScrollReveal stagger={60} className="not-prose mt-8 flex flex-col gap-4">
         {paginatedPosts.map((post) => (
           <PostCard key={post.slug} post={post} />
         ))}
@@ -119,7 +120,7 @@ export default async function BlogPage({
             {t("noResults")}
           </p>
         )}
-      </div>
+      </ScrollReveal>
 
       {posts.length > 0 && (
         <Pagination

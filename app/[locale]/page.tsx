@@ -3,6 +3,7 @@ import { Link } from "@/i18n/navigation";
 import { getPostsByLocale } from "@/lib/posts";
 import { SOCIAL_LINKS } from "@/data/social-links";
 import ThemedVideo from "@/components/ThemedVideo";
+import BlurBalls from "@/components/BlurBalls";
 import type { Locale } from "@/i18n/routing";
 
 export default async function HomePage({
@@ -21,6 +22,7 @@ export default async function HomePage({
       {/* Video background */}
       <ThemedVideo />
       <div className="fixed inset-0 bg-white/30 dark:bg-black/30 -z-10" />
+      <BlurBalls />
 
       {/* All content on top of video */}
       <div className="relative z-10 max-w-2xl mx-auto px-6 py-20">
@@ -88,6 +90,13 @@ export default async function HomePage({
             )}
           </div>
         </div>
+      </div>
+
+      {/* Scroll-down indicator */}
+      <div className="scroll-indicator" aria-hidden="true">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
       </div>
     </div>
   );

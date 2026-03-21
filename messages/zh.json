@@ -13,7 +13,8 @@
     "bio": "热爱编程和技术写作。目前专注于移动端开发，喜欢探索新技术和最佳实践。相信代码可以改变世界，文字可以连接思想。",
     "findMeOn": "在这里找到我",
     "latestPosts": "精选文章",
-    "viewAll": "全部文章 →"
+    "viewAll": "全部文章 →",
+    "scrollDown": "向下滚动"
   },
   "blog": {
     "title": "所有文章",
@@ -83,6 +84,7 @@
   },
   "notFound": {
     "title": "页面未找到",
+    "subtitle": "看起来你迷路了",
     "backHome": "返回首页"
   },
   "error": {
@@ -100,5 +102,9 @@
     "toggleLang": "切换语言",
     "openMenu": "打开菜单",
     "closeMenu": "关闭菜单"
+  },
+  "footer": {
+    "getInTouch": "想要合作或交流？欢迎联系我",
+    "madeWith": "用心构建"
   }
 }

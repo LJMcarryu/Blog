@@ -3,6 +3,7 @@ import { getTranslations } from "next-intl/server";
 import Image from "next/image";
 import fs from "fs";
 import path from "path";
+import ScrollReveal from "@/components/ScrollReveal";
 
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif", ".avif", ".svg"]);
 
@@ -56,7 +57,7 @@ export default async function PhotosPage({
           <p className="text-sm" style={{ color: "var(--fg-light)" }}>{t("empty")}</p>
         </div>
       ) : (
-        <div className="not-prose mt-8 columns-2 sm:columns-3 gap-3 slide-enter-3 photos-grid">
+        <ScrollReveal stagger={50} className="not-prose mt-8 columns-2 sm:columns-3 gap-3 photos-grid">
           {photos.map((src) => (
             <div key={src} className="break-inside-avoid mb-3">
               <Image
@@ -65,11 +66,11 @@ export default async function PhotosPage({
                 width={800}
                 height={600}
                 sizes="(max-width: 640px) 50vw, 33vw"
-                className="w-full rounded-lg object-cover"
+                className="w-full rounded-lg object-cover photo-card"
               />
             </div>
           ))}
-        </div>
+        </ScrollReveal>
       )}
     </div>
   );
