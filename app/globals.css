@@ -141,7 +141,7 @@ html:not(.no-sliding) .slide-enter-content > * {
   }
 }
 
-.scroll-reveal-target {
+html:not(.no-sliding) .scroll-reveal-target:not(.scroll-revealed) {
   opacity: 0;
 }
 
@@ -155,7 +155,7 @@ html:not(.no-sliding) .scroll-reveal-scale.scroll-revealed {
 }
 
 /* Stagger children: each child gets an incrementing delay */
-.scroll-stagger > * {
+html:not(.no-sliding) .scroll-stagger:not(.scroll-revealed) > * {
   opacity: 0;
 }
 
